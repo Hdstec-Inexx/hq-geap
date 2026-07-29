@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import { authUsers } from './auth-fixtures.js';
 
 const { Client } = pg;
 const rootDirectory = fileURLToPath(new URL('../..', import.meta.url));
@@ -35,6 +36,13 @@ export default async function prepareTestDatabase() {
     await client.query('create schema public');
     await runSqlDirectory(client, 'migrations');
     await runSqlDirectory(client, 'seeds');
+    for (const user of authUsers) {
+      await client.query(
+        `insert into usuarios (nome, email, senha_hash, papel)
+         values ($1, $2, crypt($3, gen_salt('bf')), $4)`,
+        [user.name, user.email, user.password, user.role]
+      );
+    }
   } finally {
     await client.end();
   }

@@ -2,10 +2,14 @@ import { healthResponseSchema, type HealthResponse } from '@hq-geap/contracts/he
 import type { FastifyPluginAsync } from 'fastify';
 
 const healthRoutes: FastifyPluginAsync = async (app) => {
-  app.get('/health', async (): Promise<HealthResponse> => {
-    await app.db.query('select 1');
-    return healthResponseSchema.parse({ status: 'ok', database: 'ok' });
-  });
+  app.get(
+    '/health',
+    { config: { auth: false } },
+    async (): Promise<HealthResponse> => {
+      await app.db.query('select 1');
+      return healthResponseSchema.parse({ status: 'ok', database: 'ok' });
+    }
+  );
 };
 
 export default healthRoutes;
