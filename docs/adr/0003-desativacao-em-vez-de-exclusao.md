@@ -1,7 +1,7 @@
-# Taxonomias são desativadas, nunca excluídas
+# Critérios são desativados por migration, nunca excluídos
 
-Critérios jamais sofrem exclusão física: são desativados. A alternativa — exclusão real — quebraria relatórios e deixaria avaliações históricas órfãs de suas referências. Critérios desativados somem das avaliações novas, mas o histórico antigo permanece íntegro e exibível.
+Quando o desenvolvimento substituir uma Régua, Critérios retirados jamais sofrem exclusão física: uma migration os desativa. A alternativa — exclusão real — quebraria relatórios e deixaria Avaliações históricas órfãs de suas referências. O Admin não executa essa mudança pela UI no MVP.
 
 ## Consequences
 
-Toda query de listagem para uso em novas avaliações precisa filtrar por ativo; toda query de histórico/relatório não pode filtrar. O botão "Excluir" na UI do Admin executa desativação por baixo dos panos.
+Toda query para produzir novas Avaliações precisa usar apenas a versão vigente da Régua; queries de histórico e relatório preservam Critérios desativados. A área do Admin é somente leitura para Critérios.

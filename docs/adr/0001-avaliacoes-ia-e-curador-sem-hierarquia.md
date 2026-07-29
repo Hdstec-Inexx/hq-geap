@@ -4,4 +4,4 @@ Num Atendimento revisado pelo Curador, a avaliação dele não substitui a da IA
 
 ## Consequences
 
-Não existe "nota oficial" única por Atendimento: toda agregação precisa declarar qual avaliação (ou qual par) está usando. Relatórios que misturem as duas fontes sem distinção estão errados por definição.
+Não existe "nota oficial" única por Atendimento: toda agregação precisa declarar qual Avaliação (ou qual par) está usando. Se o Curador corrigir uma revisão com outro snapshot, a Concordância corrente usa o snapshot mais recente e o histórico anterior permanece consultável. Relatórios que misturem as duas fontes sem distinção estão errados por definição.

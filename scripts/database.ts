@@ -2,8 +2,10 @@ import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import { loadEnvironment } from './environment.js';
 
 const { Client } = pg;
+loadEnvironment();
 const rootDirectory = fileURLToPath(new URL('..', import.meta.url));
 const databaseUrl =
   process.env.DATABASE_URL ??

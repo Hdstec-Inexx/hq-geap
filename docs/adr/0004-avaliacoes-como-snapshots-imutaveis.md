@@ -4,4 +4,4 @@ Uma Avaliação grava, no momento em que é produzida, a nota calculada, os chec
 
 ## Consequences
 
-A tabela de avaliações carrega sua própria cópia dos dados necessários para exibição (não depende de join "ao vivo" com a configuração atual da régua). Edição de avaliação não existe: errar uma avaliação se resolve com uma nova avaliação, nunca alterando a anterior.
+A tabela de avaliações carrega sua própria cópia dos dados necessários para exibição (não depende de join "ao vivo" com a configuração atual da régua). Edição de Avaliação não existe: errar uma Avaliação se resolve com uma nova, nunca alterando a anterior. Para o Curador, a revisão mais recente participa da Concordância corrente e as anteriores permanecem no histórico.

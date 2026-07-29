@@ -1,5 +1,7 @@
 import { defineConfig } from '@playwright/test';
+import { loadEnvironment } from './scripts/environment.js';
 
+loadEnvironment();
 const testDatabaseUrl =
   process.env.TEST_DATABASE_URL ??
   'postgres://hq_geap:hq_geap@127.0.0.1:5432/hq_geap_test';

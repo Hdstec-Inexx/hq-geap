@@ -18,7 +18,7 @@ pnpm dev
 - API em `http://localhost:3000`;
 - saúde ponta a ponta em `http://localhost:5173/health`.
 
-As configurações locais possuem valores padrão compatíveis com `compose.yaml`. Para sobrescrevê-las, use as variáveis documentadas em `.env.example`.
+As configurações locais possuem valores padrão compatíveis com `compose.yaml`. Para sobrescrevê-las, crie um `.env` na raiz com as variáveis documentadas em `.env.example`. Variáveis fornecidas diretamente pelo ambiente têm precedência sobre o arquivo.
 
 ## Verificações
 
@@ -26,6 +26,7 @@ Com o banco do Compose ativo:
 
 ```bash
 pnpm typecheck
+pnpm test:unit
 pnpm db:validate
 pnpm exec playwright install chromium
 pnpm test

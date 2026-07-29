@@ -1,5 +1,6 @@
 import fp from 'fastify-plugin';
 import { z } from 'zod';
+import { loadEnvironment } from '../environment.js';
 
 const configSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -35,6 +36,7 @@ declare module 'fastify' {
 
 export default fp(
   async (app) => {
+    loadEnvironment();
     app.decorate('config', configSchema.parse(process.env));
   },
   { name: 'config' }

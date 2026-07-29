@@ -10,17 +10,17 @@ Plano em fases do sistema de qualidade do agente de voz. A linguagem de domínio
 
 ## Fase 0 — Fundação
 
-- Setup do repo (API Node + front React), migrations, CI básico.
+- Setup do repo (API Node + front React), migrations e verificações locais automatizadas.
 - Autenticação e autorização com os 3 papéis: `Admin`, `Gestão`, `Curador` (ver CONTEXT.md → Papéis).
 - CRUD de usuários (somente Admin).
 - Entidade `Agente de Voz` (mesmo com um único registro — todo Atendimento pertence a um).
 
 ## Fase 1 — Ingestão do Atendimento
 
-- Fluxo principal: webhook pós-chamada da ElevenLabs → n8n → API (ver ADR-0007).
-- Rede de segurança: polling de reconciliação agendado (n8n lista conversas recentes e ingere faltantes).
+- Fluxo principal: webhook pós-Atendimento da ElevenLabs → n8n → API (ver ADR-0007).
+- Rede de segurança: polling de reconciliação agendado (n8n lista Atendimentos recentes e ingere faltantes).
 - Backfill/reprocessamento: fluxo manual "Buscar Conversa" (GET por ID), já existente no n8n.
-- Ingestão idempotente pela chave da conversa ElevenLabs (sem duplicar atendimento nem avaliação).
+- Ingestão idempotente pelo `conversation_id` externo da ElevenLabs (sem duplicar Atendimento nem Avaliação).
 - Persistir: metadados, transcrição, `data_collection_results` (Motivo de Contato), `houve_transferência` (fato: tool de transferência executada), duração (TMA) e Custo.
 - Áudio no MinIO/Google Cloud, referência no PostgreSQL.
 - Ciclo de vida do Atendimento: `Em andamento` → `Concluído`.
@@ -56,7 +56,7 @@ Plano em fases do sistema de qualidade do agente de voz. A linguagem de domínio
 
 ## Fase 6 — Admin
 
-- Ativação/desativação de Critérios (sem criação/edição de valores — ADR-0002).
+- Consulta da Régua de Avaliação; mudanças de Critérios exigem código/migration e uma nova Régua válida (ADR-0002/0003).
 - Fila de Comentários `Pendente` → marcar `Resolvido` (a lista de trabalho da manutenção do agente).
 - Gestão de usuários e configuração da IA Avaliadora (das Fases 0 e 2, consolidadas na área do Admin).
 
@@ -65,7 +65,7 @@ Plano em fases do sistema de qualidade do agente de voz. A linguagem de domínio
 ## Fora do MVP (decidido nas sessões de domínio)
 
 - Papel `Cliente` (dashboards externos).
-- Intervenção em chamadas ao vivo (encerrar, transferir, takeover) — ver ADR-0005.
+- Intervenção em Atendimentos ao vivo (encerrar, transferir, takeover) — ver ADR-0005.
 - Edição do Agente de Voz por dentro do sistema — ver ADR-0006.
 - Critérios fracionáveis e pesos editáveis — ver ADR-0002.
 - Métricas de produtividade do Curador.
