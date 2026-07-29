@@ -3,6 +3,7 @@ import { Shell } from './shell';
 import { LoginPage } from '../features/auth/LoginPage';
 import { HomePage, RequireRole, RequireSession } from '../features/auth/routes';
 import { HealthPage } from '../features/health/routes';
+import { ConfiguracaoIaRoute } from '../features/admin/configuracao-ia/routes';
 
 export const router = createBrowserRouter([
   {
@@ -17,7 +18,13 @@ export const router = createBrowserRouter([
           { path: '/app', element: <Navigate replace to="/" /> },
           {
             element: <RequireRole roles={['admin']} />,
-            children: [{ path: '/admin', element: <HomePage /> }]
+            children: [
+              { path: '/admin', element: <HomePage /> },
+              {
+                path: '/admin/configuracao-ia',
+                element: <ConfiguracaoIaRoute />
+              }
+            ]
           },
           {
             element: <RequireRole roles={['gestao']} />,

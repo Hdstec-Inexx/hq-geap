@@ -33,3 +33,7 @@ pnpm test
 ```
 
 `db:validate` aplica migration e seed dentro de uma transação isolada e confirma que a Régua inicial contém sete Critérios ativos somando exatamente 10, além de uma configuração ativa da IA Avaliadora.
+
+## Integração do n8n
+
+O workflow consulta diretamente a única linha ativa de `prompts_ia_avaliadora`, que expõe `prompt`, `provedor`, `modelo`, `temperatura` e `versao`. As credenciais de PostgreSQL e OpenRouter pertencem ao cofre de Credentials do n8n e não devem ser copiadas para o `.env` do HQ GEAP nem gravadas no workflow.

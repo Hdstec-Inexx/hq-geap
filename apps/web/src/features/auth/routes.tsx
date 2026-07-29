@@ -1,6 +1,6 @@
 import type { UserRole } from '@hq-geap/contracts/auth';
 import { useEffect, useState } from 'react';
-import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   clearSession,
   getSession,
@@ -95,6 +95,11 @@ export function HomePage() {
           Seu acesso está pronto. As áreas do HQ GEAP serão liberadas conforme
           as permissões de {roleNames[session.user.role]}.
         </p>
+        {session.user.role === 'admin' ? (
+          <Link className="admin-feature-link" to="/admin/configuracao-ia">
+            Configurar IA Avaliadora
+          </Link>
+        ) : null}
       </div>
       <aside className="identity-card">
         <span className="identity-role">{roleNames[session.user.role]}</span>

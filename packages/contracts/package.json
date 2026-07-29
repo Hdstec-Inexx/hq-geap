@@ -8,6 +8,10 @@
       "types": "./src/auth.ts",
       "default": "./dist/auth.js"
     },
+    "./configuracao-ia": {
+      "types": "./src/configuracao-ia.ts",
+      "default": "./dist/configuracao-ia.js"
+    },
     "./health": {
       "types": "./src/health.ts",
       "default": "./dist/health.js"
