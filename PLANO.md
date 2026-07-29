@@ -17,17 +17,20 @@ Plano em fases do sistema de qualidade do agente de voz. A linguagem de domínio
 
 ## Fase 1 — Ingestão do Atendimento
 
-- Webhook pós-chamada da ElevenLabs → n8n → API.
+- Fluxo principal: webhook pós-chamada da ElevenLabs → n8n → API (ver ADR-0007).
+- Rede de segurança: polling de reconciliação agendado (n8n lista conversas recentes e ingere faltantes).
+- Backfill/reprocessamento: fluxo manual "Buscar Conversa" (GET por ID), já existente no n8n.
+- Ingestão idempotente pela chave da conversa ElevenLabs (sem duplicar atendimento nem avaliação).
 - Persistir: metadados, transcrição, `data_collection_results` (Motivo de Contato), `houve_transferência` (fato: tool de transferência executada), duração (TMA).
 - Áudio no MinIO/Google Cloud, referência no PostgreSQL.
 - Ciclo de vida do Atendimento: `Em andamento` → `Concluído`.
 
 ## Fase 2 — IA Avaliadora
 
-- Tabela fixa de Critérios com valores (Régua = 10; ver ADR-0002) e Categorias de Negócio iniciais.
-- Pipeline pós-conclusão: Gemini avalia cada Atendimento → checks por critério, categoria, justificativa, nota = soma dos critérios.
-- Avaliação gravada como **snapshot imutável** (ADR-0004).
-- Configuração da IA Avaliadora editável pelo Admin: prompt, modelo, temperatura (ADR-0006).
+- Tabela fixa de Critérios com valores (Régua = 10; ver ADR-0002), seed com os 7 critérios do prompt atual da Lívia.
+- Configuração da IA Avaliadora versionada no banco (prompt, provedor, modelo, temperatura), editável pelo Admin (ADR-0006/0008). Provedor atual: **OpenRouter**.
+- Execução da avaliação no n8n (ADR-0008): após a conclusão, o workflow busca a config ativa, chama o LLM e grava a Avaliação — checks por critério (3 estados), falhas identificadas, resumo, nota = soma (snapshot, ADR-0004). Aprovação é regra de leitura (nota ≥ 7.0 E sem Falha Crítica), nunca gravada.
+- Avaliação referencia a versão do prompt que a produziu (recorte de Concordância por versão).
 
 ## Fase 3 — Curador
 
