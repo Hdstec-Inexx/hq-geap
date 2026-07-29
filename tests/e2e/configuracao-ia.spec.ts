@@ -110,14 +110,89 @@ test.describe.serial('configuracao versionada da IA Avaliadora', () => {
           versao: current.version + 1
         })
       ]);
-      expect(rows.rows.filter((row) => row.ativo)).toHaveLength(1);
+      const activeCount = await client.query<{ count: string }>(
+        'select count(*) from prompts_ia_avaliadora where ativo'
+      );
+      expect(activeCount.rows[0]?.count).toBe('1');
 
       await expect(
         client.query(
           'update prompts_ia_avaliadora set modelo = $1 where versao = $2',
-          ['modelo-adulterado', current.version],
+          ['modelo-adulterado', current.version]
         )
       ).rejects.toThrow(/immutable/i);
+
+      const agent = await client.query<{ id: string }>(`
+        insert into agentes_voz (nome, elevenlabs_agent_id)
+        values ('Agente para teste', 'agent-config-test')
+        returning id
+      `);
+      const atendimento = await client.query<{ id: string }>(`
+        insert into atendimentos (agente_voz_id, elevenlabs_conversation_id, status)
+        values ($1, 'conversation-config-test', 'concluido')
+        returning id
+      `, [agent.rows[0]!.id]);
+      await expect(
+        client.query(
+          `insert into avaliacoes (atendimento_id, autor, nota)
+           values ($1, 'ia', 0)`,
+          [atendimento.rows[0]!.id]
+        )
+      ).rejects.toThrow(/avaliacoes_ia_exigem_prompt/i);
+    } finally {
+      await client.end();
+    }
+  });
+
+  test('publicacoes concorrentes preservam uma unica versao ativa', async ({
+    request
+  }) => {
+    const admin = await login(request, 'admin');
+    const headers = { authorization: `Bearer ${admin.token}` };
+    const currentResponse = await request.get(`${apiUrl}/admin/configuracao-ia`, {
+      headers
+    });
+    const current = await currentResponse.json();
+
+    const responses = await Promise.all(
+      ['google/gemini-2.5-flash', 'google/gemini-2.5-pro'].map((model) =>
+        request.post(`${apiUrl}/admin/configuracao-ia`, {
+          data: {
+            prompt: `Configuracao concorrente para ${model}.`,
+            provider: 'openrouter',
+            model,
+            temperature: 0.1
+          },
+          headers
+        })
+      )
+    );
+
+    expect(responses.map((response) => response.status())).toEqual([201, 201]);
+    const publications = await Promise.all(
+      responses.map((response) => response.json())
+    );
+    expect(publications.map(({ version }) => version).sort((a, b) => a - b)).toEqual([
+      current.version + 1,
+      current.version + 2
+    ]);
+
+    const client = new Client({
+      connectionString:
+        process.env.TEST_DATABASE_URL ??
+        'postgres://hq_geap:hq_geap@127.0.0.1:5432/hq_geap_test'
+    });
+    await client.connect();
+    try {
+      const active = await client.query<{ count: string; version: number }>(`
+        select count(*) as count, max(versao) as version
+        from prompts_ia_avaliadora
+        where ativo
+      `);
+      expect(active.rows[0]).toEqual({
+        count: '1',
+        version: current.version + 2
+      });
     } finally {
       await client.end();
     }
