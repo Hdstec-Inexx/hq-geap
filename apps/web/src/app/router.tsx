@@ -4,6 +4,10 @@ import { LoginPage } from '../features/auth/LoginPage';
 import { HomePage, RequireRole, RequireSession } from '../features/auth/routes';
 import { HealthPage } from '../features/health/routes';
 import { ConfiguracaoIaRoute } from '../features/admin/configuracao-ia/routes';
+import {
+  AtendimentoRoute,
+  AtendimentosRoute
+} from '../features/atendimentos/routes';
 
 export const router = createBrowserRouter([
   {
@@ -16,6 +20,11 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <HomePage /> },
           { path: '/app', element: <Navigate replace to="/" /> },
+          { path: '/atendimentos', element: <AtendimentosRoute /> },
+          {
+            path: '/atendimentos/:atendimentoId',
+            element: <AtendimentoRoute />
+          },
           {
             element: <RequireRole roles={['admin']} />,
             children: [

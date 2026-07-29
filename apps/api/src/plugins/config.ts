@@ -12,7 +12,11 @@ const configSchema = z.object({
     .default('postgres://hq_geap:hq_geap@127.0.0.1:5432/hq_geap'),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
   JWT_SECRET: z.string().min(32).default('development-only-secret-change-me'),
-  JWT_EXPIRES_IN_SECONDS: z.coerce.number().int().positive().default(28_800)
+  JWT_EXPIRES_IN_SECONDS: z.coerce.number().int().positive().default(28_800),
+  INGESTION_API_KEY: z
+    .string()
+    .min(32)
+    .default('development-ingestion-key-change-me')
 }).superRefine((config, context) => {
   if (
     config.NODE_ENV === 'production' &&
@@ -22,6 +26,16 @@ const configSchema = z.object({
       code: 'custom',
       path: ['JWT_SECRET'],
       message: 'JWT_SECRET must be configured in production'
+    });
+  }
+  if (
+    config.NODE_ENV === 'production' &&
+    config.INGESTION_API_KEY === 'development-ingestion-key-change-me'
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['INGESTION_API_KEY'],
+      message: 'INGESTION_API_KEY must be configured in production'
     });
   }
 });

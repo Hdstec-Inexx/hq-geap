@@ -1,0 +1,98 @@
+{
+  "name": "HQ GEAP - Ingestão de Atendimento",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "hq-geap/atendimentos",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "d0383511-97be-4f66-a0e5-bd1bb407a12e",
+      "name": "Webhook ElevenLabs",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "webhookId": "hq-geap-atendimentos"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            { "id": "conversation-id", "name": "conversation_id", "type": "string", "value": "={{ ($json.body?.data ?? $json.data).conversation_id }}" },
+            { "id": "agent-id", "name": "agent_id", "type": "string", "value": "={{ ($json.body?.data ?? $json.data).agent_id }}" },
+            { "id": "status", "name": "status", "type": "string", "value": "={{ ($json.body?.data ?? $json.data).status === 'done' ? 'concluido' : 'em_andamento' }}" },
+            { "id": "started-at", "name": "started_at", "type": "string", "value": "={{ new Date(($json.body?.data ?? $json.data).metadata.start_time_unix_secs * 1000).toISOString() }}" },
+            { "id": "completed-at", "name": "completed_at", "type": "string", "value": "={{ new Date((($json.body?.data ?? $json.data).metadata.start_time_unix_secs + ($json.body?.data ?? $json.data).metadata.call_duration_secs) * 1000).toISOString() }}" },
+            { "id": "duration", "name": "duration_seconds", "type": "number", "value": "={{ ($json.body?.data ?? $json.data).metadata.call_duration_secs }}" },
+            { "id": "transcript", "name": "transcript", "type": "array", "value": "={{ ($json.body?.data ?? $json.data).transcript.map(({ role, message, time_in_call_secs }) => ({ role, message, time_in_call_secs })) }}" },
+            { "id": "audio", "name": "audio_url", "type": "string", "value": "={{ ($json.body?.data ?? $json.data).audio_url }}" },
+            { "id": "reason", "name": "contact_reason", "type": "string", "value": "={{ ($json.body?.data ?? $json.data).analysis.data_collection_results['Classificação'].value }}" },
+            { "id": "transferred", "name": "transferred", "type": "boolean", "value": "={{ ($json.body?.data ?? $json.data).transcript.some(turn => turn.tool_calls?.some(call => call.tool_name.toLowerCase().includes('transfer'))) }}" },
+            { "id": "cost", "name": "cost", "type": "number", "value": "={{ ($json.body?.data ?? $json.data).metadata.cost }}" }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "e409c0f2-88a7-4e4e-b187-4c80f9988e8d",
+      "name": "Contrato normalizado",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.HQ_API_URL }}/atendimentos/ingestao",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "f7b0a050-d998-47b7-aae9-09fc48536aab",
+      "name": "Persistir Atendimento",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 0],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURE_NO_N8N",
+          "name": "HQ Ingestion API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "9c81d891-2e4a-45bb-8574-cf25f630469a",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [720, 0]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook ElevenLabs": {
+      "main": [[{ "node": "Contrato normalizado", "type": "main", "index": 0 }]]
+    },
+    "Contrato normalizado": {
+      "main": [[{ "node": "Persistir Atendimento", "type": "main", "index": 0 }]]
+    },
+    "Persistir Atendimento": {
+      "main": [[{ "node": "Responder", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "versionId": "71725c9a-6025-44cb-a027-49ab058b0fb1",
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}
