@@ -4,7 +4,7 @@ export function Shell() {
   return (
     <div className="app-shell">
       <header className="masthead">
-        <a className="brand" href="/health" aria-label="HQ GEAP, início">
+        <a className="brand" href="/" aria-label="HQ GEAP, início">
           <span className="brand-mark" aria-hidden="true">
             HQ
           </span>

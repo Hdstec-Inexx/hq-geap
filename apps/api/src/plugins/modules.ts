@@ -13,5 +13,5 @@ export default fp(
       matchFilter: (path) => /routes\.(?:js|ts)$/.test(path)
     });
   },
-  { name: 'modules', dependencies: ['database'] }
+  { name: 'modules', dependencies: ['auth'] }
 );

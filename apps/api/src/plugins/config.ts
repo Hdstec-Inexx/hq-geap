@@ -9,7 +9,20 @@ const configSchema = z.object({
     .string()
     .url()
     .default('postgres://hq_geap:hq_geap@127.0.0.1:5432/hq_geap'),
-  CORS_ORIGIN: z.string().default('http://localhost:5173')
+  CORS_ORIGIN: z.string().default('http://localhost:5173'),
+  JWT_SECRET: z.string().min(32).default('development-only-secret-change-me'),
+  JWT_EXPIRES_IN_SECONDS: z.coerce.number().int().positive().default(28_800)
+}).superRefine((config, context) => {
+  if (
+    config.NODE_ENV === 'production' &&
+    config.JWT_SECRET === 'development-only-secret-change-me'
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['JWT_SECRET'],
+      message: 'JWT_SECRET must be configured in production'
+    });
+  }
 });
 
 export type AppConfig = z.infer<typeof configSchema>;
