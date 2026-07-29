@@ -2,7 +2,7 @@
 
 Plano em fases do sistema de qualidade do agente de voz. A linguagem de domínio está em [CONTEXT.md](./CONTEXT.md) e as decisões estruturais em [docs/adr/](./docs/adr/). Ler ambos antes de codar.
 
-**Stack:** Node.js/Fastify (API), React (front), PostgreSQL (dados), Redis (cache/filas), MinIO + Google Cloud (áudio), OpenRouter (provedor da IA Avaliadora), n8n (ingestão e execução da avaliação, ADR-0007/0008) e ElevenLabs API.
+**Stack:** Node.js/Fastify (API), React (front), PostgreSQL (dados), Redis (cache/filas), MinIO + Google Cloud (áudio), OpenRouter (provedor da IA Avaliadora), n8n (ingestão, execução e persistência da avaliação, ADR-0007/0008) e ElevenLabs API.
 
 **Premissa de conta:** o Monitoramento ao Vivo exige plano **Enterprise** da ElevenLabs (ver ADR-0005). Confirmar antes da Fase 4.
 
@@ -29,13 +29,13 @@ Plano em fases do sistema de qualidade do agente de voz. A linguagem de domínio
 
 - Tabela fixa de Critérios com valores (Régua = 10; ver ADR-0002), seed com os 7 critérios do prompt atual da Lívia.
 - Configuração da IA Avaliadora versionada no banco (prompt, provedor, modelo, temperatura), editável pelo Admin (ADR-0006/0008). Provedor atual: **OpenRouter**.
-- Execução da avaliação no n8n (ADR-0008): após a conclusão, o workflow busca a config ativa, chama o LLM e grava a Avaliação — checks por critério (3 estados), falhas identificadas, resumo, nota = soma (snapshot, ADR-0004). Aprovação é regra de leitura (nota ≥ 7.0 E sem Falha Crítica), nunca gravada.
+- Execução e persistência da avaliação no n8n (ADR-0008): após a conclusão, o workflow lê a config ativa, chama o LLM e grava o snapshot diretamente no PostgreSQL por uma operação transacional. O HQ apenas consulta os dados gravados e deriva a Aprovação (nota ≥ 7.0 E sem Falha Crítica).
 - Avaliação referencia a versão do prompt que a produziu (recorte de Concordância por versão).
 
 ## Fase 3 — Curador
 
 - Fila de Curadoria: lista de Atendimentos concluídos e avaliados pela IA (modelo pull — o Curador escolhe).
-- Tela de revisão: player de áudio + transcrição + avaliação da IA ao lado do formulário do Curador (mesma estrutura: critérios, categoria, justificativa → nota por soma).
+- Tela de revisão: player de áudio + transcrição + avaliação da IA ao lado da conferência do Curador (critérios confirmados ou corrigidos → nota por soma).
 - Comentários no Atendimento (autoria: Curador e Admin; status inicial `Pendente`).
 - Regra dura: avaliação do Curador **só após** `Concluído`.
 
@@ -50,13 +50,12 @@ Plano em fases do sistema de qualidade do agente de voz. A linguagem de domínio
 - KPIs: Total de Atendimentos, TMA, Nota Média (par IA × Curador), Transferências, Resolvidas sem transferência (derivado), Custo total e Custo médio.
 - Donut de Motivos de Contato (agregação dos valores recebidos no webhook).
 - Barras de % de acerto por Critério.
-- Concordância IA × Curador (nota, categoria e critério) nos Atendimentos revisados.
+- Concordância IA × Curador (nota e critério) nos Atendimentos revisados.
 - Ranking dos piores Atendimentos.
 - Gestão lê Comentários no contexto do Atendimento (leitura apenas).
 
 ## Fase 6 — Admin
 
-- CRUD de Categorias de Negócio com **desativação** (ADR-0003).
 - Ativação/desativação de Critérios (sem criação/edição de valores — ADR-0002).
 - Fila de Comentários `Pendente` → marcar `Resolvido` (a lista de trabalho da manutenção do agente).
 - Gestão de usuários e configuração da IA Avaliadora (das Fases 0 e 2, consolidadas na área do Admin).

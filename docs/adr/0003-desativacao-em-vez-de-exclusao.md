@@ -1,6 +1,6 @@
 # Taxonomias são desativadas, nunca excluídas
 
-Categorias de Negócio (gerenciadas pelo Admin) e Critérios (fixos, ativados/desativados pelo Admin) jamais sofrem exclusão física: são desativados. A alternativa — exclusão real — quebraria relatórios e deixaria avaliações históricas órfãs de suas referências. Itens desativados somem das avaliações novas, mas o histórico antigo permanece íntegro e exibível.
+Critérios jamais sofrem exclusão física: são desativados. A alternativa — exclusão real — quebraria relatórios e deixaria avaliações históricas órfãs de suas referências. Critérios desativados somem das avaliações novas, mas o histórico antigo permanece íntegro e exibível.
 
 ## Consequences
 
