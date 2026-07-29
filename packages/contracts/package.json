@@ -1,0 +1,22 @@
+{
+  "name": "@hq-geap/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./health": {
+      "types": "./src/health.ts",
+      "default": "./dist/health.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc --noEmit false --outDir dist",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "zod": "^4.0.10"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

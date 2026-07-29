@@ -2,7 +2,7 @@
 
 Plano em fases do sistema de qualidade do agente de voz. A linguagem de domínio está em [CONTEXT.md](./CONTEXT.md) e as decisões estruturais em [docs/adr/](./docs/adr/). Ler ambos antes de codar.
 
-**Stack** (do desenho original): Node.js (API), React (front), PostgreSQL (dados), Redis (cache/filas), MinIO + Google Cloud (áudio), Gemini (IA Avaliadora), n8n (orquestração do webhook), ElevenLabs API.
+**Stack:** Node.js/Fastify (API), React (front), PostgreSQL (dados), Redis (cache/filas), MinIO + Google Cloud (áudio), OpenRouter (provedor da IA Avaliadora), n8n (ingestão e execução da avaliação, ADR-0007/0008) e ElevenLabs API.
 
 **Premissa de conta:** o Monitoramento ao Vivo exige plano **Enterprise** da ElevenLabs (ver ADR-0005). Confirmar antes da Fase 4.
 
@@ -21,7 +21,7 @@ Plano em fases do sistema de qualidade do agente de voz. A linguagem de domínio
 - Rede de segurança: polling de reconciliação agendado (n8n lista conversas recentes e ingere faltantes).
 - Backfill/reprocessamento: fluxo manual "Buscar Conversa" (GET por ID), já existente no n8n.
 - Ingestão idempotente pela chave da conversa ElevenLabs (sem duplicar atendimento nem avaliação).
-- Persistir: metadados, transcrição, `data_collection_results` (Motivo de Contato), `houve_transferência` (fato: tool de transferência executada), duração (TMA).
+- Persistir: metadados, transcrição, `data_collection_results` (Motivo de Contato), `houve_transferência` (fato: tool de transferência executada), duração (TMA) e Custo.
 - Áudio no MinIO/Google Cloud, referência no PostgreSQL.
 - Ciclo de vida do Atendimento: `Em andamento` → `Concluído`.
 
@@ -47,7 +47,7 @@ Plano em fases do sistema de qualidade do agente de voz. A linguagem de domínio
 ## Fase 5 — Dashboards da Gestão
 
 - Filtro de período em todos os painéis.
-- KPIs: Total de Atendimentos, TMA, Nota Média (par IA × Curador), Transferências, Resolvidas sem transferência (derivado).
+- KPIs: Total de Atendimentos, TMA, Nota Média (par IA × Curador), Transferências, Resolvidas sem transferência (derivado), Custo total e Custo médio.
 - Donut de Motivos de Contato (agregação dos valores recebidos no webhook).
 - Barras de % de acerto por Critério.
 - Concordância IA × Curador (nota, categoria e critério) nos Atendimentos revisados.
