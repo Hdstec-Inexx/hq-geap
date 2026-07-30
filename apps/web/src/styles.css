@@ -534,6 +534,13 @@ h1 {
   gap: 16px;
 }
 
+.atendimentos-pagination {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 20px;
+  font-weight: 800;
+}
+
 .atendimento-row {
   display: grid;
   grid-template-columns: minmax(240px, 0.75fr) minmax(0, 1.25fr);

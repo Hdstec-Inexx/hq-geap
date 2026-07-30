@@ -16,7 +16,13 @@ const configSchema = z.object({
   INGESTION_API_KEY: z
     .string()
     .min(32)
-    .default('development-ingestion-key-change-me')
+    .default('development-ingestion-key-change-me'),
+  STORAGE_PROVIDER: z.enum(['public', 'minio', 'gcs']).default('public'),
+  STORAGE_BUCKET: z.string().trim().min(1).default('hq-geap-audio'),
+  STORAGE_PUBLIC_URL: z.url().default('http://127.0.0.1:9000/hq-geap-audio'),
+  STORAGE_ENDPOINT: z.url().optional(),
+  STORAGE_ACCESS_KEY: z.string().trim().min(1).optional(),
+  STORAGE_SECRET_KEY: z.string().trim().min(1).optional()
 }).superRefine((config, context) => {
   if (
     config.NODE_ENV === 'production' &&
@@ -36,6 +42,37 @@ const configSchema = z.object({
       code: 'custom',
       path: ['INGESTION_API_KEY'],
       message: 'INGESTION_API_KEY must be configured in production'
+    });
+  }
+  if (config.NODE_ENV === 'production' && config.STORAGE_PROVIDER === 'public') {
+    context.addIssue({
+      code: 'custom',
+      path: ['STORAGE_PROVIDER'],
+      message: 'A signed storage provider must be configured in production'
+    });
+  }
+  if (
+    config.STORAGE_PROVIDER === 'minio' &&
+    (!config.STORAGE_ENDPOINT ||
+      !config.STORAGE_ACCESS_KEY ||
+      !config.STORAGE_SECRET_KEY)
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['STORAGE_PROVIDER'],
+      message: 'MinIO endpoint and credentials are required'
+    });
+  }
+  if (
+    config.NODE_ENV === 'production' &&
+    config.STORAGE_PROVIDER === 'minio' &&
+    config.STORAGE_ENDPOINT &&
+    new URL(config.STORAGE_ENDPOINT).protocol !== 'https:'
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['STORAGE_ENDPOINT'],
+      message: 'MinIO must use HTTPS in production'
     });
   }
 });

@@ -6,7 +6,7 @@
         "httpMethod": "POST",
         "path": "hq-geap/atendimentos",
         "responseMode": "responseNode",
-        "options": {}
+        "options": { "rawBody": true }
       },
       "id": "d0383511-97be-4f66-a0e5-bd1bb407a12e",
       "name": "Webhook ElevenLabs",
@@ -17,29 +17,132 @@
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            { "id": "conversation-id", "name": "conversation_id", "type": "string", "value": "={{ ($json.body?.data ?? $json.data).conversation_id }}" },
-            { "id": "agent-id", "name": "agent_id", "type": "string", "value": "={{ ($json.body?.data ?? $json.data).agent_id }}" },
-            { "id": "status", "name": "status", "type": "string", "value": "={{ ($json.body?.data ?? $json.data).status === 'done' ? 'concluido' : 'em_andamento' }}" },
-            { "id": "started-at", "name": "started_at", "type": "string", "value": "={{ new Date(($json.body?.data ?? $json.data).metadata.start_time_unix_secs * 1000).toISOString() }}" },
-            { "id": "completed-at", "name": "completed_at", "type": "string", "value": "={{ new Date((($json.body?.data ?? $json.data).metadata.start_time_unix_secs + ($json.body?.data ?? $json.data).metadata.call_duration_secs) * 1000).toISOString() }}" },
-            { "id": "duration", "name": "duration_seconds", "type": "number", "value": "={{ ($json.body?.data ?? $json.data).metadata.call_duration_secs }}" },
-            { "id": "transcript", "name": "transcript", "type": "array", "value": "={{ ($json.body?.data ?? $json.data).transcript.map(({ role, message, time_in_call_secs }) => ({ role, message, time_in_call_secs })) }}" },
-            { "id": "audio", "name": "audio_url", "type": "string", "value": "={{ ($json.body?.data ?? $json.data).audio_url }}" },
-            { "id": "reason", "name": "contact_reason", "type": "string", "value": "={{ ($json.body?.data ?? $json.data).analysis.data_collection_results['Classificação'].value }}" },
-            { "id": "transferred", "name": "transferred", "type": "boolean", "value": "={{ ($json.body?.data ?? $json.data).transcript.some(turn => turn.tool_calls?.some(call => call.tool_name.toLowerCase().includes('transfer'))) }}" },
-            { "id": "cost", "name": "cost", "type": "number", "value": "={{ ($json.body?.data ?? $json.data).metadata.cost }}" }
-          ]
+        "mode": "runOnceForAllItems",
+        "jsCode": "const { createHmac, timingSafeEqual } = require('crypto');\nconst item = $input.first();\nconst rawBody = (await this.helpers.getBinaryDataBuffer(0, 'data')).toString('utf8');\nconst header = item.json.headers?.['elevenlabs-signature'];\nconst secret = $env.ELEVENLABS_WEBHOOK_SECRET;\nif (!header || !secret) return [{ json: { valid: false } }];\nconst parts = header.split(',');\nconst timestamp = parts.find(part => part.startsWith('t='))?.slice(2);\nconst signature = parts.find(part => part.startsWith('v0='))?.slice(3);\nif (!timestamp || !signature || !/^[0-9a-f]{64}$/.test(signature)) return [{ json: { valid: false } }];\nconst timestampMs = Number(timestamp) * 1000;\nif (!Number.isFinite(timestampMs) || timestampMs < Date.now() - 30 * 60_000 || timestampMs > Date.now() + 5 * 60_000) return [{ json: { valid: false } }];\nconst expected = createHmac('sha256', secret).update(`${timestamp}.${rawBody}`, 'utf8').digest();\nconst supplied = Buffer.from(signature, 'hex');\nif (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return [{ json: { valid: false } }];\ntry {\n  return [{ json: { valid: true, event: JSON.parse(rawBody) } }];\n} catch {\n  return [{ json: { valid: false } }];\n}"
+      },
+      "id": "02ab9023-b852-467f-ae8b-7574278fb62d",
+      "name": "Validar assinatura ElevenLabs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "signature-valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
         },
-        "includeOtherFields": false,
         "options": {}
+      },
+      "id": "be1aba29-101d-4135-a5eb-e8ab1f7cd80f",
+      "name": "Assinatura válida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"received\":false}",
+        "options": { "responseCode": 401 }
+      },
+      "id": "917b82e4-f1ea-4804-a51b-5deaf2df299f",
+      "name": "Rejeitar assinatura",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [660, 180]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const event = $json.event;\nif (event?.type !== 'post_call_transcription') throw new Error('Unsupported ElevenLabs event');\nconst data = event.data;\nconst transferToolName = $env.ELEVENLABS_TRANSFER_TOOL_NAME;\nif (!transferToolName) throw new Error('ELEVENLABS_TRANSFER_TOOL_NAME is required');\nconst startedAt = new Date(data.metadata.start_time_unix_secs * 1000);\nconst duration = data.metadata.call_duration_secs;\nconst contactReason = data.analysis?.data_collection_results?.['Classificação']?.value ?? null;\nconst transferred = data.transcript.some(turn => turn.tool_calls?.some(call => call.tool_name === transferToolName && call.tool_has_been_called === true));\nreturn [{ json: {\n  conversation_id: data.conversation_id,\n  agent_id: data.agent_id,\n  event_timestamp: event.event_timestamp,\n  status: data.status === 'done' ? 'concluido' : 'em_andamento',\n  started_at: startedAt.toISOString(),\n  completed_at: data.status === 'done' ? new Date(startedAt.getTime() + duration * 1000).toISOString() : null,\n  duration_seconds: duration,\n  transcript: data.transcript.filter(turn => turn.role === 'agent' || turn.role === 'user').map(({ role, message, time_in_call_secs }) => ({ role, message, time_in_call_secs })),\n  contact_reason: contactReason,\n  transferred,\n  cost: data.metadata.cost_fiat ?? null,\n  has_audio: data.has_audio === true,\n  audio_object_key: `atendimentos/${data.conversation_id}.mp3`\n} }];"
       },
       "id": "e409c0f2-88a7-4e4e-b187-4c80f9988e8d",
       "name": "Contrato normalizado",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [240, 0]
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, -80]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "has-audio",
+              "leftValue": "={{ $('Contrato normalizado').item.json.has_audio }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3ab77410-d251-4471-a194-d1fd18999ac2",
+      "name": "Possui áudio?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1320, -80]
+    },
+    {
+      "parameters": {
+        "url": "={{ ($env.ELEVENLABS_API_URL || 'https://api.elevenlabs.io') + '/v1/convai/conversations/' + $('Contrato normalizado').item.json.conversation_id + '/audio' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": { "response": { "responseFormat": "file", "outputPropertyName": "data" } }
+        }
+      },
+      "id": "8e0e5561-d5a1-4e3b-9bad-d3316ed1462d",
+      "name": "Baixar áudio ElevenLabs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, -180],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpHeaderAuth": { "id": "CONFIGURE_NO_N8N", "name": "ElevenLabs API Key" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "={{ $env.STORAGE_BUCKET }}",
+        "fileName": "={{ $('Contrato normalizado').item.json.audio_object_key }}",
+        "binaryPropertyName": "data"
+      },
+      "id": "bc74f683-c05d-4fd2-9826-c12cb0bd5a1e",
+      "name": "Armazenar áudio",
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [1760, -180],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "s3": { "id": "CONFIGURE_NO_N8N", "name": "HQ Audio Storage" }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const normalized = $items('Contrato normalizado')[0].json;\nconst { has_audio, audio_object_key, ...payload } = normalized;\nreturn [{ json: { ...payload, audio_reference: null } }];"
+      },
+      "id": "f979572c-28a2-4ad8-a2a8-36b93153bef0",
+      "name": "Preparar contrato API",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, -80]
     },
     {
       "parameters": {
@@ -57,38 +160,72 @@
       "name": "Persistir Atendimento",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [480, 0],
+      "position": [1100, -80],
       "credentials": {
-        "httpHeaderAuth": {
-          "id": "CONFIGURE_NO_N8N",
-          "name": "HQ Ingestion API Key"
-        }
+        "httpHeaderAuth": { "id": "CONFIGURE_NO_N8N", "name": "HQ Ingestion API Key" }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const normalized = $items('Contrato normalizado')[0].json;\nconst { has_audio, audio_object_key, ...payload } = normalized;\nreturn [{ json: { ...payload, audio_reference: audio_object_key } }];"
+      },
+      "id": "9a80bd09-2e37-4fea-9216-64f0825238f6",
+      "name": "Adicionar referência de áudio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1980, -180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.HQ_API_URL }}/atendimentos/ingestao",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "1bc44f18-9ddd-42c6-a731-9abeb81c293c",
+      "name": "Atualizar referência de áudio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2200, -180],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpHeaderAuth": { "id": "CONFIGURE_NO_N8N", "name": "HQ Ingestion API Key" }
       }
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ $json }}",
-        "options": {}
+        "responseBody": "={\"received\":true}",
+        "options": { "responseCode": 200 }
       },
       "id": "9c81d891-2e4a-45bb-8574-cf25f630469a",
-      "name": "Responder",
+      "name": "Confirmar recebimento",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.4,
-      "position": [720, 0]
+      "position": [2420, -80]
     }
   ],
   "pinData": {},
   "connections": {
-    "Webhook ElevenLabs": {
-      "main": [[{ "node": "Contrato normalizado", "type": "main", "index": 0 }]]
-    },
-    "Contrato normalizado": {
-      "main": [[{ "node": "Persistir Atendimento", "type": "main", "index": 0 }]]
-    },
-    "Persistir Atendimento": {
-      "main": [[{ "node": "Responder", "type": "main", "index": 0 }]]
-    }
+    "Webhook ElevenLabs": { "main": [[{ "node": "Validar assinatura ElevenLabs", "type": "main", "index": 0 }]] },
+    "Validar assinatura ElevenLabs": { "main": [[{ "node": "Assinatura válida?", "type": "main", "index": 0 }]] },
+    "Assinatura válida?": { "main": [[{ "node": "Contrato normalizado", "type": "main", "index": 0 }], [{ "node": "Rejeitar assinatura", "type": "main", "index": 0 }]] },
+    "Contrato normalizado": { "main": [[{ "node": "Preparar contrato API", "type": "main", "index": 0 }]] },
+    "Preparar contrato API": { "main": [[{ "node": "Persistir Atendimento", "type": "main", "index": 0 }]] },
+    "Persistir Atendimento": { "main": [[{ "node": "Confirmar recebimento", "type": "main", "index": 0 }]] },
+    "Confirmar recebimento": { "main": [[{ "node": "Possui áudio?", "type": "main", "index": 0 }]] },
+    "Possui áudio?": { "main": [[{ "node": "Baixar áudio ElevenLabs", "type": "main", "index": 0 }], []] },
+    "Baixar áudio ElevenLabs": { "main": [[{ "node": "Armazenar áudio", "type": "main", "index": 0 }]] },
+    "Armazenar áudio": { "main": [[{ "node": "Adicionar referência de áudio", "type": "main", "index": 0 }]] },
+    "Adicionar referência de áudio": { "main": [[{ "node": "Atualizar referência de áudio", "type": "main", "index": 0 }]] }
   },
   "active": false,
   "settings": { "executionOrder": "v1" },

@@ -1,8 +1,13 @@
 import { z } from 'zod';
 
-const optionalNullableUrl = z.url().nullable().optional();
 const optionalNullableText = z.string().trim().min(1).nullable().optional();
 const optionalNullableNonnegativeNumber = z.number().nonnegative().nullable().optional();
+const storageReference = z
+  .string()
+  .trim()
+  .min(1)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._/-]*$/)
+  .refine((value) => !value.split('/').includes('..'));
 
 export const transcriptEntrySchema = z.object({
   role: z.enum(['agent', 'user']),
@@ -13,9 +18,10 @@ export const transcriptEntrySchema = z.object({
 const ingestBaseSchema = z.object({
   conversation_id: z.string().trim().min(1),
   agent_id: z.string().trim().min(1),
+  event_timestamp: z.number().int().nonnegative(),
   started_at: z.iso.datetime().nullable().optional(),
   transcript: z.array(transcriptEntrySchema),
-  audio_url: optionalNullableUrl,
+  audio_reference: storageReference.nullable().optional(),
   contact_reason: optionalNullableText,
   transferred: z.boolean(),
   cost: optionalNullableNonnegativeNumber
@@ -59,6 +65,11 @@ export const atendimentoDetailSchema = atendimentoSummarySchema.extend({
 });
 
 export const atendimentoListSchema = z.array(atendimentoSummarySchema);
+
+export const atendimentosQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).max(10_000).default(0)
+});
 
 export type IngestAtendimento = z.infer<typeof ingestAtendimentoSchema>;
 export type AtendimentoSummary = z.infer<typeof atendimentoSummarySchema>;

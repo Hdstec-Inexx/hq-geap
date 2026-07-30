@@ -4,9 +4,9 @@ import {
   type AtendimentoDetail,
   type AtendimentoSummary
 } from '@hq-geap/contracts/atendimentos';
-import type { AtendimentoRow } from './repository.js';
+import type { AtendimentoRow, AtendimentoSummaryRow } from './repository.js';
 
-function summaryValues(row: AtendimentoRow) {
+function summaryValues(row: AtendimentoSummaryRow) {
   return {
     id: row.id,
     conversationId: row.conversationId,
@@ -25,7 +25,7 @@ function summaryValues(row: AtendimentoRow) {
   };
 }
 
-export function toAtendimentoSummary(row: AtendimentoRow): AtendimentoSummary {
+export function toAtendimentoSummary(row: AtendimentoSummaryRow): AtendimentoSummary {
   return atendimentoSummarySchema.parse(summaryValues(row));
 }
 

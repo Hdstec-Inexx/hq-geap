@@ -1,15 +1,11 @@
 import {
-  atendimentoListSchema,
-  type AtendimentoSummary
+  atendimentoListSchema
 } from '@hq-geap/contracts/atendimentos';
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { apiUrl, getSession } from '../auth/session';
+import { Link, useSearchParams } from 'react-router-dom';
+import { formatDuration, useAuthenticatedResource } from './api';
 
-type PageState =
-  | { status: 'loading' }
-  | { status: 'error' }
-  | { status: 'ready'; atendimentos: AtendimentoSummary[] };
+const pageSize = 50;
+const maximumPage = 201;
 
 function formatDate(value: string | null) {
   return value
@@ -20,52 +16,25 @@ function formatDate(value: string | null) {
     : 'Ainda em andamento';
 }
 
-function formatDuration(seconds: number | null) {
-  if (seconds === null) {
-    return 'Não disponível';
-  }
-  return `${Math.floor(seconds / 60)}min ${seconds % 60}s`;
-}
-
 function formatCost(cost: number | null | undefined) {
   return cost === null || cost === undefined
     ? null
     : new Intl.NumberFormat('pt-BR', {
         style: 'currency',
-        currency: 'BRL'
+        currency: 'USD'
       }).format(cost);
 }
 
 export function AtendimentosPage() {
-  const [state, setState] = useState<PageState>({ status: 'loading' });
-
-  useEffect(() => {
-    const session = getSession();
-    const controller = new AbortController();
-    if (!session) {
-      setState({ status: 'error' });
-      return () => controller.abort();
-    }
-
-    fetch(`${apiUrl}/atendimentos`, {
-      headers: { authorization: `Bearer ${session.token}` },
-      signal: controller.signal
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(`Atendimentos request failed with ${response.status}`);
-        }
-        return atendimentoListSchema.parse(await response.json());
-      })
-      .then((atendimentos) => setState({ status: 'ready', atendimentos }))
-      .catch((error: unknown) => {
-        if (!(error instanceof DOMException && error.name === 'AbortError')) {
-          setState({ status: 'error' });
-        }
-      });
-
-    return () => controller.abort();
-  }, []);
+  const [searchParams] = useSearchParams();
+  const page = Math.min(
+    maximumPage,
+    Math.max(1, Math.floor(Number(searchParams.get('page')) || 1))
+  );
+  const state = useAuthenticatedResource(
+    `/atendimentos?limit=${pageSize}&offset=${(page - 1) * pageSize}`,
+    atendimentoListSchema
+  );
 
   return (
     <main className="atendimentos-page">
@@ -85,12 +54,12 @@ export function AtendimentosPage() {
           Não foi possível carregar os Atendimentos.
         </p>
       ) : null}
-      {state.status === 'ready' && state.atendimentos.length === 0 ? (
+      {state.status === 'ready' && state.data.length === 0 ? (
         <p className="atendimentos-state">Nenhum Atendimento recebido.</p>
       ) : null}
-      {state.status === 'ready' && state.atendimentos.length > 0 ? (
+      {state.status === 'ready' && state.data.length > 0 ? (
         <div className="atendimentos-list">
-          {state.atendimentos.map((atendimento) => {
+          {state.data.map((atendimento) => {
             const cost = formatCost(atendimento.custo);
             return (
               <article className="atendimento-row" key={atendimento.id}>
@@ -112,6 +81,10 @@ export function AtendimentosPage() {
               </article>
             );
           })}
+          <nav className="atendimentos-pagination" aria-label="Paginação">
+            {page > 1 ? <Link to={`?page=${page - 1}`}>Página anterior</Link> : <span />}
+            {state.data.length === pageSize && page < maximumPage ? <Link to={`?page=${page + 1}`}>Próxima página</Link> : null}
+          </nav>
         </div>
       ) : null}
     </main>

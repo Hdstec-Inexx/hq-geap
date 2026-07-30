@@ -1,5 +1,6 @@
 import {
   ingestAtendimentoSchema,
+  atendimentosQuerySchema,
   type AtendimentoDetail,
   type AtendimentoSummary
 } from '@hq-geap/contracts/atendimentos';
@@ -32,7 +33,7 @@ const routes: FastifyPluginAsync = async (app) => {
         reply.code(result.created ? 201 : 200);
         return toAtendimentoDetail(
           result.row,
-          app.storage.resolveAudioUrl(result.row.audioUrl)
+          await app.storage.resolveAudioUrl(result.row.audioReference)
         );
       } catch (error) {
         if (error instanceof UnknownVoiceAgentError) {
@@ -49,8 +50,14 @@ const routes: FastifyPluginAsync = async (app) => {
     }
   );
 
-  app.get('/atendimentos', async (): Promise<AtendimentoSummary[]> => {
-    return (await repository.list()).map(toAtendimentoSummary);
+  app.get('/atendimentos', async (request): Promise<AtendimentoSummary[]> => {
+    const query = atendimentosQuerySchema.safeParse(request.query);
+    if (!query.success) {
+      throw app.httpErrors.badRequest('Invalid pagination');
+    }
+    return (await repository.list(query.data.limit, query.data.offset)).map(
+      toAtendimentoSummary
+    );
   });
 
   app.get<{ Params: { id: string } }>(
@@ -60,7 +67,10 @@ const routes: FastifyPluginAsync = async (app) => {
       if (!row) {
         throw app.httpErrors.notFound('Atendimento not found');
       }
-      return toAtendimentoDetail(row, app.storage.resolveAudioUrl(row.audioUrl));
+      return toAtendimentoDetail(
+        row,
+        await app.storage.resolveAudioUrl(row.audioReference)
+      );
     }
   );
 };

@@ -81,7 +81,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     expect(persisted.rows[0]?.count).toBe('0');
   });
 
-  test('cria pelo conversation_id e ignora o reenvio sem duplicar', async ({
+  test('cria pelo conversation_id e atualiza o reenvio sem duplicar', async ({
     request
   }) => {
     const first = await request.post(`${apiUrl}/atendimentos/ingestao`, {
@@ -99,7 +99,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await expect(replay.json()).resolves.toMatchObject({
       id: created.id,
       conversationId: atendimento.conversation_id,
-      motivoContato: atendimento.contact_reason,
+      motivoContato: 'Segunda via de boleto',
       status: 'concluido'
     });
 
@@ -130,6 +130,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       data: {
         conversation_id: conversationId,
         agent_id: atendimento.agent_id,
+        event_timestamp: atendimento.event_timestamp - 100,
         status: 'em_andamento',
         started_at: atendimento.started_at,
         transcript: [],
@@ -149,6 +150,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       data: {
         conversation_id: conversationId,
         agent_id: atendimento.agent_id,
+        event_timestamp: atendimento.event_timestamp - 100,
         status: 'em_andamento',
         started_at: atendimento.started_at,
         transcript: [],
@@ -168,6 +170,51 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     expect(persisted.rows[0]).toMatchObject({
       status: 'concluido',
       concluido_em: expect.any(Date)
+    });
+  });
+
+  test('ignora evento antigo e nao regride Transferencia confirmada', async ({
+    request
+  }) => {
+    const conversationId = 'conv-monotonic-001';
+    const first = await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: {
+        ...atendimento,
+        conversation_id: conversationId,
+        transferred: true
+      },
+      headers: ingestionHeaders
+    });
+    expect(first.status()).toBe(201);
+
+    const stale = await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: {
+        ...atendimento,
+        conversation_id: conversationId,
+        event_timestamp: atendimento.event_timestamp - 1,
+        contact_reason: 'Evento antigo',
+        transferred: false
+      },
+      headers: ingestionHeaders
+    });
+    expect(stale.status()).toBe(200);
+    await expect(stale.json()).resolves.toMatchObject({
+      houveTransferencia: true,
+      motivoContato: atendimento.contact_reason
+    });
+
+    const newer = await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: {
+        ...atendimento,
+        conversation_id: conversationId,
+        event_timestamp: atendimento.event_timestamp + 1,
+        transferred: false
+      },
+      headers: ingestionHeaders
+    });
+    expect(newer.status()).toBe(200);
+    await expect(newer.json()).resolves.toMatchObject({
+      houveTransferencia: true
     });
   });
 
@@ -192,9 +239,22 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       custo: atendimento.cost,
       duracaoSegundos: atendimento.duration_seconds,
       houveTransferencia: atendimento.transferred,
-      motivoContato: atendimento.contact_reason,
+      motivoContato: 'Segunda via de boleto',
       status: 'concluido'
     });
+    expect(summary).not.toHaveProperty('transcricao');
+
+    const limitedList = await request.get(
+      `${apiUrl}/atendimentos?limit=1&offset=0`,
+      { headers: headersFor(admin.token) }
+    );
+    expect(limitedList.status()).toBe(200);
+    expect((await limitedList.json()) as unknown[]).toHaveLength(1);
+    const invalidPagination = await request.get(
+      `${apiUrl}/atendimentos?limit=101`,
+      { headers: headersFor(admin.token) }
+    );
+    expect(invalidPagination.status()).toBe(400);
 
     const id = summary?.id as string;
     for (const session of [admin, gestao]) {
@@ -203,7 +263,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       });
       expect(response.status()).toBe(200);
       await expect(response.json()).resolves.toMatchObject({
-        audioUrl: atendimento.audio_url,
+        audioUrl: expect.stringContaining(atendimento.audio_reference),
         custo: atendimento.cost,
         transcricao: atendimento.transcript
       });
@@ -227,10 +287,10 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await page.getByRole('link', { name: 'Consultar Atendimentos' }).click();
 
     await expect(page.getByRole('heading', { name: 'Atendimentos' })).toBeVisible();
-    await page.getByRole('link', { name: /Financeiro\/Boletos/ }).click();
+    await page.getByRole('link', { name: /Segunda via de boleto/ }).click();
     await expect(page.getByRole('heading', { name: /Atendimento/ })).toBeVisible();
-    await expect(page.getByText('Financeiro/Boletos')).toBeVisible();
-    await expect(page.getByText('R$ 0,18')).toBeVisible();
+    await expect(page.getByText('Segunda via de boleto')).toBeVisible();
+    await expect(page.getByText(/US\$\s*0,18/)).toBeVisible();
     await expect(page.getByText(/Preciso da segunda via do boleto/)).toBeVisible();
   });
 });

@@ -2,51 +2,20 @@ import {
   atendimentoDetailSchema,
   type AtendimentoDetail
 } from '@hq-geap/contracts/atendimentos';
-import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { apiUrl, getSession } from '../auth/session';
-
-type PageState =
-  | { status: 'loading' }
-  | { status: 'error' }
-  | { status: 'ready'; atendimento: AtendimentoDetail };
+import { formatDuration, useAuthenticatedResource } from './api';
 
 const currency = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
-  currency: 'BRL'
+  currency: 'USD'
 });
 
 export function AtendimentoPage() {
   const { atendimentoId } = useParams();
-  const [state, setState] = useState<PageState>({ status: 'loading' });
-
-  useEffect(() => {
-    const session = getSession();
-    const controller = new AbortController();
-    if (!session || !atendimentoId) {
-      setState({ status: 'error' });
-      return () => controller.abort();
-    }
-
-    fetch(`${apiUrl}/atendimentos/${atendimentoId}`, {
-      headers: { authorization: `Bearer ${session.token}` },
-      signal: controller.signal
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(`Atendimento request failed with ${response.status}`);
-        }
-        return atendimentoDetailSchema.parse(await response.json());
-      })
-      .then((atendimento) => setState({ status: 'ready', atendimento }))
-      .catch((error: unknown) => {
-        if (!(error instanceof DOMException && error.name === 'AbortError')) {
-          setState({ status: 'error' });
-        }
-      });
-
-    return () => controller.abort();
-  }, [atendimentoId]);
+  const state = useAuthenticatedResource(
+    `/atendimentos/${atendimentoId ?? ''}`,
+    atendimentoDetailSchema
+  );
 
   if (state.status !== 'ready') {
     return (
@@ -60,7 +29,7 @@ export function AtendimentoPage() {
     );
   }
 
-  const { atendimento } = state;
+  const atendimento: AtendimentoDetail = state.data;
   return (
     <main className="atendimentos-page atendimento-detail">
       <header className="atendimentos-heading">
@@ -74,7 +43,7 @@ export function AtendimentoPage() {
 
       <section className="atendimento-facts" aria-label="Dados do Atendimento">
         <div><span>Motivo de Contato</span><strong>{atendimento.motivoContato ?? 'Não informado'}</strong></div>
-        <div><span>Duração</span><strong>{atendimento.duracaoSegundos === null ? 'Não disponível' : `${Math.floor(atendimento.duracaoSegundos / 60)}min ${atendimento.duracaoSegundos % 60}s`}</strong></div>
+        <div><span>Duração</span><strong>{formatDuration(atendimento.duracaoSegundos)}</strong></div>
         <div><span>Transferência</span><strong>{atendimento.houveTransferencia ? 'Realizada' : 'Não realizada'}</strong></div>
         {atendimento.custo !== undefined ? <div><span>Custo</span><strong>{atendimento.custo === null ? 'Não disponível' : currency.format(atendimento.custo)}</strong></div> : null}
       </section>
