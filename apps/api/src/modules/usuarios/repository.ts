@@ -11,17 +11,17 @@ export type UsuarioRow = {
   updatedAt: Date;
 };
 
-const selectUsuario = `
-  select
-    id,
-    nome as name,
-    email,
-    papel as role,
-    ativo as active,
-    criado_em as "createdAt",
-    atualizado_em as "updatedAt"
-  from usuarios
+const usuarioColumns = `
+  id,
+  nome as name,
+  email,
+  papel as role,
+  ativo as active,
+  criado_em as "createdAt",
+  atualizado_em as "updatedAt"
 `;
+const selectUsuario = `select ${usuarioColumns} from usuarios`;
+const activeAdminMutationLockId = 90410;
 
 export class LastActiveAdminError extends Error {}
 
@@ -30,7 +30,9 @@ async function protectActiveAdmin(
   id: string,
   replacementRole: UserRole | null
 ) {
-  await client.query('select pg_advisory_xact_lock(90410)');
+  await client.query('select pg_advisory_xact_lock($1)', [
+    activeAdminMutationLockId
+  ]);
   const target = await client.query<{ active: boolean; role: UserRole }>(
     `select ativo as active, papel as role
      from usuarios
@@ -56,13 +58,47 @@ async function protectActiveAdmin(
   return true;
 }
 
+async function withTransaction<T>(
+  db: pg.Pool,
+  operation: (client: pg.PoolClient) => Promise<T>
+) {
+  const client = await db.connect();
+  try {
+    await client.query('begin');
+    const result = await operation(client);
+    await client.query('commit');
+    return result;
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export function createUsuariosRepository(db: pg.Pool) {
   return {
-    async list(): Promise<UsuarioRow[]> {
-      const result = await db.query<UsuarioRow>(
-        `${selectUsuario} order by ativo desc, lower(nome), id`
-      );
-      return result.rows;
+    async list(page: number, pageSize: number) {
+      const offset = (page - 1) * pageSize;
+      return withTransaction(db, async (client) => {
+        await client.query(
+          'set transaction isolation level repeatable read read only'
+        );
+        const count = await client.query<{ total: string }>(
+          'select count(*) as total from usuarios'
+        );
+        const users = await client.query<UsuarioRow>(
+          `select ${usuarioColumns}
+           from usuarios
+           order by ativo desc, lower(nome), id
+           limit $1 offset $2`,
+          [pageSize, offset]
+        );
+        return {
+          users: users.rows,
+          total: Number(count.rows[0]?.total ?? 0)
+        };
+      });
     },
 
     async create(input: {
@@ -85,11 +121,8 @@ export function createUsuariosRepository(db: pg.Pool) {
       id: string,
       input: { name: string; email: string; role: UserRole }
     ): Promise<UsuarioRow | null> {
-      const client = await db.connect();
-      try {
-        await client.query('begin');
+      return withTransaction(db, async (client) => {
         if (!(await protectActiveAdmin(client, id, input.role))) {
-          await client.query('rollback');
           return null;
         }
         const result = await client.query<UsuarioRow>(
@@ -100,22 +133,13 @@ export function createUsuariosRepository(db: pg.Pool) {
              criado_em as "createdAt", atualizado_em as "updatedAt"`,
           [id, input.name, input.email, input.role]
         );
-        await client.query('commit');
         return result.rows[0] ?? null;
-      } catch (error) {
-        await client.query('rollback');
-        throw error;
-      } finally {
-        client.release();
-      }
+      });
     },
 
     async deactivate(id: string): Promise<UsuarioRow | null> {
-      const client = await db.connect();
-      try {
-        await client.query('begin');
+      return withTransaction(db, async (client) => {
         if (!(await protectActiveAdmin(client, id, null))) {
-          await client.query('rollback');
           return null;
         }
         const result = await client.query<UsuarioRow>(
@@ -126,14 +150,8 @@ export function createUsuariosRepository(db: pg.Pool) {
              criado_em as "createdAt", atualizado_em as "updatedAt"`,
           [id]
         );
-        await client.query('commit');
         return result.rows[0] ?? null;
-      } catch (error) {
-        await client.query('rollback');
-        throw error;
-      } finally {
-        client.release();
-      }
+      });
     }
   };
 }

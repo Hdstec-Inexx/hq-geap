@@ -1,12 +1,13 @@
 import {
+  listUsuariosResponseSchema,
   usuarioSchema,
   type CreateUsuario,
   type UpdateUsuario,
   type Usuario
 } from '@hq-geap/contracts/usuarios';
-import { z } from 'zod';
 import { useEffect, useState, type FormEvent } from 'react';
-import { apiUrl, getSession } from '../../auth/session';
+import { useNavigate } from 'react-router-dom';
+import { apiUrl, clearSession, getSession } from '../../auth/session';
 
 const roleNames = {
   admin: 'Admin',
@@ -25,37 +26,75 @@ const emptyUser: CreateUsuario = {
   role: 'curador'
 };
 
+const pageSize = 20;
+
+class RequestError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+  }
+}
+
+function isRevokedSession(error: unknown) {
+  return (
+    error instanceof RequestError &&
+    (error.status === 401 || error.status === 403)
+  );
+}
+
 export function UsuariosPage() {
   const [users, setUsers] = useState<Usuario[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [revision, setRevision] = useState(0);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const session = getSession()!;
+  const [session] = useState(() => getSession()!);
   const token = session.token;
+  const navigate = useNavigate();
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  async function requireSuccessfulResponse(response: Response) {
+    if (response.status === 401 || response.status === 403) {
+      clearSession();
+      navigate('/login', { replace: true });
+      throw new RequestError(response.status, 'Session revoked');
+    }
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        message?: string;
+      } | null;
+      throw new RequestError(response.status, body?.message ?? 'Request failed');
+    }
+  }
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`${apiUrl}/admin/usuarios`, {
+    setLoading(true);
+    fetch(`${apiUrl}/admin/usuarios?page=${page}&pageSize=${pageSize}`, {
       headers: { authorization: `Bearer ${token}` },
       signal: controller.signal
     })
       .then(async (response) => {
-        if (!response.ok) throw new Error('Users request failed');
-        return z.array(usuarioSchema).parse(await response.json());
+        await requireSuccessfulResponse(response);
+        return listUsuariosResponseSchema.parse(await response.json());
       })
       .then((result) => {
-        setUsers(result);
+        setUsers(result.users);
+        setTotal(result.total);
         setLoading(false);
       })
       .catch((requestError: unknown) => {
         if (!(requestError instanceof DOMException && requestError.name === 'AbortError')) {
-          setError('Não foi possível carregar os usuários.');
+          if (!isRevokedSession(requestError)) {
+            setError('Não foi possível carregar os usuários.');
+          }
           setLoading(false);
         }
       });
     return () => controller.abort();
-  }, [token]);
+  }, [navigate, page, revision, token]);
 
   function edit(user: Usuario) {
     setError(null);
@@ -100,23 +139,26 @@ export function UsuariosPage() {
           body: JSON.stringify(editor.user)
         }
       );
-      if (!response.ok) {
-        if (response.status === 409) throw new Error('duplicate');
-        throw new Error('save');
+      await requireSuccessfulResponse(response);
+      usuarioSchema.parse(await response.json());
+      if (creating) {
+        if (page === 1) setRevision((current) => current + 1);
+        else setPage(1);
+      } else {
+        setRevision((current) => current + 1);
       }
-      const saved = usuarioSchema.parse(await response.json());
-      setUsers((current) =>
-        creating
-          ? [saved, ...current]
-          : current.map((user) => (user.id === saved.id ? saved : user))
-      );
       setEditor(null);
     } catch (saveError) {
-      setError(
-        saveError instanceof Error && saveError.message === 'duplicate'
-          ? 'Este e-mail já está em uso.'
-          : 'Não foi possível salvar o usuário.'
-      );
+      if (isRevokedSession(saveError)) return;
+      if (saveError instanceof RequestError && saveError.status === 409) {
+        setError(
+          saveError.message === 'Email already in use'
+            ? 'Este e-mail já está em uso.'
+            : 'A operação removeria o último acesso de Admin.'
+        );
+      } else {
+        setError('Não foi possível salvar o usuário.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -129,15 +171,16 @@ export function UsuariosPage() {
         method: 'POST',
         headers: { authorization: `Bearer ${token}` }
       });
-      if (!response.ok) throw new Error('deactivate');
-      const deactivated = usuarioSchema.parse(await response.json());
-      setUsers((current) =>
-        current.map((candidate) =>
-          candidate.id === deactivated.id ? deactivated : candidate
-        )
+      await requireSuccessfulResponse(response);
+      usuarioSchema.parse(await response.json());
+      setRevision((current) => current + 1);
+    } catch (deactivateError) {
+      if (isRevokedSession(deactivateError)) return;
+      setError(
+        deactivateError instanceof RequestError && deactivateError.status === 409
+          ? 'A operação removeria o último acesso de Admin.'
+          : 'Não foi possível desativar o usuário.'
       );
-    } catch {
-      setError('Não foi possível desativar o usuário.');
     }
   }
 
@@ -193,6 +236,19 @@ export function UsuariosPage() {
               ))}
             </tbody>
           </table>
+          <nav aria-label="Paginação de usuários" className="users-pagination">
+            <span>
+              Página {page} de {totalPages} · {total} usuários
+            </span>
+            <div>
+              <button disabled={page === 1 || loading} onClick={() => setPage((current) => current - 1)} type="button">
+                Anterior
+              </button>
+              <button disabled={page === totalPages || loading} onClick={() => setPage((current) => current + 1)} type="button">
+                Próxima
+              </button>
+            </div>
+          </nav>
         </div>
       )}
 

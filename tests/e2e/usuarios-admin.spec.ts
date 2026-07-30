@@ -141,11 +141,19 @@ test.describe.serial('administracao de usuarios', () => {
       headers: adminHeaders
     });
     expect(list.status()).toBe(200);
-    await expect(list.json()).resolves.toEqual(
-      expect.arrayContaining([
+    await expect(list.json()).resolves.toMatchObject({
+      users: expect.arrayContaining([
         expect.objectContaining({ email: 'curador-promovido@hq.test' })
-      ])
+      ]),
+      page: 1,
+      pageSize: 20,
+      total: expect.any(Number)
+    });
+    const excessivePage = await request.get(
+      `${apiUrl}/admin/usuarios?page=1&pageSize=101`,
+      { headers: adminHeaders }
     );
+    expect(excessivePage.status()).toBe(400);
 
     const deactivate = await request.post(
       `${apiUrl}/admin/usuarios/${curador.id}/desativar`,
@@ -192,5 +200,44 @@ test.describe.serial('administracao de usuarios', () => {
     await expect(editedRow).toContainText('Gestão');
     await editedRow.getByRole('button', { name: 'Desativar' }).click();
     await expect(editedRow).toContainText('Inativo');
+  });
+
+  test('sessao rebaixada ou desativada sai da area administrativa ao retomar foco', async ({
+    page,
+    request
+  }) => {
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('novo-admin@hq.test');
+    await page.getByLabel('Senha').fill('senha-segura');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.getByRole('link', { name: 'Administrar usuários' }).click();
+
+    const admin = await login(request, 'admin');
+    const headers = { authorization: `Bearer ${admin.token}` };
+    const list = await request.get(`${apiUrl}/admin/usuarios`, { headers });
+    const users = (await list.json()) as {
+      users: Array<{ id: string; email: string; name: string }>;
+    };
+    const revoked = users.users.find((user) => user.email === 'novo-admin@hq.test')!;
+    const demotion = await request.patch(`${apiUrl}/admin/usuarios/${revoked.id}`, {
+      data: { email: revoked.email, name: revoked.name, role: 'gestao' },
+      headers
+    });
+    expect(demotion.status()).toBe(200);
+
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect(
+      page.getByRole('heading', { name: 'Acesso não autorizado' })
+    ).toBeVisible();
+
+    const deactivation = await request.post(
+      `${apiUrl}/admin/usuarios/${revoked.id}/desativar`,
+      { headers }
+    );
+    expect(deactivation.status()).toBe(200);
+
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect(page).toHaveURL('/login');
   });
 });

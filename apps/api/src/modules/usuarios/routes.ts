@@ -1,6 +1,8 @@
 import {
   createUsuarioSchema,
+  listUsuariosQuerySchema,
   updateUsuarioSchema,
+  type ListUsuariosResponse,
   type Usuario
 } from '@hq-geap/contracts/usuarios';
 import type { FastifyPluginAsync } from 'fastify';
@@ -21,9 +23,23 @@ const usuariosRoutes: FastifyPluginAsync = async (app) => {
   const repository = createUsuariosRepository(app.db);
   const adminOnly = { config: { auth: { roles: ['admin' as const] } } };
 
-  app.get('/admin/usuarios', adminOnly, async (): Promise<Usuario[]> => {
-    return (await repository.list()).map(toUsuario);
-  });
+  app.get(
+    '/admin/usuarios',
+    adminOnly,
+    async (request): Promise<ListUsuariosResponse> => {
+      const query = listUsuariosQuerySchema.safeParse(request.query);
+      if (!query.success) {
+        throw app.httpErrors.badRequest('Invalid pagination');
+      }
+      const result = await repository.list(query.data.page, query.data.pageSize);
+      return {
+        users: result.users.map(toUsuario),
+        page: query.data.page,
+        pageSize: query.data.pageSize,
+        total: result.total
+      };
+    }
+  );
 
   app.post(
     '/admin/usuarios',

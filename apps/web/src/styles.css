@@ -616,6 +616,38 @@ h1 {
   color: #a73e32;
 }
 
+.users-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px 24px;
+  color: #52717a;
+  font-size: 0.82rem;
+}
+
+.users-pagination div {
+  display: flex;
+  gap: 10px;
+}
+
+.users-pagination button {
+  min-height: 38px;
+  padding: 0 14px;
+  color: #123b4a;
+  background: transparent;
+  border: 1px solid rgb(18 59 74 / 24%);
+  border-radius: 2px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.users-pagination button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 .users-loading,
 .users-error {
   padding: 24px;
@@ -800,6 +832,16 @@ h1 {
   .user-actions button + button {
     margin-top: 8px;
     margin-left: auto;
+  }
+
+  .users-pagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .users-pagination div,
+  .users-pagination button {
+    flex: 1;
   }
 
   .user-editor-backdrop {
