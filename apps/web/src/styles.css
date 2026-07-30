@@ -1683,3 +1683,153 @@ h1 {
     animation: none;
   }
 }
+
+.comentarios-panel,
+.manutencao-item,
+.manutencao-empty {
+  background: rgb(255 255 255 / 68%);
+  border: 1px solid rgb(18 59 74 / 16%);
+  border-radius: 18px;
+  padding: 28px;
+}
+
+.comentarios-panel {
+  display: grid;
+  gap: 24px;
+  margin-top: 28px;
+}
+
+.comentarios-panel h2,
+.manutencao-empty h2 {
+  margin: 4px 0 8px;
+}
+
+.comentario-form {
+  display: grid;
+  gap: 10px;
+}
+
+.comentario-form label,
+.manutencao-filter {
+  color: #52717a;
+  display: grid;
+  font-size: 0.82rem;
+  font-weight: 700;
+  gap: 7px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.comentario-form textarea,
+.manutencao-filter select {
+  background: #f8fcfa;
+  border: 1px solid rgb(18 59 74 / 25%);
+  border-radius: 10px;
+  color: #123b4a;
+  font: inherit;
+  padding: 12px;
+}
+
+.comentario-form > div,
+.manutencao-actions,
+.manutencao-item-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.comentarios-lista,
+.manutencao-lista {
+  display: grid;
+  gap: 14px;
+}
+
+.comentario-item {
+  border-left: 3px solid #16816f;
+  padding: 4px 0 4px 18px;
+}
+
+.comentario-item p,
+.manutencao-item > p {
+  line-height: 1.6;
+  margin: 10px 0;
+  white-space: pre-wrap;
+}
+
+.comentario-item small,
+.manutencao-item small {
+  color: #52717a;
+  display: block;
+  margin-top: 5px;
+}
+
+.comentario-meta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.comentario-meta > span:not(.comentario-status) {
+  color: #52717a;
+  font-size: 0.82rem;
+}
+
+.comentario-status {
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 5px 9px;
+  text-transform: uppercase;
+}
+
+.status-pendente {
+  background: #fff0cc;
+  color: #7a4b00;
+}
+
+.status-resolvido {
+  background: #dff4e7;
+  color: #175f36;
+}
+
+.manutencao-page {
+  max-width: 980px;
+}
+
+.manutencao-filter {
+  min-width: 180px;
+}
+
+.manutencao-item {
+  display: grid;
+  gap: 8px;
+}
+
+.manutencao-item-heading a {
+  color: #123b4a;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.manutencao-actions {
+  border-top: 1px solid rgb(18 59 74 / 16%);
+  margin-top: 12px;
+  padding-top: 16px;
+}
+
+@media (max-width: 720px) {
+  .comentario-form > div,
+  .manutencao-actions,
+  .manutencao-item-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .comentario-form button,
+  .manutencao-actions button {
+    width: 100%;
+  }
+}

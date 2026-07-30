@@ -16,6 +16,10 @@
       "types": "./src/auth.ts",
       "default": "./dist/auth.js"
     },
+    "./comentarios": {
+      "types": "./src/comentarios.ts",
+      "default": "./dist/comentarios.js"
+    },
     "./configuracao-ia": {
       "types": "./src/configuracao-ia.ts",
       "default": "./dist/configuracao-ia.js"
