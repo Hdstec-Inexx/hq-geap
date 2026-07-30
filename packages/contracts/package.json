@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./atendimentos": {
+      "types": "./src/atendimentos.ts",
+      "default": "./dist/atendimentos.js"
+    },
     "./auth": {
       "types": "./src/auth.ts",
       "default": "./dist/auth.js"
