@@ -195,6 +195,14 @@ test.describe.serial('Dashboard da Gestao', () => {
       total: 2,
       percentual: 50
     });
+    expect(dashboard.concordancia.porCriterio).toContainEqual(
+      expect.objectContaining({
+        chave: 'validou_email_por_extenso',
+        concordantes: 1,
+        total: 2,
+        percentual: 50
+      })
+    );
     expect(dashboard.pioresAtendimentos[0]).toEqual(
       expect.objectContaining({
         conversationId: 'conv-dashboard-2',

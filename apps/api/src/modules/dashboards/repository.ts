@@ -71,8 +71,13 @@ export function createDashboardRepository(db: pg.Pool) {
         from atendimentos a
         left join avaliacoes ia
           on ia.atendimento_id = a.id and ia.autor = 'ia'
-        left join avaliacoes_curador_mais_recentes curador
-          on curador.atendimento_id = a.id
+        left join lateral (
+          select avaliacao.nota
+          from avaliacoes avaliacao
+          where avaliacao.atendimento_id = a.id and avaliacao.autor = 'curador'
+          order by avaliacao.criado_em desc, avaliacao.id desc
+          limit 1
+        ) curador on true
         where ${periodFilter}
       `, [periodo.inicio, periodo.fim]);
       return result.rows[0]!;
@@ -116,8 +121,13 @@ export function createDashboardRepository(db: pg.Pool) {
           from atendimentos a
           join avaliacoes ia
             on ia.atendimento_id = a.id and ia.autor = 'ia'
-          join avaliacoes_curador_mais_recentes curador
-            on curador.atendimento_id = a.id
+          join lateral (
+            select avaliacao.id, avaliacao.nota
+            from avaliacoes avaliacao
+            where avaliacao.atendimento_id = a.id and avaliacao.autor = 'curador'
+            order by avaliacao.criado_em desc, avaliacao.id desc
+            limit 1
+          ) curador on true
           where ${periodFilter}
         ),
         notas as (
@@ -159,8 +169,13 @@ export function createDashboardRepository(db: pg.Pool) {
         from atendimentos a
         join avaliacoes ia
           on ia.atendimento_id = a.id and ia.autor = 'ia'
-        join avaliacoes_curador_mais_recentes curador
-          on curador.atendimento_id = a.id
+        join lateral (
+          select avaliacao.id
+          from avaliacoes avaliacao
+          where avaliacao.atendimento_id = a.id and avaliacao.autor = 'curador'
+          order by avaliacao.criado_em desc, avaliacao.id desc
+          limit 1
+        ) curador on true
         join avaliacao_criterios ia_check on ia_check.avaliacao_id = ia.id
         join avaliacao_criterios curador_check
           on curador_check.avaliacao_id = curador.id
@@ -186,8 +201,13 @@ export function createDashboardRepository(db: pg.Pool) {
         from atendimentos a
         join avaliacoes ia
           on ia.atendimento_id = a.id and ia.autor = 'ia'
-        left join avaliacoes_curador_mais_recentes curador
-          on curador.atendimento_id = a.id
+        left join lateral (
+          select avaliacao.nota
+          from avaliacoes avaliacao
+          where avaliacao.atendimento_id = a.id and avaliacao.autor = 'curador'
+          order by avaliacao.criado_em desc, avaliacao.id desc
+          limit 1
+        ) curador on true
         where ${periodFilter}
         order by ia.nota, a.concluido_em desc, a.id
         limit 10

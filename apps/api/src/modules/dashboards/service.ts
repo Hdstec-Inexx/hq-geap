@@ -18,15 +18,12 @@ export async function getDashboard(
   repository: DashboardRepository,
   periodo: DashboardPeriod
 ): Promise<Dashboard> {
-  const [kpis, motivos, criterios, concordancia, porCriterio, piores] =
-    await Promise.all([
-      repository.getKpis(periodo),
-      repository.listMotivos(periodo),
-      repository.listCriterios(periodo),
-      repository.getConcordancia(periodo),
-      repository.listConcordanciaPorCriterio(periodo),
-      repository.listPiores(periodo)
-    ]);
+  const kpis = await repository.getKpis(periodo);
+  const motivos = await repository.listMotivos(periodo);
+  const criterios = await repository.listCriterios(periodo);
+  const concordancia = await repository.getConcordancia(periodo);
+  const porCriterio = await repository.listConcordanciaPorCriterio(periodo);
+  const piores = await repository.listPiores(periodo);
 
   const notasConcordantes = Number(concordancia.notasConcordantes);
   const totalNotas = Number(concordancia.totalNotas);

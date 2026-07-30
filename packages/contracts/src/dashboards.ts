@@ -10,7 +10,17 @@ export const dashboardPeriodSchema = z
   })
   .refine(({ inicio, fim }) => inicio <= fim, {
     message: 'A data inicial deve ser anterior ou igual a data final'
-  });
+  })
+  .refine(
+    ({ inicio, fim }) => {
+      const maximumEnd = new Date(`${inicio}T00:00:00Z`);
+      maximumEnd.setUTCFullYear(maximumEnd.getUTCFullYear() + 1);
+      return fim <= maximumEnd.toISOString().slice(0, 10);
+    },
+    {
+      message: 'O periodo do dashboard nao pode exceder um ano'
+    }
+  );
 
 export const dashboardKpisSchema = z.object({
   volume: z.number().int().nonnegative(),
