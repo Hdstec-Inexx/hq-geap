@@ -129,6 +129,11 @@ export function HomePage() {
         <Link className="admin-feature-link" to="/atendimentos">
           Consultar Atendimentos
         </Link>
+        <Link className="admin-feature-link" to="/curadoria">
+          {session.user.role === 'gestao'
+            ? 'Consultar Fila de Curadoria'
+            : 'Abrir Fila de Curadoria'}
+        </Link>
         {session.user.role === 'admin' ? (
           <div className="admin-feature-links">
             <Link className="admin-feature-link" to="/admin/usuarios">

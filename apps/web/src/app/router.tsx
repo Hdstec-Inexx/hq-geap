@@ -8,6 +8,10 @@ import { CriteriosRoute } from '../features/admin/criterios/routes';
 import { UsuariosRoute } from '../features/admin/usuarios/routes';
 import { AtendimentoPage } from '../features/atendimentos/AtendimentoPage';
 import { AtendimentosPage } from '../features/atendimentos/AtendimentosPage';
+import {
+  CuradoriaReviewRoute,
+  FilaCuradoriaRoute
+} from '../features/curadoria/routes';
 
 export const router = createBrowserRouter([
   {
@@ -42,8 +46,14 @@ export const router = createBrowserRouter([
             children: [{ path: '/gestao', element: <HomePage /> }]
           },
           {
-            element: <RequireRole roles={['curador']} />,
-            children: [{ path: '/curadoria', element: <HomePage /> }]
+            element: <RequireRole roles={['curador', 'gestao']} />,
+            children: [
+              { path: '/curadoria', element: FilaCuradoriaRoute },
+              {
+                path: '/curadoria/:atendimentoId',
+                element: CuradoriaReviewRoute
+              }
+            ]
           }
         ]
       }

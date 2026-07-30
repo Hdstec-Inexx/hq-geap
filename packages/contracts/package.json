@@ -24,6 +24,10 @@
       "types": "./src/criterios.ts",
       "default": "./dist/criterios.js"
     },
+    "./curadoria": {
+      "types": "./src/curadoria.ts",
+      "default": "./dist/curadoria.js"
+    },
     "./health": {
       "types": "./src/health.ts",
       "default": "./dist/health.js"
