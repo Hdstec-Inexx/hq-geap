@@ -87,7 +87,11 @@ export function CriteriosPage() {
               </div>
               <p>{criterio.descricao ?? 'Sem descrição.'}</p>
               <div className="criterion-tags">
-                {criterio.critico ? <span className="critical-tag">Crítico</span> : null}
+                {criterio.critico ? (
+                  <span className="critical-tag">Crítico</span>
+                ) : (
+                  <span>Não crítico</span>
+                )}
                 {criterio.condicional ? <span>Condicional</span> : null}
                 {!criterio.condicional ? <span>Aplicação obrigatória</span> : null}
               </div>

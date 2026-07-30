@@ -98,6 +98,12 @@ test.describe('consulta da Regua de Avaliacao', () => {
     await expect(
       criterioCritico.getByText('Aplicação obrigatória', { exact: true })
     ).toBeVisible();
+    const criterioNaoCritico = page
+      .locator('[data-testid="criterio-regua"]')
+      .filter({ hasText: 'Saudação e Intenção' });
+    await expect(
+      criterioNaoCritico.getByText('Não crítico', { exact: true })
+    ).toBeVisible();
     await expect(page.locator('[data-testid="criterio-regua"]')).toHaveCount(7);
     await expect(page.locator('form')).toHaveCount(0);
     await expect(
