@@ -19,6 +19,7 @@ const roleNames = {
 export function RequireSession() {
   const location = useLocation();
   const [session] = useState(getSession);
+  const [sessionRevision, setSessionRevision] = useState(0);
   const [state, setState] = useState<AccessState>(
     session ? 'checking' : 'anonymous'
   );
@@ -28,20 +29,50 @@ export function RequireSession() {
       return;
     }
 
+    const activeSession = session;
+    let currentUser = activeSession.user;
     const controller = new AbortController();
-    validateSession(session.token, controller.signal)
-      .then((user) => {
-        saveSession({ token: session.token, user });
+    let validating = false;
+    let revoked = false;
+
+    async function refreshSession() {
+      if (validating || revoked) return;
+      validating = true;
+      try {
+        const user = await validateSession(activeSession.token, controller.signal);
+        saveSession({ token: activeSession.token, user });
+        if (
+          user.id !== currentUser.id ||
+          user.name !== currentUser.name ||
+          user.email !== currentUser.email ||
+          user.role !== currentUser.role
+        ) {
+          currentUser = user;
+          setSessionRevision((current) => current + 1);
+        }
         setState('authenticated');
-      })
-      .catch((error: unknown) => {
+      } catch (error) {
         if (!(error instanceof DOMException && error.name === 'AbortError')) {
+          revoked = true;
           clearSession();
           setState('anonymous');
         }
-      });
+      } finally {
+        validating = false;
+      }
+    }
 
-    return () => controller.abort();
+    void refreshSession();
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshSession();
+    }, 60_000);
+    window.addEventListener('focus', refreshSession);
+
+    return () => {
+      controller.abort();
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshSession);
+    };
   }, [session]);
 
   if (state === 'anonymous') {
@@ -50,7 +81,7 @@ export function RequireSession() {
   if (state === 'checking') {
     return <p className="session-check">Validando acesso...</p>;
   }
-  return <Outlet />;
+  return <Outlet key={sessionRevision} />;
 }
 
 export function RequireRole({ roles }: { roles: UserRole[] }) {
@@ -99,9 +130,14 @@ export function HomePage() {
           Consultar Atendimentos
         </Link>
         {session.user.role === 'admin' ? (
-          <Link className="admin-feature-link" to="/admin/configuracao-ia">
-            Configurar IA Avaliadora
-          </Link>
+          <div className="admin-feature-links">
+            <Link className="admin-feature-link" to="/admin/usuarios">
+              Administrar usuários
+            </Link>
+            <Link className="admin-feature-link" to="/admin/configuracao-ia">
+              Configurar IA Avaliadora
+            </Link>
+          </div>
         ) : null}
       </div>
       <aside className="identity-card">
