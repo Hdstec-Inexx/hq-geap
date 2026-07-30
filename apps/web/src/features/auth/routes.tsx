@@ -126,6 +126,11 @@ export function HomePage() {
           Seu acesso está pronto. As áreas do HQ GEAP serão liberadas conforme
           as permissões de {roleNames[session.user.role]}.
         </p>
+        {session.user.role !== 'curador' ? (
+          <Link className="admin-feature-link" to="/dashboard">
+            Abrir Dashboard da Gestão
+          </Link>
+        ) : null}
         <Link className="admin-feature-link" to="/atendimentos">
           Consultar Atendimentos
         </Link>

@@ -13,6 +13,7 @@ import {
   CuradoriaReviewRoute,
   FilaCuradoriaRoute
 } from '../features/curadoria/routes';
+import { DashboardRoute } from '../features/dashboards/routes';
 
 export const router = createBrowserRouter([
   {
@@ -48,7 +49,11 @@ export const router = createBrowserRouter([
           },
           {
             element: <RequireRole roles={['gestao']} />,
-            children: [{ path: '/gestao', element: <HomePage /> }]
+            children: [
+              { path: '/dashboard', element: DashboardRoute },
+              { path: '/gestao', element: <HomePage /> },
+              { path: '/gestao/dashboard', element: DashboardRoute }
+            ]
           },
           {
             element: <RequireRole roles={['curador', 'gestao']} />,
