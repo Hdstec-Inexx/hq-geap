@@ -28,6 +28,10 @@
       "types": "./src/curadoria.ts",
       "default": "./dist/curadoria.js"
     },
+    "./dashboards": {
+      "types": "./src/dashboards.ts",
+      "default": "./dist/dashboards.js"
+    },
     "./health": {
       "types": "./src/health.ts",
       "default": "./dist/health.js"
