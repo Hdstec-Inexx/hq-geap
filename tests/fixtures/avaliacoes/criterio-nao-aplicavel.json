@@ -1,0 +1,13 @@
+{
+  "checklist": {
+    "saudacao_e_intencao": "atendido",
+    "solicitou_cpf": "atendido",
+    "informou_protocolo_email": "atendido",
+    "resolveu_solicitacao": "atendido",
+    "validou_email_por_extenso": "nao_se_aplica",
+    "sem_diminutivos": "atendido",
+    "encerramento_geap": "atendido"
+  },
+  "falhas_identificadas": [],
+  "resumo_atendimento": "Atendimento sem envio de e-mail."
+}

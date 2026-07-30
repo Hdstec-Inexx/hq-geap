@@ -873,6 +873,123 @@ h1 {
   margin-top: 24px;
 }
 
+.avaliacao-panel {
+  margin-top: 24px;
+  padding: clamp(26px, 4vw, 42px);
+  background: rgb(255 255 255 / 76%);
+  border-top: 6px solid #16816f;
+}
+
+.avaliacao-state {
+  color: #52717a;
+}
+
+.avaliacao-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 28px;
+}
+
+.avaliacao-heading h2 {
+  margin: 10px 0 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2rem, 5vw, 3.3rem);
+  font-weight: 400;
+}
+
+.avaliacao-score {
+  display: grid;
+  min-width: 130px;
+  padding: 16px 20px;
+  color: #eff9f5;
+  background: #16816f;
+  text-align: right;
+}
+
+.avaliacao-score.reprovado {
+  background: #9f3f32;
+}
+
+.avaliacao-score strong {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2.5rem;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.avaliacao-score span {
+  margin-top: 6px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.avaliacao-checklist {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 32px;
+  background: #c9d9d4;
+  border: 1px solid #c9d9d4;
+}
+
+.criterio-check {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px;
+  background: #f7fbf9;
+  border-left: 5px solid #16816f;
+}
+
+.criterio-nao_atendido {
+  border-left-color: #b95042;
+}
+
+.criterio-nao_se_aplica {
+  border-left-color: #d39f37;
+}
+
+.criterio-check h3,
+.criterio-check p {
+  margin: 0;
+}
+
+.criterio-check h3 {
+  font-size: 0.94rem;
+}
+
+.criterio-check p {
+  color: #52717a;
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.critical-label {
+  display: inline-block;
+  margin-top: 5px;
+  color: #9f3f32;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.avaliacao-notes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+  margin-top: 32px;
+}
+
+.avaliacao-notes p,
+.avaliacao-notes ul {
+  line-height: 1.6;
+}
+
 .transcript-panel,
 .audio-panel {
   padding: clamp(26px, 4vw, 42px);
@@ -1054,8 +1171,14 @@ h1 {
   }
 
   .atendimento-row,
-  .atendimento-content {
+  .atendimento-content,
+  .avaliacao-checklist,
+  .avaliacao-notes {
     grid-template-columns: 1fr;
+  }
+
+  .avaliacao-heading {
+    flex-direction: column;
   }
 
   .atendimento-row-data,
