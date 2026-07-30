@@ -96,9 +96,14 @@ export function HomePage() {
           as permissões de {roleNames[session.user.role]}.
         </p>
         {session.user.role === 'admin' ? (
-          <Link className="admin-feature-link" to="/admin/configuracao-ia">
-            Configurar IA Avaliadora
-          </Link>
+          <div className="admin-feature-links">
+            <Link className="admin-feature-link" to="/admin/usuarios">
+              Administrar usuários
+            </Link>
+            <Link className="admin-feature-link" to="/admin/configuracao-ia">
+              Configurar IA Avaliadora
+            </Link>
+          </div>
         ) : null}
       </div>
       <aside className="identity-card">

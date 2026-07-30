@@ -15,6 +15,10 @@
     "./health": {
       "types": "./src/health.ts",
       "default": "./dist/health.js"
+    },
+    "./usuarios": {
+      "types": "./src/usuarios.ts",
+      "default": "./dist/usuarios.js"
     }
   },
   "scripts": {
