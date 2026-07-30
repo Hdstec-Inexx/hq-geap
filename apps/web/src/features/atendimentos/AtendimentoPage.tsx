@@ -3,6 +3,7 @@ import {
   type AtendimentoDetail
 } from '@hq-geap/contracts/atendimentos';
 import { Link, useParams } from 'react-router-dom';
+import { AvaliacaoIaPanel } from '../avaliacoes/AvaliacaoIaPanel';
 import { formatDuration, useAuthenticatedResource } from './api';
 
 const currency = new Intl.NumberFormat('pt-BR', {
@@ -47,6 +48,10 @@ export function AtendimentoPage() {
         <div><span>Transferência</span><strong>{atendimento.houveTransferencia ? 'Realizada' : 'Não realizada'}</strong></div>
         {atendimento.custo !== undefined ? <div><span>Custo</span><strong>{atendimento.custo === null ? 'Não disponível' : currency.format(atendimento.custo)}</strong></div> : null}
       </section>
+
+      {atendimento.status === 'concluido' ? (
+        <AvaliacaoIaPanel atendimentoId={atendimento.id} />
+      ) : null}
 
       <div className="atendimento-content">
         <section className="transcript-panel">

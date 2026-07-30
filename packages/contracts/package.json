@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./avaliacoes": {
+      "types": "./src/avaliacoes.ts",
+      "default": "./dist/avaliacoes.js"
+    },
     "./atendimentos": {
       "types": "./src/atendimentos.ts",
       "default": "./dist/atendimentos.js"
