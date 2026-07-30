@@ -199,7 +199,7 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
 
     await queryDatabase(`
       update criterios
-      set nome = 'Nome atual alterado', critico = false, ordem = 99
+      set nome = 'Nome atual alterado', valor = 0.25, critico = false, ordem = 99
       where chave = 'informou_protocolo_email'
     `);
     try {
@@ -213,6 +213,7 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
           expect.objectContaining({
             chave: 'informou_protocolo_email',
             nome: 'Informação de Protocolo',
+            valor: 2.5,
             critico: true,
             estado: 'nao_atendido',
             ordem: 3
@@ -222,7 +223,7 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
     } finally {
       await queryDatabase(`
         update criterios
-        set nome = 'Informação de Protocolo', critico = true, ordem = 3
+        set nome = 'Informação de Protocolo', valor = 2.5, critico = true, ordem = 3
         where chave = 'informou_protocolo_email'
       `);
     }

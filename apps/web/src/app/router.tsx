@@ -4,6 +4,7 @@ import { LoginPage } from '../features/auth/LoginPage';
 import { HomePage, RequireRole, RequireSession } from '../features/auth/routes';
 import { HealthPage } from '../features/health/routes';
 import { ConfiguracaoIaRoute } from '../features/admin/configuracao-ia/routes';
+import { CriteriosRoute } from '../features/admin/criterios/routes';
 import { UsuariosRoute } from '../features/admin/usuarios/routes';
 import { AtendimentoPage } from '../features/atendimentos/AtendimentoPage';
 import { AtendimentosPage } from '../features/atendimentos/AtendimentosPage';
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
             element: <RequireRole roles={['admin']} />,
             children: [
               { path: '/admin', element: <HomePage /> },
+              { path: '/admin/criterios', element: <CriteriosRoute /> },
               { path: '/admin/usuarios', element: <UsuariosRoute /> },
               {
                 path: '/admin/configuracao-ia',
