@@ -80,6 +80,39 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
     `);
   });
 
+  test('reivindica pendencias distintas e entrega o contrato canonico da Regua', async () => {
+    const firstAtendimentoId = await createAtendimento('conv-claim-primeiro');
+    const secondAtendimentoId = await createAtendimento('conv-claim-segundo');
+    const claimedIds = [firstAtendimentoId, secondAtendimentoId];
+
+    try {
+      const first = await queryDatabase<{
+        atendimento_id: string;
+        checklist_schema: Record<string, { enum: string[] }>;
+        criterio_chaves: string[];
+      }>('select * from reivindicar_avaliacoes_ia(1)');
+      const second = await queryDatabase<{ atendimento_id: string }>(
+        'select * from reivindicar_avaliacoes_ia(1)'
+      );
+
+      expect(first.rows[0]?.atendimento_id).not.toBe(second.rows[0]?.atendimento_id);
+      expect(claimedIds).toContain(first.rows[0]?.atendimento_id);
+      expect(claimedIds).toContain(second.rows[0]?.atendimento_id);
+      expect(first.rows[0]?.criterio_chaves).toContain('solicitou_cpf');
+      expect(first.rows[0]?.checklist_schema.validou_email_por_extenso?.enum).toContain(
+        'nao_se_aplica'
+      );
+      expect(first.rows[0]?.checklist_schema.solicitou_cpf?.enum).not.toContain(
+        'nao_se_aplica'
+      );
+    } finally {
+      await queryDatabase(
+        'delete from atendimentos where id = any($1::uuid[])',
+        [claimedIds]
+      );
+    }
+  });
+
   test('persiste checklist e nota recalculada sem estado parcial', async () => {
     const atendimentoId = await createAtendimento('conv-avaliacao-aprovada');
     const result = await persistirAvaliacao(atendimentoId, aprovada);
@@ -154,7 +187,7 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
       nota: 7.5,
       falhasIdentificadas: falhaCritica.falhas_identificadas,
       resumoAtendimento: falhaCritica.resumo_atendimento,
-      promptVersao: 1,
+      promptVersao: 2,
       checklist: expect.arrayContaining([
         expect.objectContaining({
           chave: 'informou_protocolo_email',
@@ -216,6 +249,6 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
     await expect(page.getByText('Reprovado')).toBeVisible();
     await expect(page.getByText('7,5')).toBeVisible();
     await expect(page.getByText('Informação de Protocolo')).toBeVisible();
-    await expect(page.getByText('Prompt v1')).toBeVisible();
+    await expect(page.getByText('Prompt v2')).toBeVisible();
   });
 });

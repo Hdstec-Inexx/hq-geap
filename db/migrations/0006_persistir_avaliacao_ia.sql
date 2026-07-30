@@ -1,22 +1,109 @@
-alter table avaliacao_criterios
-  add column criterio_chave text,
-  add column criterio_nome text,
-  add column criterio_critico boolean,
-  add column criterio_ordem smallint;
-
-update avaliacao_criterios ac
-set criterio_chave = c.chave,
-    criterio_nome = c.nome,
-    criterio_critico = c.critico,
-    criterio_ordem = c.ordem
-from criterios c
-where c.id = ac.criterio_id;
+do $$
+begin
+  if exists (select 1 from avaliacao_criterios) then
+    raise exception 'Cannot create trustworthy criterion snapshots from existing checks';
+  end if;
+end;
+$$;
 
 alter table avaliacao_criterios
-  alter column criterio_chave set not null,
-  alter column criterio_nome set not null,
-  alter column criterio_critico set not null,
-  alter column criterio_ordem set not null;
+  add column criterio_chave text not null,
+  add column criterio_nome text not null,
+  add column criterio_critico boolean not null,
+  add column criterio_ordem smallint not null;
+
+create table avaliacoes_ia_execucoes (
+  atendimento_id uuid primary key references atendimentos(id) on delete cascade,
+  lease_ate timestamptz not null,
+  criado_em timestamptz not null default now()
+);
+create index idx_avaliacoes_ia_execucoes_lease
+  on avaliacoes_ia_execucoes(lease_ate);
+
+create function reivindicar_avaliacoes_ia(p_limite integer default 20)
+returns table (
+  atendimento_id uuid,
+  transcricao jsonb,
+  prompt_id uuid,
+  prompt_versao integer,
+  prompt text,
+  provedor text,
+  modelo text,
+  temperatura numeric,
+  criterio_chaves text[],
+  checklist_schema jsonb,
+  contrato_criterios text,
+  lease_ate timestamptz
+)
+language sql
+as $$
+  with configuracao as materialized (
+    select id, versao, prompt, provedor, modelo, temperatura
+    from prompts_ia_avaliadora
+    where ativo
+  ),
+  candidatos as (
+    select a.id
+    from atendimentos a
+    cross join configuracao
+    left join avaliacoes_ia_execucoes e on e.atendimento_id = a.id
+    where a.status = 'concluido'
+      and (e.atendimento_id is null or e.lease_ate <= now())
+      and not exists (
+        select 1 from avaliacoes av
+        where av.atendimento_id = a.id and av.autor = 'ia'
+      )
+    order by a.concluido_em, a.id
+    for update of a skip locked
+    limit least(greatest(p_limite, 1), 100)
+  ),
+  reivindicados as (
+    insert into avaliacoes_ia_execucoes (atendimento_id, lease_ate)
+    select id, now() + interval '10 minutes'
+    from candidatos
+    on conflict (atendimento_id) do update
+      set lease_ate = excluded.lease_ate
+      where avaliacoes_ia_execucoes.lease_ate <= now()
+    returning atendimento_id, lease_ate
+  ),
+  regua as (
+    select
+      array_agg(chave order by ordem) as criterio_chaves,
+      jsonb_object_agg(
+        chave,
+        jsonb_build_object(
+          'type', 'string',
+          'enum', case
+            when condicional then jsonb_build_array('atendido', 'nao_atendido', 'nao_se_aplica')
+            else jsonb_build_array('atendido', 'nao_atendido')
+          end
+        )
+      ) as checklist_schema,
+      string_agg(
+        format('- %s (%s): %s', chave, nome, coalesce(descricao, '')),
+        E'\n' order by ordem
+      ) as contrato_criterios
+    from criterios
+    where ativo
+  )
+  select
+    a.id,
+    a.transcricao,
+    p.id,
+    p.versao,
+    p.prompt,
+    p.provedor,
+    p.modelo,
+    p.temperatura,
+    r.criterio_chaves,
+    r.checklist_schema,
+    r.contrato_criterios,
+    claimed.lease_ate
+  from reivindicados claimed
+  join atendimentos a on a.id = claimed.atendimento_id
+  cross join configuracao p
+  cross join regua r;
+$$;
 
 create function persistir_avaliacao_ia(
   p_atendimento_id uuid,
@@ -42,6 +129,7 @@ begin
   where a.atendimento_id = p_atendimento_id and a.autor = 'ia';
 
   if found then
+    delete from avaliacoes_ia_execucoes where atendimento_id = p_atendimento_id;
     return query select v_avaliacao_id, v_nota;
     return;
   end if;
@@ -147,6 +235,7 @@ begin
   from jsonb_each_text(p_checklist) as item(chave, estado)
   join criterios c on c.chave = item.chave and c.ativo;
 
+  delete from avaliacoes_ia_execucoes where atendimento_id = p_atendimento_id;
   return query select v_avaliacao_id, v_nota;
 end;
 $$;
