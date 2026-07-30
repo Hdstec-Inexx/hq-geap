@@ -20,6 +20,10 @@
       "types": "./src/configuracao-ia.ts",
       "default": "./dist/configuracao-ia.js"
     },
+    "./curadoria": {
+      "types": "./src/curadoria.ts",
+      "default": "./dist/curadoria.js"
+    },
     "./health": {
       "types": "./src/health.ts",
       "default": "./dist/health.js"
