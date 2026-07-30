@@ -26,6 +26,7 @@ export default defineConfig({
         CORS_ORIGIN: 'http://127.0.0.1:5173',
         HOST: '127.0.0.1',
         JWT_SECRET: 'test-only-secret-with-at-least-32-chars',
+        INGESTION_API_KEY: 'test-ingestion-key-with-at-least-32-chars',
         PORT: '3000'
       },
       reuseExistingServer: false,

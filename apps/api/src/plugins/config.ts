@@ -12,7 +12,17 @@ const configSchema = z.object({
     .default('postgres://hq_geap:hq_geap@127.0.0.1:5432/hq_geap'),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
   JWT_SECRET: z.string().min(32).default('development-only-secret-change-me'),
-  JWT_EXPIRES_IN_SECONDS: z.coerce.number().int().positive().default(28_800)
+  JWT_EXPIRES_IN_SECONDS: z.coerce.number().int().positive().default(28_800),
+  INGESTION_API_KEY: z
+    .string()
+    .min(32)
+    .default('development-ingestion-key-change-me'),
+  STORAGE_PROVIDER: z.enum(['public', 'minio', 'gcs']).default('public'),
+  STORAGE_BUCKET: z.string().trim().min(1).default('hq-geap-audio'),
+  STORAGE_PUBLIC_URL: z.url().default('http://127.0.0.1:9000/hq-geap-audio'),
+  STORAGE_ENDPOINT: z.url().optional(),
+  STORAGE_ACCESS_KEY: z.string().trim().min(1).optional(),
+  STORAGE_SECRET_KEY: z.string().trim().min(1).optional()
 }).superRefine((config, context) => {
   if (
     config.NODE_ENV === 'production' &&
@@ -22,6 +32,47 @@ const configSchema = z.object({
       code: 'custom',
       path: ['JWT_SECRET'],
       message: 'JWT_SECRET must be configured in production'
+    });
+  }
+  if (
+    config.NODE_ENV === 'production' &&
+    config.INGESTION_API_KEY === 'development-ingestion-key-change-me'
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['INGESTION_API_KEY'],
+      message: 'INGESTION_API_KEY must be configured in production'
+    });
+  }
+  if (config.NODE_ENV === 'production' && config.STORAGE_PROVIDER === 'public') {
+    context.addIssue({
+      code: 'custom',
+      path: ['STORAGE_PROVIDER'],
+      message: 'A signed storage provider must be configured in production'
+    });
+  }
+  if (
+    config.STORAGE_PROVIDER === 'minio' &&
+    (!config.STORAGE_ENDPOINT ||
+      !config.STORAGE_ACCESS_KEY ||
+      !config.STORAGE_SECRET_KEY)
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['STORAGE_PROVIDER'],
+      message: 'MinIO endpoint and credentials are required'
+    });
+  }
+  if (
+    config.NODE_ENV === 'production' &&
+    config.STORAGE_PROVIDER === 'minio' &&
+    config.STORAGE_ENDPOINT &&
+    new URL(config.STORAGE_ENDPOINT).protocol !== 'https:'
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['STORAGE_ENDPOINT'],
+      message: 'MinIO must use HTTPS in production'
     });
   }
 });

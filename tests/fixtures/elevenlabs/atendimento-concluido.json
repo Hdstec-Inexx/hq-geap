@@ -1,0 +1,72 @@
+{
+  "type": "post_call_transcription",
+  "event_timestamp": 1785330252,
+  "data": {
+    "conversation_id": "conv-fixture-concluido-001",
+    "agent_id": "agent-livia-test",
+    "status": "done",
+    "transcript": [
+      {
+        "role": "agent",
+        "message": "Olá, eu sou a Lívia. Como posso ajudar?",
+        "time_in_call_secs": 0
+      },
+      {
+        "role": "user",
+        "message": "Preciso da segunda via do boleto.",
+        "time_in_call_secs": 8
+      },
+      {
+        "role": "agent",
+        "message": "Vou enviar o boleto e o protocolo para o e-mail cadastrado.",
+        "time_in_call_secs": 19,
+        "tool_calls": [
+          { "tool_name": "enviar_segunda_via_boleto", "tool_call_id": "tool-001", "tool_has_been_called": true },
+          { "tool_name": "transfer_to_number", "tool_call_id": "tool-002", "tool_has_been_called": false }
+        ]
+      }
+    ],
+    "metadata": {
+      "start_time_unix_secs": 1785330000,
+      "call_duration_secs": 252,
+      "cost": 296,
+      "cost_fiat": 0.1842
+    },
+    "analysis": {
+      "data_collection_results": {
+        "Classificação": { "value": "Financeiro/Boletos" }
+      }
+    },
+    "has_audio": true
+  },
+  "normalized": {
+    "conversation_id": "conv-fixture-concluido-001",
+    "agent_id": "agent-livia-test",
+    "event_timestamp": 1785330252,
+    "status": "concluido",
+    "started_at": "2026-07-29T13:00:00.000Z",
+    "completed_at": "2026-07-29T13:04:12.000Z",
+    "duration_seconds": 252,
+    "transcript": [
+      {
+        "role": "agent",
+        "message": "Olá, eu sou a Lívia. Como posso ajudar?",
+        "time_in_call_secs": 0
+      },
+      {
+        "role": "user",
+        "message": "Preciso da segunda via do boleto.",
+        "time_in_call_secs": 8
+      },
+      {
+        "role": "agent",
+        "message": "Vou enviar o boleto e o protocolo para o e-mail cadastrado.",
+        "time_in_call_secs": 19
+      }
+    ],
+    "audio_reference": "atendimentos/conv-fixture-concluido-001.mp3",
+    "contact_reason": "Financeiro/Boletos",
+    "transferred": false,
+    "cost": 0.1842
+  }
+}

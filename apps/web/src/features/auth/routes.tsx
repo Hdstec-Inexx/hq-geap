@@ -95,6 +95,9 @@ export function HomePage() {
           Seu acesso está pronto. As áreas do HQ GEAP serão liberadas conforme
           as permissões de {roleNames[session.user.role]}.
         </p>
+        <Link className="admin-feature-link" to="/atendimentos">
+          Consultar Atendimentos
+        </Link>
         {session.user.role === 'admin' ? (
           <Link className="admin-feature-link" to="/admin/configuracao-ia">
             Configurar IA Avaliadora
