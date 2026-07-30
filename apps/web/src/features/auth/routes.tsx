@@ -137,6 +137,9 @@ export function HomePage() {
             <Link className="admin-feature-link" to="/admin/configuracao-ia">
               Configurar IA Avaliadora
             </Link>
+            <Link className="admin-feature-link" to="/admin/criterios">
+              Consultar Régua de Avaliação
+            </Link>
           </div>
         ) : null}
       </div>
