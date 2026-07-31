@@ -1,37 +1,14 @@
 # Referência para serviço Compose no Easypanel.
 # Preferência do painel: Domains apontando para api:3000 e web:8080 (sem publicar ports no host).
 # Credenciais e URLs públicas vêm das Environment Variables do Easypanel.
+# PostgreSQL é externo: informe DATABASE_URL apontando para o DB já provisionado.
 
 services:
-  db:
-    image: postgres:17-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-hq_geap}
-      POSTGRES_USER: ${POSTGRES_USER:-hq_geap}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
-    volumes:
-      - hq_geap_postgres:/var/lib/postgresql/data
-    healthcheck:
-      test:
-        [
-          'CMD-SHELL',
-          'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB'
-        ]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-    security_opt:
-      - no-new-privileges:true
-
   api:
     build:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
-    depends_on:
-      db:
-        condition: service_healthy
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
@@ -87,6 +64,3 @@ services:
       timeout: 3s
       retries: 3
       start_period: 5s
-
-volumes:
-  hq_geap_postgres:
