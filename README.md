@@ -22,7 +22,7 @@ As configurações locais possuem valores padrão compatíveis com `compose.yaml
 
 ## Deploy (Easypanel / VPS)
 
-Produção usa `Dockerfile` (API) e `Dockerfile.web` (UI) porque a API e a interface compartilham paths. Guia: [`docs/deploy/easypanel.md`](./docs/deploy/easypanel.md). Referência Compose: `compose.easypanel.yaml`.
+Produção usa `Dockerfile` (API, porta 3000) e `Dockerfile.web` (UI nginx, porta 8080) porque a API e a interface compartilham paths. Guia: [`docs/deploy/easypanel.md`](./docs/deploy/easypanel.md). Referência Compose: `compose.easypanel.yaml`.
 
 ## Verificações
 
