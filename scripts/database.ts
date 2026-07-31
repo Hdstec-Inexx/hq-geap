@@ -1,10 +1,14 @@
 import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import pg from 'pg';
 import { loadEnvironment } from './environment.js';
 
-const { Client } = pg;
+// Node ESM ignores NODE_PATH; in the Docker image `pg` lives under apps/api.
+const { Client } = createRequire(
+  join(dirname(fileURLToPath(import.meta.url)), '../apps/api/package.json')
+)('pg') as typeof import('pg');
 loadEnvironment();
 const rootDirectory = fileURLToPath(new URL('..', import.meta.url));
 const databaseUrl =
