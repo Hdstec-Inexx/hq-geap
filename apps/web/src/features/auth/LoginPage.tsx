@@ -1,7 +1,14 @@
 import { loginResponseSchema } from '@hq-geap/contracts/auth';
 import { useState, type FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { apiUrl, getSession, saveSession } from './session';
+import {
+  apiUrl,
+  fetchPerfil,
+  getPerfil,
+  getSession,
+  savePerfil,
+  saveSession
+} from './session';
 
 type LoginState = 'idle' | 'submitting' | 'invalid' | 'unavailable';
 
@@ -9,8 +16,9 @@ export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [state, setState] = useState<LoginState>('idle');
+  const [showPassword, setShowPassword] = useState(false);
 
-  if (getSession()) {
+  if (getSession() && getPerfil()) {
     return <Navigate replace to="/" />;
   }
 
@@ -36,7 +44,10 @@ export function LoginPage() {
         throw new Error(`Login request failed with ${response.status}`);
       }
 
-      saveSession(loginResponseSchema.parse(await response.json()));
+      const session = loginResponseSchema.parse(await response.json());
+      const perfil = await fetchPerfil(session.token);
+      saveSession(session);
+      savePerfil(perfil);
       const returnTo = (location.state as { from?: string } | null)?.from ?? '/';
       navigate(returnTo, { replace: true });
     } catch {
@@ -66,10 +77,11 @@ export function LoginPage() {
           <h2>Identifique-se</h2>
         </div>
 
-        <label>
+        <label htmlFor="login-email">
           <span>E-mail</span>
           <input
             autoComplete="username"
+            id="login-email"
             name="email"
             placeholder="nome@empresa.com.br"
             required
@@ -77,15 +89,27 @@ export function LoginPage() {
           />
         </label>
 
-        <label>
-          <span>Senha</span>
-          <input
-            autoComplete="current-password"
-            name="password"
-            required
-            type="password"
-          />
-        </label>
+        <div className="password-field">
+          <label htmlFor="login-password">
+            <span>Senha</span>
+            <input
+              autoComplete="current-password"
+              id="login-password"
+              name="password"
+              required
+              type={showPassword ? 'text' : 'password'}
+            />
+          </label>
+          <button
+            aria-controls="login-password"
+            aria-pressed={showPassword}
+            className="password-toggle"
+            onClick={() => setShowPassword((current) => !current)}
+            type="button"
+          >
+            {showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+          </button>
+        </div>
 
         {state === 'invalid' ? (
           <p className="form-error" role="alert">

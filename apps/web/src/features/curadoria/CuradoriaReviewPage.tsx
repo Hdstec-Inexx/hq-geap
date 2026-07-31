@@ -6,7 +6,7 @@ import {
 import type { EstadoCriterio } from '@hq-geap/contracts/avaliacoes';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { apiUrl, getSession } from '../auth/session';
+import { apiUrl, getPerfil, getSession } from '../auth/session';
 import { formatDuration, useAuthenticatedResource } from '../atendimentos/api';
 import { ComentariosPanel } from '../comentarios/ComentariosPanel';
 
@@ -131,7 +131,7 @@ function ReviewForm({
 
 function ReviewContent({ detail, onSaved }: { detail: CuradoriaDetail; onSaved: () => void }) {
   const atendimento = detail.atendimento;
-  const role = getSession()?.user.role;
+  const role = getPerfil()?.role;
   const canWrite = role === 'admin' || role === 'curador';
   return (
     <main className="atendimentos-page curadoria-review-page">

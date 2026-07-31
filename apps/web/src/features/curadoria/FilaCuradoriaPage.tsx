@@ -3,7 +3,7 @@ import {
   type FilaCuradoriaItem
 } from '@hq-geap/contracts/curadoria';
 import { Link } from 'react-router-dom';
-import { getSession } from '../auth/session';
+import { getPerfil } from '../auth/session';
 import { formatDuration, useAuthenticatedResource } from '../atendimentos/api';
 
 const dateTime = new Intl.DateTimeFormat('pt-BR', {
@@ -13,7 +13,7 @@ const dateTime = new Intl.DateTimeFormat('pt-BR', {
 
 export function FilaCuradoriaPage() {
   const state = useAuthenticatedResource('/curadoria?limit=100', filaCuradoriaSchema);
-  const canWrite = getSession()?.user.role !== 'gestao';
+  const canWrite = getPerfil()?.role !== 'gestao';
 
   return (
     <main className="atendimentos-page curadoria-page">
