@@ -1,0 +1,33 @@
+{
+  "conversations": [
+    {
+      "agent_id": "agent-livia-test",
+      "conversation_id": "conv-fixture-concluido-001",
+      "start_time_unix_secs": 1785330000,
+      "call_duration_secs": 252,
+      "message_count": 3,
+      "status": "done",
+      "call_successful": "success"
+    },
+    {
+      "agent_id": "agent-livia-test",
+      "conversation_id": "conv-ja-persistido-002",
+      "start_time_unix_secs": 1785329700,
+      "call_duration_secs": 120,
+      "message_count": 2,
+      "status": "done",
+      "call_successful": "success"
+    },
+    {
+      "agent_id": "agent-livia-test",
+      "conversation_id": "conv-em-andamento-003",
+      "start_time_unix_secs": 1785330200,
+      "call_duration_secs": 0,
+      "message_count": 1,
+      "status": "processing",
+      "call_successful": "unknown"
+    }
+  ],
+  "next_cursor": null,
+  "has_more": false
+}

@@ -81,7 +81,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     expect(persisted.rows[0]?.count).toBe('0');
   });
 
-  test('cria pelo conversation_id e atualiza o reenvio sem duplicar', async ({
+  test('converge reenvios no conversation_id sem duplicar Atendimento', async ({
     request
   }) => {
     const first = await request.post(`${apiUrl}/atendimentos/ingestao`, {
@@ -100,6 +100,17 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       id: created.id,
       conversationId: atendimento.conversation_id,
       motivoContato: 'Segunda via de boleto',
+      status: 'concluido'
+    });
+
+    const secondReplay = await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: atendimento,
+      headers: ingestionHeaders
+    });
+    expect(secondReplay.status()).toBe(200);
+    await expect(secondReplay.json()).resolves.toMatchObject({
+      id: created.id,
+      conversationId: atendimento.conversation_id,
       status: 'concluido'
     });
 
