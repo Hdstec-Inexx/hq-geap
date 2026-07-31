@@ -13,11 +13,11 @@ const routes: FastifyPluginAsync = async (app) => {
   const repository = createComentariosRepository(app.db);
   const readAuth = {
     config: {
-      auth: { roles: ['curador' as const, 'gestao' as const] }
+      auth: { roles: ['curador' as const, 'gestao' as const, 'admin' as const] }
     }
   };
   const writeAuth = {
-    config: { auth: { roles: ['curador' as const] } }
+    config: { auth: { roles: ['curador' as const, 'admin' as const] } }
   };
   const adminAuth = {
     config: { auth: { roles: ['admin' as const] } }

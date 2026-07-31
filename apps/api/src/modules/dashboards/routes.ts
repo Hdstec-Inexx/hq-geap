@@ -11,7 +11,7 @@ const routes: FastifyPluginAsync = async (app) => {
 
   app.get<{ Querystring: { inicio?: string; fim?: string } }>(
     '/dashboards/gestao',
-    { config: { auth: { roles: ['gestao'] } } },
+    { config: { auth: { roles: ['gestao', 'admin'] } } },
     async (request): Promise<Dashboard> => {
       const periodo = dashboardPeriodSchema.safeParse(request.query);
       if (!periodo.success) {

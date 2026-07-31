@@ -12,7 +12,7 @@ const dateTime = new Intl.DateTimeFormat('pt-BR', {
 });
 
 export function FilaCuradoriaPage() {
-  const state = useAuthenticatedResource('/curadoria', filaCuradoriaSchema);
+  const state = useAuthenticatedResource('/curadoria?limit=100', filaCuradoriaSchema);
   const canWrite = getSession()?.user.role !== 'gestao';
 
   return (

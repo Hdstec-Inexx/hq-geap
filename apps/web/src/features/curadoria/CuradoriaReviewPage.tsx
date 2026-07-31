@@ -163,7 +163,21 @@ function ReviewContent({ detail, onSaved }: { detail: CuradoriaDetail; onSaved: 
         <section className="ia-review-context">
           <p className="panel-label">Consulta somente leitura</p>
           <h2>Conferência humana</h2>
-          <p>Gestão pode consultar a avaliação e o histórico, sem alterá-los.</p>
+          {detail.avaliacaoMaisRecente ? (
+            <dl className="readonly-checklist">
+              {detail.avaliacaoMaisRecente.checklist.map((criterio) => (
+                <div key={criterio.chave}>
+                  <dt>
+                    {criterio.nome}
+                    {criterio.critico ? ' (crítico)' : ''}
+                  </dt>
+                  <dd>{stateLabels[criterio.estado]}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <p>Ainda não há conferência do Curador para este Atendimento.</p>
+          )}
         </section>
       )}
 
@@ -197,6 +211,14 @@ function ReviewContent({ detail, onSaved }: { detail: CuradoriaDetail; onSaved: 
             <strong>{detail.avaliacaoMaisRecente.autor.nome}</strong>
             <span>{dateTime.format(new Date(detail.avaliacaoMaisRecente.criadoEm))}</span>
             <b>{detail.avaliacaoMaisRecente.nota.toLocaleString('pt-BR')} / {detail.avaliacaoMaisRecente.aprovacao === 'aprovado' ? 'Aprovado' : 'Reprovado'}</b>
+            <dl>
+              {detail.avaliacaoMaisRecente.checklist.map((criterio) => (
+                <div key={criterio.chave}>
+                  <dt>{criterio.nome}</dt>
+                  <dd>{stateLabels[criterio.estado]}</dd>
+                </div>
+              ))}
+            </dl>
           </article>
         ) : <p>A primeira conferência ainda não foi salva.</p>}
         {detail.historico.length > 1 ? (

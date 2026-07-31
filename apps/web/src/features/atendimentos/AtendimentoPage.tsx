@@ -3,6 +3,7 @@ import {
   type AtendimentoDetail
 } from '@hq-geap/contracts/atendimentos';
 import { Link, useParams } from 'react-router-dom';
+import { AvaliacaoCuradorPanel } from '../avaliacoes/AvaliacaoCuradorPanel';
 import { AvaliacaoIaPanel } from '../avaliacoes/AvaliacaoIaPanel';
 import { ComentariosPanel } from '../comentarios/ComentariosPanel';
 import { formatDuration, useAuthenticatedResource } from './api';
@@ -51,7 +52,10 @@ export function AtendimentoPage() {
       </section>
 
       {atendimento.status === 'concluido' ? (
-        <AvaliacaoIaPanel atendimentoId={atendimento.id} />
+        <div className="avaliacoes-lado-a-lado">
+          <AvaliacaoIaPanel atendimentoId={atendimento.id} />
+          <AvaliacaoCuradorPanel atendimentoId={atendimento.id} />
+        </div>
       ) : null}
 
       <div className="atendimento-content">

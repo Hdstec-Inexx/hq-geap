@@ -1,4 +1,5 @@
 import {
+  filaCuradoriaQuerySchema,
   salvarConferenciaSchema,
   type AvaliacaoCurador,
   type CuradoriaDetail,
@@ -16,13 +17,23 @@ import {
 const routes: FastifyPluginAsync = async (app) => {
   const repository = createCuradoriaRepository(app.db);
   const readAuth = {
-    config: { auth: { roles: ['curador' as const, 'gestao' as const] } }
+    config: {
+      auth: { roles: ['curador' as const, 'gestao' as const, 'admin' as const] }
+    }
   };
-  const writeAuth = { config: { auth: { roles: ['curador' as const] } } };
+  const writeAuth = {
+    config: { auth: { roles: ['curador' as const, 'admin' as const] } }
+  };
 
-  app.get('/curadoria', readAuth, async (): Promise<FilaCuradoriaItem[]> =>
-    (await repository.listPending()).map(toFilaCuradoriaItem)
-  );
+  app.get('/curadoria', readAuth, async (request): Promise<FilaCuradoriaItem[]> => {
+    const query = filaCuradoriaQuerySchema.safeParse(request.query);
+    if (!query.success) {
+      throw app.httpErrors.badRequest('Invalid pagination');
+    }
+    return (await repository.listPending(query.data.limit, query.data.offset)).map(
+      toFilaCuradoriaItem
+    );
+  });
 
   app.get<{ Params: { atendimentoId: string } }>(
     '/curadoria/:atendimentoId',

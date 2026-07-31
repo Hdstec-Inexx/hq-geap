@@ -29,12 +29,21 @@ export type CuradoriaAtendimentoRow = AtendimentoRow & {
   historico: AvaliacaoCuradorRow[];
 };
 
-async function findChecklist(
+async function findChecklists(
   queryable: pg.Pool | pg.PoolClient,
-  avaliacaoId: string
-): Promise<CriterioConferencia[]> {
-  const result = await queryable.query<CriterioConferencia>(`
+  avaliacaoIds: string[]
+): Promise<Map<string, CriterioConferencia[]>> {
+  const byId = new Map<string, CriterioConferencia[]>();
+  for (const id of avaliacaoIds) {
+    byId.set(id, []);
+  }
+  if (avaliacaoIds.length === 0) {
+    return byId;
+  }
+
+  const result = await queryable.query<CriterioConferencia & { avaliacaoId: string }>(`
     select
+      ac.avaliacao_id as "avaliacaoId",
       ac.criterio_id as "criterioId",
       ac.criterio_chave as chave,
       ac.criterio_nome as nome,
@@ -44,15 +53,20 @@ async function findChecklist(
       ac.criterio_condicional as condicional,
       ac.criterio_ordem as ordem
     from avaliacao_criterios ac
-    where ac.avaliacao_id = $1
-    order by ac.criterio_ordem
-  `, [avaliacaoId]);
-  return result.rows;
+    where ac.avaliacao_id = any($1::uuid[])
+    order by ac.avaliacao_id, ac.criterio_ordem
+  `, [avaliacaoIds]);
+
+  for (const row of result.rows) {
+    const { avaliacaoId, ...criterio } = row;
+    byId.get(avaliacaoId)?.push(criterio);
+  }
+  return byId;
 }
 
 export function createCuradoriaRepository(db: pg.Pool) {
   return {
-    async listPending(): Promise<FilaCuradoriaRow[]> {
+    async listPending(limit: number, offset: number): Promise<FilaCuradoriaRow[]> {
       const result = await db.query<FilaCuradoriaRow>(`
         select
           a.id,
@@ -66,7 +80,8 @@ export function createCuradoriaRepository(db: pg.Pool) {
         join agentes_voz agente on agente.id = a.agente_voz_id
         join avaliacoes ia on ia.atendimento_id = a.id and ia.autor = 'ia'
         order by a.concluido_em, a.id
-      `);
+        limit $1 offset $2
+      `, [limit, offset]);
       return result.rows;
     },
 
@@ -126,17 +141,19 @@ export function createCuradoriaRepository(db: pg.Pool) {
         where a.atendimento_id = $1 and a.autor = 'curador'
         order by a.criado_em desc, a.id desc
       `, [atendimentoId]);
-      const historico = await Promise.all(
-        avaliacoes.rows.map(async (avaliacao) => ({
-          ...avaliacao,
-          checklist: await findChecklist(db, avaliacao.id)
-        }))
-      );
+
+      const checklists = await findChecklists(db, [
+        ia.id,
+        ...avaliacoes.rows.map((avaliacao) => avaliacao.id)
+      ]);
 
       return {
         ...atendimentoRow,
-        avaliacaoIa: { ...ia, checklist: await findChecklist(db, ia.id) },
-        historico
+        avaliacaoIa: { ...ia, checklist: checklists.get(ia.id) ?? [] },
+        historico: avaliacoes.rows.map((avaliacao) => ({
+          ...avaliacao,
+          checklist: checklists.get(avaliacao.id) ?? []
+        }))
       };
     },
 
@@ -164,23 +181,46 @@ export function createCuradoriaRepository(db: pg.Pool) {
             criado_em as "criadoEm"
         `, [atendimentoId, autorUsuarioId, nota]);
         const avaliacao = result.rows[0]!;
-        for (const criterio of checklist) {
+        if (checklist.length > 0) {
           await client.query(`
             insert into avaliacao_criterios (
               avaliacao_id, criterio_id, criterio_chave, criterio_nome,
               criterio_critico, criterio_condicional, criterio_ordem, estado,
               valor_criterio
-            ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            )
+            select
+              $1,
+              x.criterio_id,
+              x.criterio_chave,
+              x.criterio_nome,
+              x.criterio_critico,
+              x.criterio_condicional,
+              x.criterio_ordem,
+              x.estado::estado_criterio,
+              x.valor_criterio
+            from unnest(
+              $2::uuid[],
+              $3::text[],
+              $4::text[],
+              $5::boolean[],
+              $6::boolean[],
+              $7::smallint[],
+              $8::text[],
+              $9::numeric[]
+            ) as x(
+              criterio_id, criterio_chave, criterio_nome, criterio_critico,
+              criterio_condicional, criterio_ordem, estado, valor_criterio
+            )
           `, [
             avaliacao.id,
-            criterio.criterioId,
-            criterio.chave,
-            criterio.nome,
-            criterio.critico,
-            criterio.condicional,
-            criterio.ordem,
-            criterio.estado,
-            criterio.valor
+            checklist.map((c) => c.criterioId),
+            checklist.map((c) => c.chave),
+            checklist.map((c) => c.nome),
+            checklist.map((c) => c.critico),
+            checklist.map((c) => c.condicional),
+            checklist.map((c) => c.ordem),
+            checklist.map((c) => c.estado),
+            checklist.map((c) => c.valor)
           ]);
         }
         await client.query('commit');

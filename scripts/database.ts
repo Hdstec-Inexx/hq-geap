@@ -17,6 +17,11 @@ type DatabaseFile = {
   checksum: string;
 };
 
+function checksumSql(sql: string) {
+  // Normalize CRLF→LF so Windows checkouts and Linux CI share the same checksum.
+  return createHash('sha256').update(sql.replace(/\r\n/g, '\n')).digest('hex');
+}
+
 async function databaseFiles(directory: 'migrations' | 'seeds') {
   const path = `${rootDirectory}/db/${directory}`;
   const names = (await readdir(path))
@@ -29,7 +34,7 @@ async function databaseFiles(directory: 'migrations' | 'seeds') {
       return {
         name,
         sql,
-        checksum: createHash('sha256').update(sql).digest('hex')
+        checksum: checksumSql(sql)
       };
     })
   );
@@ -57,10 +62,22 @@ async function apply(directory: 'migrations' | 'seeds') {
       );
 
       if (applied.rowCount) {
-        if (applied.rows[0]?.checksum !== file.checksum) {
-          throw new Error(`${directory}/${file.name} changed after being applied`);
+        const stored = applied.rows[0]?.checksum;
+        if (stored === file.checksum) {
+          continue;
         }
-        continue;
+        // Heal checksums recorded from CRLF checkouts after LF normalization.
+        const crlfChecksum = createHash('sha256')
+          .update(file.sql.replace(/\n/g, '\r\n').replace(/\r\r\n/g, '\r\n'))
+          .digest('hex');
+        if (stored === crlfChecksum) {
+          await client.query(
+            'update schema_migrations set checksum = $1 where kind = $2 and name = $3',
+            [file.checksum, directory, file.name]
+          );
+          continue;
+        }
+        throw new Error(`${directory}/${file.name} changed after being applied`);
       }
 
       await client.query('begin');
