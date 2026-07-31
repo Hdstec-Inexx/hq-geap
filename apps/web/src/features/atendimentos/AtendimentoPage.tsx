@@ -4,6 +4,7 @@ import {
 } from '@hq-geap/contracts/atendimentos';
 import { Link, useParams } from 'react-router-dom';
 import { AvaliacaoIaPanel } from '../avaliacoes/AvaliacaoIaPanel';
+import { ComentariosPanel } from '../comentarios/ComentariosPanel';
 import { formatDuration, useAuthenticatedResource } from './api';
 
 const currency = new Intl.NumberFormat('pt-BR', {
@@ -71,6 +72,7 @@ export function AtendimentoPage() {
           {atendimento.audioUrl ? <audio controls preload="metadata" src={atendimento.audioUrl}>Seu navegador não suporta reprodução de áudio.</audio> : <p>Áudio ainda não disponível.</p>}
         </aside>
       </div>
+      <ComentariosPanel atendimentoId={atendimento.id} />
     </main>
   );
 }

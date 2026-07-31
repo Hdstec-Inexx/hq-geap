@@ -141,6 +141,9 @@ export function HomePage() {
         </Link>
         {session.user.role === 'admin' ? (
           <div className="admin-feature-links">
+            <Link className="admin-feature-link" to="/admin/comentarios">
+              Trabalhar fila de manutenção
+            </Link>
             <Link className="admin-feature-link" to="/admin/usuarios">
               Administrar usuários
             </Link>

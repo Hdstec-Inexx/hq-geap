@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { apiUrl, getSession } from '../auth/session';
 import { formatDuration, useAuthenticatedResource } from '../atendimentos/api';
+import { ComentariosPanel } from '../comentarios/ComentariosPanel';
 
 const stateLabels: Record<EstadoCriterio, string> = {
   atendido: 'Atendido',
@@ -223,6 +224,7 @@ function ReviewContent({ detail, onSaved }: { detail: CuradoriaDetail; onSaved: 
           </details>
         ) : null}
       </section>
+      <ComentariosPanel atendimentoId={atendimento.id} />
     </main>
   );
 }
