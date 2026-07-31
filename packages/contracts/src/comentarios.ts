@@ -35,6 +35,11 @@ export const comentarioFilaSchema = comentarioSchema.extend({
 
 export const comentariosFilaSchema = z.array(comentarioFilaSchema);
 
+export const comentariosFilaPageSchema = z.object({
+  items: comentariosFilaSchema,
+  nextCursor: z.uuid().nullable()
+});
+
 export const criarComentarioSchema = z.object({
   texto: z.string().trim().min(1).max(4000)
 });
@@ -44,10 +49,13 @@ export const atualizarStatusComentarioSchema = z.object({
 });
 
 export const filtroStatusComentarioSchema = z.object({
-  status: statusComentarioSchema.default('pendente')
+  status: statusComentarioSchema.default('pendente'),
+  cursor: z.uuid().optional(),
+  limite: z.coerce.number().int().min(1).max(100).default(50)
 });
 
 export type StatusComentario = z.infer<typeof statusComentarioSchema>;
 export type Comentario = z.infer<typeof comentarioSchema>;
 export type ComentarioFila = z.infer<typeof comentarioFilaSchema>;
+export type ComentariosFilaPage = z.infer<typeof comentariosFilaPageSchema>;
 export type CriarComentario = z.infer<typeof criarComentarioSchema>;

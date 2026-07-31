@@ -1,37 +1,11 @@
 import {
   comentarioSchema,
-  comentariosSchema,
-  type Comentario
+  comentariosSchema
 } from '@hq-geap/contracts/comentarios';
 import { useState } from 'react';
 import { apiUrl, getSession } from '../auth/session';
 import { useAuthenticatedResource } from '../atendimentos/api';
-
-const dateTime = new Intl.DateTimeFormat('pt-BR', {
-  dateStyle: 'short',
-  timeStyle: 'short'
-});
-
-function ComentarioItem({ comentario }: { comentario: Comentario }) {
-  return (
-    <article className="comentario-item">
-      <div className="comentario-meta">
-        <strong>{comentario.autor.nome}</strong>
-        <span>{dateTime.format(new Date(comentario.criadoEm))}</span>
-        <span className={`comentario-status status-${comentario.status}`}>
-          {comentario.status === 'pendente' ? 'Pendente' : 'Resolvido'}
-        </span>
-      </div>
-      <p>{comentario.texto}</p>
-      {comentario.resolucao ? (
-        <small>
-          Resolvido por {comentario.resolucao.responsavel.nome} em{' '}
-          {dateTime.format(new Date(comentario.resolucao.resolvidoEm))}
-        </small>
-      ) : null}
-    </article>
-  );
-}
+import { ComentarioCard } from './ComentarioCard';
 
 export function ComentariosPanel({ atendimentoId }: { atendimentoId: string }) {
   const [revision, setRevision] = useState(0);
@@ -113,7 +87,7 @@ export function ComentariosPanel({ atendimentoId }: { atendimentoId: string }) {
       {state.status === 'ready' && state.data.length > 0 ? (
         <div className="comentarios-lista">
           {state.data.map((comentario) => (
-            <ComentarioItem comentario={comentario} key={comentario.id} />
+            <ComentarioCard comentario={comentario} key={comentario.id} />
           ))}
         </div>
       ) : null}

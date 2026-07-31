@@ -3,7 +3,7 @@ import {
   criarComentarioSchema,
   filtroStatusComentarioSchema,
   type Comentario,
-  type ComentarioFila
+  type ComentariosFilaPage
 } from '@hq-geap/contracts/comentarios';
 import type { FastifyPluginAsync } from 'fastify';
 import { createComentariosRepository } from './repository.js';
@@ -55,13 +55,25 @@ const routes: FastifyPluginAsync = async (app) => {
     }
   );
 
-  app.get<{ Querystring: { status?: string } }>(
+  app.get<{
+    Querystring: { status?: string; cursor?: string; limite?: string };
+  }>(
     '/comentarios',
     adminAuth,
-    async (request): Promise<ComentarioFila[]> => {
+    async (request): Promise<ComentariosFilaPage> => {
       const parsed = filtroStatusComentarioSchema.safeParse(request.query);
       if (!parsed.success) throw app.httpErrors.badRequest('Status invalido');
-      return (await repository.listByStatus(parsed.data.status)).map(toComentarioFila);
+      const rows = await repository.listByStatus(
+        parsed.data.status,
+        parsed.data.cursor,
+        parsed.data.limite
+      );
+      const items = rows.slice(0, parsed.data.limite).map(toComentarioFila);
+      return {
+        items,
+        nextCursor:
+          rows.length > parsed.data.limite ? items.at(-1)?.id ?? null : null
+      };
     }
   );
 

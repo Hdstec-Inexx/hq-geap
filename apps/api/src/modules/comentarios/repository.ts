@@ -80,7 +80,11 @@ export function createComentariosRepository(db: pg.Pool) {
       return result.rows[0] ?? null;
     },
 
-    async listByStatus(status: StatusComentario): Promise<ComentarioFilaRow[]> {
+    async listByStatus(
+      status: StatusComentario,
+      cursor: string | undefined,
+      limite: number
+    ): Promise<ComentarioFilaRow[]> {
       const result = await db.query<ComentarioFilaRow>(`
         select ${comentarioColumns},
         a.elevenlabs_conversation_id as "conversationId",
@@ -89,8 +93,17 @@ export function createComentariosRepository(db: pg.Pool) {
         join atendimentos a on a.id = c.atendimento_id
         join agentes_voz agente on agente.id = a.agente_voz_id
         where c.status = $1
+          and (
+            $2::uuid is null
+            or (c.criado_em, c.id) > (
+              select cursor.criado_em, cursor.id
+              from comentarios cursor
+              where cursor.id = $2
+            )
+          )
         order by c.criado_em, c.id
-      `, [status]);
+        limit $3
+      `, [status, cursor ?? null, limite + 1]);
       return result.rows;
     },
 

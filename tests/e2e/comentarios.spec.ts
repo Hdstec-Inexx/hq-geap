@@ -184,7 +184,9 @@ test.describe.serial('Comentarios e fila de manutencao', () => {
     });
     expect(pending.status()).toBe(200);
     expect(
-      ((await pending.json()) as Array<{ id: string }>).map(({ id }) => id)
+      ((await pending.json()) as { items: Array<{ id: string }> }).items.map(
+        ({ id }) => id
+      )
     ).not.toContain(comentario.id);
 
     const resolvedQueue = await request.get(
@@ -193,8 +195,52 @@ test.describe.serial('Comentarios e fila de manutencao', () => {
     );
     expect(resolvedQueue.status()).toBe(200);
     expect(
-      ((await resolvedQueue.json()) as Array<{ id: string }>).map(({ id }) => id)
+      ((await resolvedQueue.json()) as { items: Array<{ id: string }> }).items.map(
+        ({ id }) => id
+      )
     ).toContain(comentario.id);
+  });
+
+  test('fila usa cursor e limita a quantidade retornada', async ({ request }) => {
+    const atendimentoId = await createAtendimento('conv-comentarios-paginacao');
+    const admin = await login(request, 'admin');
+    const headers = { authorization: `Bearer ${admin.token}` };
+    for (const texto of ['Primeiro item.', 'Segundo item.', 'Terceiro item.']) {
+      const created = await request.post(
+        `${apiUrl}/atendimentos/${atendimentoId}/comentarios`,
+        { headers, data: { texto } }
+      );
+      expect(created.status()).toBe(201);
+    }
+
+    const firstResponse = await request.get(
+      `${apiUrl}/comentarios?status=pendente&limite=2`,
+      { headers }
+    );
+    expect(firstResponse.status()).toBe(200);
+    const first = (await firstResponse.json()) as {
+      items: Array<{ id: string }>;
+      nextCursor: string | null;
+    };
+    expect(first.items).toHaveLength(2);
+    expect(first.nextCursor).toBe(first.items[1]?.id);
+    const resolvedCursor = await request.patch(
+      `${apiUrl}/comentarios/${first.nextCursor}`,
+      { headers, data: { status: 'resolvido' } }
+    );
+    expect(resolvedCursor.status()).toBe(200);
+
+    const secondResponse = await request.get(
+      `${apiUrl}/comentarios?status=pendente&limite=2&cursor=${first.nextCursor}`,
+      { headers }
+    );
+    expect(secondResponse.status()).toBe(200);
+    const second = (await secondResponse.json()) as {
+      items: Array<{ id: string }>;
+    };
+    expect(second.items.map(({ id }) => id)).not.toEqual(
+      expect.arrayContaining(first.items.map(({ id }) => id))
+    );
   });
 
   test('Comentarios aparecem no detalhe e na revisao do Curador', async ({

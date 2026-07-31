@@ -1,25 +1,21 @@
 import {
   comentarioSchema,
-  comentariosFilaSchema,
+  comentariosFilaPageSchema,
+  type Comentario,
   type ComentarioFila,
   type StatusComentario
 } from '@hq-geap/contracts/comentarios';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiUrl, getSession } from '../../auth/session';
-import { useAuthenticatedResource } from '../../atendimentos/api';
-
-const dateTime = new Intl.DateTimeFormat('pt-BR', {
-  dateStyle: 'short',
-  timeStyle: 'short'
-});
+import { ComentarioCard } from '../../comentarios/ComentarioCard';
 
 function FilaItem({
   comentario,
   onResolved
 }: {
   comentario: ComentarioFila;
-  onResolved: () => void;
+  onResolved: (comentario: Comentario) => void;
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
@@ -39,8 +35,7 @@ function FilaItem({
         body: JSON.stringify({ status: 'resolvido' })
       });
       if (!response.ok) throw new Error(`Request failed with ${response.status}`);
-      comentarioSchema.parse(await response.json());
-      onResolved();
+      onResolved(comentarioSchema.parse(await response.json()));
     } catch {
       setError(true);
       setSaving(false);
@@ -48,28 +43,20 @@ function FilaItem({
   }
 
   return (
-    <article className="manutencao-item">
-      <div className="manutencao-item-heading">
-        <div>
-          <p className="panel-label">{comentario.atendimento.agenteVozNome}</p>
-          <Link to={`/atendimentos/${comentario.atendimento.id}`}>
-            {comentario.atendimento.conversationId}
-          </Link>
+    <ComentarioCard
+      cabecalho={
+        <div className="manutencao-item-heading">
+          <div>
+            <p className="panel-label">{comentario.atendimento.agenteVozNome}</p>
+            <Link to={`/atendimentos/${comentario.atendimento.id}`}>
+              {comentario.atendimento.conversationId}
+            </Link>
+          </div>
         </div>
-        <span className={`comentario-status status-${comentario.status}`}>
-          {comentario.status === 'pendente' ? 'Pendente' : 'Resolvido'}
-        </span>
-      </div>
-      <p>{comentario.texto}</p>
-      <small>
-        {comentario.autor.nome} · {dateTime.format(new Date(comentario.criadoEm))}
-      </small>
-      {comentario.resolucao ? (
-        <small>
-          Resolvido por {comentario.resolucao.responsavel.nome} em{' '}
-          {dateTime.format(new Date(comentario.resolucao.resolvidoEm))}
-        </small>
-      ) : null}
+      }
+      className="manutencao-item"
+      comentario={comentario}
+    >
       {comentario.status === 'pendente' ? (
         <div className="manutencao-actions">
           <span aria-live="polite">
@@ -85,17 +72,82 @@ function FilaItem({
           </button>
         </div>
       ) : null}
-    </article>
+    </ComentarioCard>
   );
+}
+
+async function fetchQueuePage(
+  status: StatusComentario,
+  cursor?: string,
+  signal?: AbortSignal
+) {
+  const session = getSession();
+  if (!session) throw new Error('Authentication required');
+  const query = new URLSearchParams({ status, limite: '50' });
+  if (cursor) query.set('cursor', cursor);
+  const response = await fetch(`${apiUrl}/comentarios?${query}`, {
+    headers: { authorization: `Bearer ${session.token}` },
+    signal
+  });
+  if (!response.ok) throw new Error(`Request failed with ${response.status}`);
+  return comentariosFilaPageSchema.parse(await response.json());
 }
 
 export function ComentariosPendentesPage() {
   const [status, setStatus] = useState<StatusComentario>('pendente');
-  const [revision, setRevision] = useState(0);
-  const state = useAuthenticatedResource(
-    `/comentarios?status=${status}&revision=${revision}`,
-    comentariosFilaSchema
+  const statusRef = useRef(status);
+  const [items, setItems] = useState<ComentarioFila[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>(
+    'loading'
   );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setItems([]);
+    setNextCursor(null);
+    setLoadState('loading');
+    fetchQueuePage(status, undefined, controller.signal)
+      .then((page) => {
+        setItems(page.items);
+        setNextCursor(page.nextCursor);
+        setLoadState('ready');
+      })
+      .catch((error: unknown) => {
+        if (!(error instanceof DOMException && error.name === 'AbortError')) {
+          setLoadState('error');
+        }
+      });
+    return () => controller.abort();
+  }, [status]);
+
+  async function loadMore() {
+    if (!nextCursor) return;
+    const requestedStatus = status;
+    setLoadState('loading');
+    try {
+      const page = await fetchQueuePage(requestedStatus, nextCursor);
+      if (statusRef.current !== requestedStatus) return;
+      setItems((current) => [...current, ...page.items]);
+      setNextCursor(page.nextCursor);
+      setLoadState('ready');
+    } catch {
+      if (statusRef.current === requestedStatus) {
+        setLoadState('error');
+      }
+    }
+  }
+
+  function removeResolved(resolved: Comentario) {
+    setItems((current) =>
+      current.filter((comentario) => comentario.id !== resolved.id)
+    );
+  }
+
+  function changeStatus(nextStatus: StatusComentario) {
+    statusRef.current = nextStatus;
+    setStatus(nextStatus);
+  }
 
   return (
     <main className="atendimentos-page manutencao-page">
@@ -108,7 +160,9 @@ export function ComentariosPendentesPage() {
         <label className="manutencao-filter">
           Status
           <select
-            onChange={(event) => setStatus(event.target.value as StatusComentario)}
+            onChange={(event) =>
+              changeStatus(event.target.value as StatusComentario)
+            }
             value={status}
           >
             <option value="pendente">Pendente</option>
@@ -117,23 +171,35 @@ export function ComentariosPendentesPage() {
         </label>
       </header>
 
-      {state.status === 'loading' ? <p>Carregando fila...</p> : null}
-      {state.status === 'error' ? <p>Não foi possível carregar a fila.</p> : null}
-      {state.status === 'ready' && state.data.length === 0 ? (
+      {loadState === 'loading' && items.length === 0 ? (
+        <p>Carregando fila...</p>
+      ) : null}
+      {loadState === 'error' ? <p>Não foi possível carregar a fila.</p> : null}
+      {loadState === 'ready' && items.length === 0 && !nextCursor ? (
         <section className="manutencao-empty">
           <h2>Nenhum comentário {status}</h2>
           <p>A fila está em dia para este status.</p>
         </section>
       ) : null}
-      {state.status === 'ready' && state.data.length > 0 ? (
+      {items.length > 0 || nextCursor ? (
         <section className="manutencao-lista" aria-label="Comentários da fila">
-          {state.data.map((comentario) => (
+          {items.map((comentario) => (
             <FilaItem
               comentario={comentario}
               key={comentario.id}
-              onResolved={() => setRevision((current) => current + 1)}
+              onResolved={removeResolved}
             />
           ))}
+          {nextCursor ? (
+            <button
+              className="primary-action"
+              disabled={loadState === 'loading'}
+              onClick={loadMore}
+              type="button"
+            >
+              {loadState === 'loading' ? 'Carregando...' : 'Carregar mais'}
+            </button>
+          ) : null}
         </section>
       ) : null}
     </main>
