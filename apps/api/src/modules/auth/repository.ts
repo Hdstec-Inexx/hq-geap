@@ -1,4 +1,4 @@
-import type { SessionUser, UserRole } from '@hq-geap/contracts/auth';
+import type { Perfil, UserRole } from '@hq-geap/contracts/auth';
 import type pg from 'pg';
 
 type UserRow = {
@@ -9,7 +9,7 @@ type UserRow = {
   role: UserRole;
 };
 
-export type AuthUser = SessionUser & { passwordHash: string };
+export type AuthUser = Perfil & { passwordHash: string };
 
 const selectUser = `
   select

@@ -7,7 +7,7 @@ import {
 } from '@hq-geap/contracts/usuarios';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiUrl, clearSession, getSession } from '../../auth/session';
+import { apiUrl, clearSession, getPerfil, getSession } from '../../auth/session';
 
 const roleNames = {
   admin: 'Admin',
@@ -51,6 +51,7 @@ export function UsuariosPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [session] = useState(() => getSession()!);
+  const [perfil] = useState(() => getPerfil()!);
   const token = session.token;
   const navigate = useNavigate();
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -228,7 +229,7 @@ export function UsuariosPage() {
                   <td><span className={`user-status ${user.active ? '' : 'inactive'}`}>{user.active ? 'Ativo' : 'Inativo'}</span></td>
                   <td className="user-actions">
                     <button onClick={() => edit(user)} type="button">Editar</button>
-                    {user.active && user.id !== session.user.id ? (
+                    {user.active && user.id !== perfil.id ? (
                       <button className="danger-action" onClick={() => deactivate(user)} type="button">Desativar</button>
                     ) : null}
                   </td>
@@ -275,7 +276,7 @@ export function UsuariosPage() {
             ) : null}
             <label>
               <span>Papel</span>
-              <select disabled={editor.mode === 'edit' && editor.id === session.user.id} value={editor.user.role} onChange={(event) => updateUser({ role: event.target.value as UpdateUsuario['role'] })}>
+              <select disabled={editor.mode === 'edit' && editor.id === perfil.id} value={editor.user.role} onChange={(event) => updateUser({ role: event.target.value as UpdateUsuario['role'] })}>
                 <option value="admin">Admin</option>
                 <option value="gestao">Gestão</option>
                 <option value="curador">Curador</option>

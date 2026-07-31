@@ -1,13 +1,19 @@
 import {
   loginRequestSchema,
   loginResponseSchema,
-  sessionUserSchema,
+  perfilSchema,
+  sessionIdentitySchema,
   type LoginResponse,
-  type SessionUser
+  type Perfil,
+  type SessionIdentity
 } from '@hq-geap/contracts/auth';
 import type { FastifyPluginAsync } from 'fastify';
 import { createAuthRepository } from './repository.js';
-import { authenticateUser, toSessionUser } from './service.js';
+import {
+  authenticateUser,
+  toPerfil,
+  toSessionIdentity
+} from './service.js';
 
 const authRoutes: FastifyPluginAsync = async (app) => {
   const repository = createAuthRepository(app.db);
@@ -28,12 +34,16 @@ const authRoutes: FastifyPluginAsync = async (app) => {
         { sub: user.id },
         { expiresIn: app.config.JWT_EXPIRES_IN_SECONDS }
       ),
-      user: toSessionUser(user)
+      user: toSessionIdentity(user)
     });
   });
 
-  app.get('/auth/session', async (request): Promise<SessionUser> => {
-    return sessionUserSchema.parse(request.authUser);
+  app.get('/auth/session', async (request): Promise<SessionIdentity> => {
+    return sessionIdentitySchema.parse({ id: request.authUser!.id });
+  });
+
+  app.get('/me', async (request): Promise<Perfil> => {
+    return perfilSchema.parse(request.authUser);
   });
 };
 

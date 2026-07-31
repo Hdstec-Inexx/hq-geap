@@ -2,7 +2,13 @@ import { z } from 'zod';
 
 export const userRoleSchema = z.enum(['admin', 'gestao', 'curador']);
 
-export const sessionUserSchema = z.object({
+export const sessionIdentitySchema = z
+  .object({
+    id: z.uuid()
+  })
+  .strict();
+
+export const perfilSchema = z.object({
   id: z.uuid(),
   name: z.string(),
   email: z.email(),
@@ -16,10 +22,11 @@ export const loginRequestSchema = z.object({
 
 export const loginResponseSchema = z.object({
   token: z.string().min(1),
-  user: sessionUserSchema
+  user: sessionIdentitySchema
 });
 
 export type UserRole = z.infer<typeof userRoleSchema>;
-export type SessionUser = z.infer<typeof sessionUserSchema>;
+export type SessionIdentity = z.infer<typeof sessionIdentitySchema>;
+export type Perfil = z.infer<typeof perfilSchema>;
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 export type LoginResponse = z.infer<typeof loginResponseSchema>;

@@ -2,10 +2,12 @@ import type { UserRole } from '@hq-geap/contracts/auth';
 import { useEffect, useState } from 'react';
 import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
+  AuthExpiredError,
   clearSession,
+  fetchPerfil,
+  getPerfil,
   getSession,
-  saveSession,
-  validateSession
+  savePerfil
 } from './session';
 
 type AccessState = 'checking' | 'authenticated' | 'anonymous';
@@ -16,13 +18,15 @@ const roleNames = {
   curador: 'Curador'
 } as const;
 
+const focusRefreshDebounceMs = 2000;
+
 export function RequireSession() {
   const location = useLocation();
   const [session] = useState(getSession);
-  const [sessionRevision, setSessionRevision] = useState(0);
-  const [state, setState] = useState<AccessState>(
-    session ? 'checking' : 'anonymous'
-  );
+  const [state, setState] = useState<AccessState>(() => {
+    if (!session) return 'anonymous';
+    return getPerfil() ? 'authenticated' : 'checking';
+  });
 
   useEffect(() => {
     if (!session) {
@@ -30,33 +34,35 @@ export function RequireSession() {
     }
 
     const activeSession = session;
-    let currentUser = activeSession.user;
     const controller = new AbortController();
     let validating = false;
     let revoked = false;
+    let focusTimer: number | undefined;
 
     async function refreshSession() {
       if (validating || revoked) return;
       validating = true;
       try {
-        const user = await validateSession(activeSession.token, controller.signal);
-        saveSession({ token: activeSession.token, user });
-        if (
-          user.id !== currentUser.id ||
-          user.name !== currentUser.name ||
-          user.email !== currentUser.email ||
-          user.role !== currentUser.role
-        ) {
-          currentUser = user;
-          setSessionRevision((current) => current + 1);
-        }
+        // /me validates the token and refreshes Perfil in one round-trip.
+        const perfil = await fetchPerfil(activeSession.token, controller.signal);
+        if (controller.signal.aborted || revoked) return;
+        savePerfil(perfil);
         setState('authenticated');
       } catch (error) {
-        if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        if (controller.signal.aborted || revoked) return;
+        if (error instanceof AuthExpiredError) {
           revoked = true;
           clearSession();
           setState('anonymous');
+          return;
         }
+        if (getPerfil()) {
+          setState('authenticated');
+          return;
+        }
+        revoked = true;
+        clearSession();
+        setState('anonymous');
       } finally {
         validating = false;
       }
@@ -66,12 +72,20 @@ export function RequireSession() {
     const interval = window.setInterval(() => {
       if (document.visibilityState === 'visible') void refreshSession();
     }, 60_000);
-    window.addEventListener('focus', refreshSession);
+
+    function onFocus() {
+      window.clearTimeout(focusTimer);
+      focusTimer = window.setTimeout(() => {
+        if (document.visibilityState === 'visible') void refreshSession();
+      }, focusRefreshDebounceMs);
+    }
+    window.addEventListener('focus', onFocus);
 
     return () => {
       controller.abort();
       window.clearInterval(interval);
-      window.removeEventListener('focus', refreshSession);
+      window.clearTimeout(focusTimer);
+      window.removeEventListener('focus', onFocus);
     };
   }, [session]);
 
@@ -81,15 +95,15 @@ export function RequireSession() {
   if (state === 'checking') {
     return <p className="session-check">Validando acesso...</p>;
   }
-  return <Outlet key={sessionRevision} />;
+  return <Outlet />;
 }
 
 export function RequireRole({ roles }: { roles: UserRole[] }) {
-  const session = getSession();
-  if (!session) {
+  const perfil = getPerfil();
+  if (!perfil) {
     return <Navigate replace to="/login" />;
   }
-  if (session.user.role === 'admin' || roles.includes(session.user.role)) {
+  if (perfil.role === 'admin' || roles.includes(perfil.role)) {
     return <Outlet />;
   }
   return (
@@ -107,8 +121,8 @@ export function RequireRole({ roles }: { roles: UserRole[] }) {
 
 export function HomePage() {
   const navigate = useNavigate();
-  const session = getSession();
-  if (!session) {
+  const perfil = getPerfil();
+  if (!perfil) {
     return <Navigate replace to="/login" />;
   }
 
@@ -120,13 +134,13 @@ export function HomePage() {
   return (
     <section className="session-page">
       <div>
-        <p className="eyebrow">Sessão ativa / {roleNames[session.user.role]}</p>
-        <h1>Olá, {session.user.name}</h1>
+        <p className="eyebrow">Sessão ativa / {roleNames[perfil.role]}</p>
+        <h1>Olá, {perfil.name}</h1>
         <p className="summary">
           Seu acesso está pronto. As áreas do HQ GEAP serão liberadas conforme
-          as permissões de {roleNames[session.user.role]}.
+          as permissões de {roleNames[perfil.role]}.
         </p>
-        {session.user.role !== 'curador' ? (
+        {perfil.role !== 'curador' ? (
           <Link className="admin-feature-link" to="/dashboard">
             Abrir Dashboard da Gestão
           </Link>
@@ -138,11 +152,11 @@ export function HomePage() {
           Monitoramento ao Vivo
         </Link>
         <Link className="admin-feature-link" to="/curadoria">
-          {session.user.role === 'gestao'
+          {perfil.role === 'gestao'
             ? 'Consultar Fila de Curadoria'
             : 'Abrir Fila de Curadoria'}
         </Link>
-        {session.user.role === 'admin' ? (
+        {perfil.role === 'admin' ? (
           <div className="admin-feature-links">
             <Link className="admin-feature-link" to="/admin/comentarios">
               Trabalhar fila de manutenção
@@ -160,9 +174,9 @@ export function HomePage() {
         ) : null}
       </div>
       <aside className="identity-card">
-        <span className="identity-role">{roleNames[session.user.role]}</span>
-        <strong>{session.user.name}</strong>
-        <span>{session.user.email}</span>
+        <span className="identity-role">{roleNames[perfil.role]}</span>
+        <strong>{perfil.name}</strong>
+        <span>{perfil.email}</span>
         <button className="secondary-button" onClick={logout} type="button">
           Sair
         </button>

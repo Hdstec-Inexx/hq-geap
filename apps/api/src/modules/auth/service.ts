@@ -1,4 +1,8 @@
-import type { LoginRequest, SessionUser } from '@hq-geap/contracts/auth';
+import type {
+  LoginRequest,
+  Perfil,
+  SessionIdentity
+} from '@hq-geap/contracts/auth';
 import { compare } from 'bcryptjs';
 import type { AuthRepository, AuthUser } from './repository.js';
 
@@ -20,7 +24,11 @@ export async function authenticateUser(
   return user;
 }
 
-export function toSessionUser(user: AuthUser): SessionUser {
+export function toSessionIdentity(user: AuthUser): SessionIdentity {
+  return { id: user.id };
+}
+
+export function toPerfil(user: AuthUser): Perfil {
   return {
     id: user.id,
     name: user.name,

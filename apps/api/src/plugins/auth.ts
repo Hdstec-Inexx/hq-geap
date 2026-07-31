@@ -1,5 +1,5 @@
 import jwt from '@fastify/jwt';
-import type { SessionUser, UserRole } from '@hq-geap/contracts/auth';
+import type { Perfil, UserRole } from '@hq-geap/contracts/auth';
 import fp from 'fastify-plugin';
 import { createAuthRepository } from '../modules/auth/repository.js';
 import {
@@ -7,7 +7,7 @@ import {
   canUseMethod,
   redactCostFromJson
 } from '../modules/auth/policy.js';
-import { toSessionUser } from '../modules/auth/service.js';
+import { toPerfil } from '../modules/auth/service.js';
 
 type AuthRouteConfig = false | { roles?: UserRole[] };
 
@@ -17,7 +17,7 @@ declare module 'fastify' {
   }
 
   interface FastifyRequest {
-    authUser: SessionUser | null;
+    authUser: Perfil | null;
   }
 }
 
@@ -45,7 +45,7 @@ export default fp(
         throw app.httpErrors.unauthorized('Authentication required');
       }
 
-      request.authUser = toSessionUser(user);
+      request.authUser = toPerfil(user);
 
       if (!canUseMethod(user.role, request.method)) {
         throw app.httpErrors.forbidden('Gestao has read-only access');
