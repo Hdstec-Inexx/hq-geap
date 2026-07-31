@@ -20,6 +20,10 @@ pnpm dev
 
 As configurações locais possuem valores padrão compatíveis com `compose.yaml`. Para sobrescrevê-las, crie um `.env` na raiz com as variáveis documentadas em `.env.example`. Variáveis fornecidas diretamente pelo ambiente têm precedência sobre o arquivo.
 
+## Deploy (Easypanel / VPS)
+
+Produção usa `Dockerfile` (API) e `Dockerfile.web` (UI) porque a API e a interface compartilham paths. Guia: [`docs/deploy/easypanel.md`](./docs/deploy/easypanel.md). Referência Compose: `compose.easypanel.yaml`.
+
 ## Verificações
 
 Com o banco do Compose ativo:

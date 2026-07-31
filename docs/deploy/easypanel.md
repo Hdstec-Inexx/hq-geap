@@ -1,0 +1,70 @@
+# Deploy no Easypanel (VPS)
+
+O HQ GEAP sobe como **dois App services** (API + Web) mais um PostgreSQL. As rotas da API e da UI compartilham paths (`/atendimentos`, `/curadoria`, …), então não dá para servir os dois no mesmo host/porta sem prefixo `/api`.
+
+`compose.yaml` continua só para desenvolvimento local. Produção usa:
+
+- `Dockerfile` → API
+- `Dockerfile.web` → interface (nginx)
+- `compose.easypanel.yaml` → alternativa Compose no painel
+
+## Serviços no painel
+
+1. **PostgreSQL** (Database do Easypanel ou Compose `db`)
+2. **hq-api** (App → `Dockerfile`, porta `3000`)
+3. **hq-web** (App → `Dockerfile.web`, porta `80`)
+4. Storage: MinIO com HTTPS público **ou** GCS (`STORAGE_PROVIDER=gcs`)
+5. **n8n** continua separado (Credentials próprias; ver `docs/n8n/credentials.md`)
+
+## App `hq-api`
+
+- Source: repositório Git, branch de deploy, Build Path `/`
+- Build: Dockerfile, path `Dockerfile`
+- Domínio: ex. `https://api.seudominio.com` → porta interna `3000`
+- Environment (exemplo):
+
+```dotenv
+NODE_ENV=production
+HOST=0.0.0.0
+PORT=3000
+DATABASE_URL=postgres://USER:PASSWORD@NOME_DO_SERVICO_DB:5432/hq_geap
+CORS_ORIGIN=https://hq.seudominio.com
+JWT_SECRET=troque-por-segredo-com-pelo-menos-32-chars
+INGESTION_API_KEY=troque-por-chave-com-pelo-menos-32-chars
+ELEVENLABS_API_KEY=sk_...
+STORAGE_PROVIDER=minio
+STORAGE_BUCKET=hq-geap-audio
+STORAGE_ENDPOINT=https://minio.seudominio.com
+STORAGE_ACCESS_KEY=...
+STORAGE_SECRET_KEY=...
+STORAGE_PUBLIC_URL=https://minio.seudominio.com/hq-geap-audio
+```
+
+O entrypoint aplica `migrate` + `seed` antes de subir a API. O seed cria o Admin `admin@hq.local` / `senha-admin` se ainda não houver Admin ativo — troque a senha no primeiro acesso.
+
+Em produção, se `HOST` não for definido, a API escuta em `0.0.0.0` (necessário para o proxy do Easypanel).
+
+## App `hq-web`
+
+- Build: Dockerfile path `Dockerfile.web`
+- Environment / build arg: `VITE_API_URL=https://api.seudominio.com` (URL pública da API, sem barra final). O Easypanel injeta envs do serviço como build args.
+- Domínio: ex. `https://hq.seudominio.com` → porta interna `80`
+
+Rebuild a Web sempre que mudar `VITE_API_URL` (é embutida no bundle Vite).
+
+## Compose no Easypanel (alternativa)
+
+1. Serviço **Compose** com arquivo `compose.easypanel.yaml`
+2. Preencha as variáveis exigidas (`POSTGRES_PASSWORD`, `DATABASE_URL`, `CORS_ORIGIN`, secrets, `VITE_API_URL`, …)
+3. Domains do painel:
+   - API → serviço interno `api`, porta `3000`
+   - Web → serviço interno `web`, porta `80`
+4. Não publique `ports` no host para HTTP; o proxy do Easypanel resolve isso
+
+## Checklist pós-deploy
+
+- [ ] `GET https://api.seudominio.com/health` responde OK
+- [ ] Login em `https://hq.seudominio.com/login`
+- [ ] n8n aponta ingestão para a API com `x-ingestion-key`
+- [ ] Áudio acessível via storage assinado (não use `STORAGE_PROVIDER=public` em produção)
+- [ ] Senha do Admin inicial alterada
