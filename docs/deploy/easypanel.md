@@ -4,15 +4,15 @@ O HQ GEAP sobe como **dois App services** (API + Web) mais um PostgreSQL. As rot
 
 `compose.yaml` continua só para desenvolvimento local. Produção usa:
 
-- `Dockerfile` → API
-- `Dockerfile.web` → interface (nginx)
+- `Dockerfile` → API (usuário não-root, deps de produção)
+- `Dockerfile.web` → interface (nginx unprivileged)
 - `compose.easypanel.yaml` → alternativa Compose no painel
 
 ## Serviços no painel
 
 1. **PostgreSQL** (Database do Easypanel ou Compose `db`)
 2. **hq-api** (App → `Dockerfile`, porta `3000`)
-3. **hq-web** (App → `Dockerfile.web`, porta `80`)
+3. **hq-web** (App → `Dockerfile.web`, porta `8080`)
 4. Storage: MinIO com HTTPS público **ou** GCS (`STORAGE_PROVIDER=gcs`)
 5. **n8n** continua separado (Credentials próprias; ver `docs/n8n/credentials.md`)
 
@@ -40,15 +40,19 @@ STORAGE_SECRET_KEY=...
 STORAGE_PUBLIC_URL=https://minio.seudominio.com/hq-geap-audio
 ```
 
-O entrypoint aplica `migrate` + `seed` antes de subir a API. O seed cria o Admin `admin@hq.local` / `senha-admin` se ainda não houver Admin ativo — troque a senha no primeiro acesso.
+O entrypoint aplica `migrate` e, por padrão, `seed` antes de subir a API. O seed é idempotente e cria o Admin `admin@hq.local` / `senha-admin` se ainda não houver Admin ativo — **troque a senha no primeiro acesso**. Depois do primeiro deploy, defina `SKIP_DB_SEED=1` para não reexecutar seeds a cada restart.
 
 Em produção, se `HOST` não for definido, a API escuta em `0.0.0.0` (necessário para o proxy do Easypanel).
+
+### GCS (opcional)
+
+Com `STORAGE_PROVIDER=gcs`, o bucket deve existir e a API precisa de credenciais ADC (ex.: monte o JSON da service account e aponte `GOOGLE_APPLICATION_CREDENTIALS` para o path dentro do container). `STORAGE_BUCKET` e `STORAGE_PUBLIC_URL` continuam obrigatórios.
 
 ## App `hq-web`
 
 - Build: Dockerfile path `Dockerfile.web`
 - Environment / build arg: `VITE_API_URL=https://api.seudominio.com` (URL pública da API, sem barra final). O Easypanel injeta envs do serviço como build args.
-- Domínio: ex. `https://hq.seudominio.com` → porta interna `80`
+- Domínio: ex. `https://hq.seudominio.com` → porta interna `8080`
 
 Rebuild a Web sempre que mudar `VITE_API_URL` (é embutida no bundle Vite).
 
@@ -58,13 +62,14 @@ Rebuild a Web sempre que mudar `VITE_API_URL` (é embutida no bundle Vite).
 2. Preencha as variáveis exigidas (`POSTGRES_PASSWORD`, `DATABASE_URL`, `CORS_ORIGIN`, secrets, `VITE_API_URL`, …)
 3. Domains do painel:
    - API → serviço interno `api`, porta `3000`
-   - Web → serviço interno `web`, porta `80`
+   - Web → serviço interno `web`, porta `8080`
 4. Não publique `ports` no host para HTTP; o proxy do Easypanel resolve isso
 
 ## Checklist pós-deploy
 
 - [ ] `GET https://api.seudominio.com/health` responde OK
 - [ ] Login em `https://hq.seudominio.com/login`
+- [ ] Senha do Admin inicial alterada
+- [ ] `SKIP_DB_SEED=1` após o primeiro seed (recomendado)
 - [ ] n8n aponta ingestão para a API com `x-ingestion-key`
 - [ ] Áudio acessível via storage assinado (não use `STORAGE_PROVIDER=public` em produção)
-- [ ] Senha do Admin inicial alterada

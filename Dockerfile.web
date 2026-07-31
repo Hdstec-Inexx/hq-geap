@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 # Imagem da interface (SPA). No Easypanel use este arquivo no App hq-web
 # e defina o build arg/env VITE_API_URL=https://api.seudominio.com
+# Porta interna: 8080 (nginx unprivileged).
 
 FROM node:24-alpine AS base
 RUN corepack enable
@@ -11,19 +12,20 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY packages/contracts/package.json packages/contracts/
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --filter @hq-geap/web...
 
 FROM deps AS build
 COPY tsconfig.base.json tsconfig.json ./
 COPY packages/contracts packages/contracts
-COPY apps/api apps/api
 COPY apps/web apps/web
 ARG VITE_API_URL
 ENV VITE_API_URL=${VITE_API_URL}
 RUN pnpm --filter @hq-geap/contracts build \
   && pnpm --filter @hq-geap/web build
 
-FROM nginx:1.27-alpine
+FROM nginxinc/nginx-unprivileged:1.27-alpine
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html
-EXPOSE 80
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1

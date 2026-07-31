@@ -20,3 +20,5 @@ n8n
 tests
 playwright.config.ts
 *.md
+compose.yaml
+compose.easypanel.yaml

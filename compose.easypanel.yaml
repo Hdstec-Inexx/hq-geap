@@ -1,10 +1,11 @@
 # Referência para serviço Compose no Easypanel.
-# Preferência do painel: Domains apontando para api:3000 e web:80 (sem publicar ports no host).
+# Preferência do painel: Domains apontando para api:3000 e web:8080 (sem publicar ports no host).
 # Credenciais e URLs públicas vêm das Environment Variables do Easypanel.
 
 services:
   db:
     image: postgres:17-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-hq_geap}
       POSTGRES_USER: ${POSTGRES_USER:-hq_geap}
@@ -20,11 +21,14 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+    security_opt:
+      - no-new-privileges:true
 
   api:
     build:
       context: .
       dockerfile: Dockerfile
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
@@ -45,8 +49,23 @@ services:
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-}
       ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:?set ELEVENLABS_API_KEY}
       ELEVENLABS_API_URL: ${ELEVENLABS_API_URL:-https://api.elevenlabs.io}
+      SKIP_DB_SEED: ${SKIP_DB_SEED:-0}
     expose:
       - '3000'
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
 
   web:
     build:
@@ -54,10 +73,20 @@ services:
       dockerfile: Dockerfile.web
       args:
         VITE_API_URL: ${VITE_API_URL:?set VITE_API_URL}
+    restart: unless-stopped
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     expose:
-      - '80'
+      - '8080'
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8080/healthz']
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
 
 volumes:
   hq_geap_postgres:
