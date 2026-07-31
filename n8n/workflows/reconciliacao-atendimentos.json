@@ -1,0 +1,246 @@
+{
+  "name": "HQ GEAP - Reconciliação de Atendimentos",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": "={{ Number($env.RECONCILIATION_INTERVAL_MINUTES || 5) }}"
+            }
+          ]
+        }
+      },
+      "id": "4f861184-282d-49ea-a940-1fd481c59695",
+      "name": "Polling de reconciliação",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const lookbackMinutes = Number($env.RECONCILIATION_LOOKBACK_MINUTES || 30);\nif (!Number.isFinite(lookbackMinutes) || lookbackMinutes <= 0) throw new Error('RECONCILIATION_LOOKBACK_MINUTES must be positive');\nconst callStartBefore = Math.floor(Date.now() / 1000);\nreturn [{ json: { call_start_after_unix: callStartBefore - Math.ceil(lookbackMinutes * 60), call_start_before_unix: callStartBefore, cursor: null } }];"
+      },
+      "id": "c08828ec-d3fe-47db-8605-6e4295d9106d",
+      "name": "Configurar janela",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ ($env.ELEVENLABS_API_URL || 'https://api.elevenlabs.io') + '/v1/convai/conversations?page_size=100&call_start_after_unix=' + $json.call_start_after_unix + '&call_start_before_unix=' + $json.call_start_before_unix + ($json.cursor ? '&cursor=' + encodeURIComponent($json.cursor) : '') }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "15dc2c06-c876-45fd-860b-aeb879e6cf75",
+      "name": "Listar Atendimentos ElevenLabs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURE_NO_N8N",
+          "name": "ElevenLabs API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return ($json.conversations ?? []).filter(conversation => conversation.status === 'done').map(conversation => ({ json: { conversation_id: conversation.conversation_id } }));"
+      },
+      "id": "c9714470-2c70-49ad-94d9-f79c97ee714a",
+      "name": "Extrair Atendimentos concluídos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, -120]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const conversationIds = $input.all().map(item => item.json.conversation_id).filter(Boolean);\nif (conversationIds.length === 0) return [];\nreturn [{ json: { conversation_ids: conversationIds } }];"
+      },
+      "id": "d2a1f8c0-5b3e-4c91-9e7a-1f0b6d4a2c88",
+      "name": "Agregar candidatos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, -120]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select c.conversation_id\nfrom unnest($1::text[]) as c(conversation_id)\nwhere not exists (\n  select 1\n  from atendimentos\n  where elevenlabs_conversation_id = c.conversation_id\n)",
+        "options": {
+          "queryReplacement": "={{ [$json.conversation_ids] }}"
+        }
+      },
+      "id": "11e3ba63-e374-4b68-b4d5-c13ead125664",
+      "name": "Manter somente ausentes",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [1100, -120],
+      "credentials": {
+        "postgres": {
+          "id": "CONFIGURE_NO_N8N",
+          "name": "HQ GEAP PostgreSQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ ($env.ELEVENLABS_API_URL || 'https://api.elevenlabs.io') + '/v1/convai/conversations/' + encodeURIComponent($json.conversation_id) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "ceda9eaf-af83-489b-bace-587df62b732d",
+      "name": "Buscar Conversa ElevenLabs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, -120],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURE_NO_N8N",
+          "name": "ElevenLabs API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const data = $json;\nif (data?.error || !data?.conversation_id) return [];\nif (data.status !== 'done') return [];\nconst transferToolName = $env.ELEVENLABS_TRANSFER_TOOL_NAME;\nif (!transferToolName) throw new Error('ELEVENLABS_TRANSFER_TOOL_NAME is required');\nconst startedAt = new Date(data.metadata.start_time_unix_secs * 1000);\nconst duration = data.metadata.call_duration_secs;\nconst contactReason = data.analysis?.data_collection_results?.['Classificação']?.value ?? null;\nconst transferred = data.transcript.some(turn => turn.tool_calls?.some(call => call.tool_name === transferToolName && call.tool_has_been_called === true));\nreturn [{ json: {\n  conversation_id: data.conversation_id,\n  agent_id: data.agent_id,\n  event_timestamp: data.metadata.start_time_unix_secs + duration,\n  status: 'concluido',\n  started_at: startedAt.toISOString(),\n  completed_at: new Date(startedAt.getTime() + duration * 1000).toISOString(),\n  duration_seconds: duration,\n  transcript: data.transcript.filter(turn => turn.role === 'agent' || turn.role === 'user').map(({ role, message, time_in_call_secs }) => ({ role, message, time_in_call_secs })),\n  audio_reference: null,\n  contact_reason: contactReason,\n  transferred,\n  cost: data.metadata.cost_fiat ?? null\n} }];"
+      },
+      "id": "9b8f626b-00f1-4bb4-8440-9d250c0ccf10",
+      "name": "Contrato normalizado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, -120],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.HQ_API_URL }}/atendimentos/ingestao",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "f11c9355-cda0-43f5-bf6f-fb2e59743186",
+      "name": "Persistir Atendimento",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1760, -120],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURE_NO_N8N",
+          "name": "HQ Ingestion API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-more",
+              "leftValue": "={{ $json.has_more }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ac4b1bcd-0bb2-42ec-9d33-71c0eca3702d",
+      "name": "Há próxima página?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [660, 120]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const window = $items('Configurar janela')[0].json;\nif (!$json.next_cursor) throw new Error('ElevenLabs returned has_more without next_cursor');\nreturn [{ json: { ...window, cursor: $json.next_cursor } }];"
+      },
+      "id": "81b0ef1f-21fe-48f6-959f-694fa596f327",
+      "name": "Preparar próxima página",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 120]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Polling de reconciliação": {
+      "main": [[{ "node": "Configurar janela", "type": "main", "index": 0 }]]
+    },
+    "Configurar janela": {
+      "main": [[{ "node": "Listar Atendimentos ElevenLabs", "type": "main", "index": 0 }]]
+    },
+    "Listar Atendimentos ElevenLabs": {
+      "main": [[
+        { "node": "Extrair Atendimentos concluídos", "type": "main", "index": 0 },
+        { "node": "Há próxima página?", "type": "main", "index": 0 }
+      ]]
+    },
+    "Extrair Atendimentos concluídos": {
+      "main": [[{ "node": "Agregar candidatos", "type": "main", "index": 0 }]]
+    },
+    "Agregar candidatos": {
+      "main": [[{ "node": "Manter somente ausentes", "type": "main", "index": 0 }]]
+    },
+    "Manter somente ausentes": {
+      "main": [[{ "node": "Buscar Conversa ElevenLabs", "type": "main", "index": 0 }]]
+    },
+    "Buscar Conversa ElevenLabs": {
+      "main": [[{ "node": "Contrato normalizado", "type": "main", "index": 0 }]]
+    },
+    "Contrato normalizado": {
+      "main": [[{ "node": "Persistir Atendimento", "type": "main", "index": 0 }]]
+    },
+    "Há próxima página?": {
+      "main": [[{ "node": "Preparar próxima página", "type": "main", "index": 0 }], []]
+    },
+    "Preparar próxima página": {
+      "main": [[{ "node": "Listar Atendimentos ElevenLabs", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "17028bfa-da14-45d4-8a04-b8a93bd62ec1",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

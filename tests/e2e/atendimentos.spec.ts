@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 import pg from 'pg';
+import aprovada from '../fixtures/avaliacoes/avaliacao-aprovada.json' with { type: 'json' };
 import fixture from '../fixtures/elevenlabs/atendimento-concluido.json' with { type: 'json' };
 import { authUsers } from '../support/auth-fixtures.js';
 
@@ -81,7 +82,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     expect(persisted.rows[0]?.count).toBe('0');
   });
 
-  test('cria pelo conversation_id e atualiza o reenvio sem duplicar', async ({
+  test('converge reenvios no conversation_id sem duplicar Atendimento', async ({
     request
   }) => {
     const first = await request.post(`${apiUrl}/atendimentos/ingestao`, {
@@ -103,6 +104,38 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       status: 'concluido'
     });
 
+    const secondReplay = await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: atendimento,
+      headers: ingestionHeaders
+    });
+    expect(secondReplay.status()).toBe(200);
+    await expect(secondReplay.json()).resolves.toMatchObject({
+      id: created.id,
+      conversationId: atendimento.conversation_id,
+      status: 'concluido'
+    });
+
+    await queryDatabase(`
+      select * from persistir_avaliacao_ia(
+        $1,
+        (select id from prompts_ia_avaliadora where ativo),
+        $2::jsonb,
+        $3::jsonb,
+        $4
+      )
+    `, [
+      created.id,
+      JSON.stringify(aprovada.checklist),
+      JSON.stringify(aprovada.falhas_identificadas),
+      aprovada.resumo_atendimento
+    ]);
+
+    const afterAvaliacao = await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: atendimento,
+      headers: ingestionHeaders
+    });
+    expect(afterAvaliacao.status()).toBe(200);
+
     const persisted = await queryDatabase<{
       agente_voz_id: string;
       count: string;
@@ -112,6 +145,11 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       where elevenlabs_conversation_id = $1
       group by elevenlabs_conversation_id
     `, [atendimento.conversation_id]);
+    const avaliacoes = await queryDatabase<{ count: string }>(
+      `select count(*)::text as count from avaliacoes
+       where atendimento_id = $1 and autor = 'ia'`,
+      [created.id]
+    );
     const agent = await queryDatabase<{ id: string }>(
       'select id from agentes_voz where elevenlabs_agent_id = $1',
       [atendimento.agent_id]
@@ -120,6 +158,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       agente_voz_id: agent.rows[0]?.id,
       count: '1'
     });
+    expect(avaliacoes.rows[0]?.count).toBe('1');
   });
 
   test('permite em andamento para concluido e impede regressao', async ({
