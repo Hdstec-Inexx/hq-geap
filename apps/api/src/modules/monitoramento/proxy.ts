@@ -1,5 +1,8 @@
 import WebSocket, { type WebSocket as WsWebSocket } from 'ws';
-import { mapObservationEvent } from './service.js';
+import {
+  mapObservationEvent,
+  maxUpstreamMessageBytes
+} from './service.js';
 
 const upstreamFailureMessage =
   'Falha no monitoramento da ElevenLabs. Verifique se ELEVENLABS_API_KEY é válida e se o Atendimento ainda está ativo.';
@@ -67,9 +70,20 @@ export function createMonitoramentoProxy({
   });
 
   upstream.on('message', (data) => {
+    const raw =
+      typeof data === 'string'
+        ? data
+        : Buffer.isBuffer(data)
+          ? data.toString('utf8')
+          : Array.isArray(data)
+            ? Buffer.concat(data).toString('utf8')
+            : Buffer.from(data as ArrayBuffer).toString('utf8');
+    if (raw.length > maxUpstreamMessageBytes) {
+      return;
+    }
     let parsed: unknown;
     try {
-      parsed = JSON.parse(String(data));
+      parsed = JSON.parse(raw);
     } catch {
       return;
     }

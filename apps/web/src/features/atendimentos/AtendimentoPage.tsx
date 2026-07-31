@@ -53,7 +53,7 @@ export function AtendimentoPage() {
 
       {atendimento.status === 'em_andamento' ? (
         <p className="atendimentos-state">
-          <Link to={`/monitoramento/${atendimento.id}`}>
+          <Link to={`/monitoramento/${atendimento.conversationId}`}>
             Abrir Monitoramento ao Vivo
           </Link>
         </p>

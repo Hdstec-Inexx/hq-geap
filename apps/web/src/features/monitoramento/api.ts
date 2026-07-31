@@ -1,9 +1,9 @@
 import { apiUrl, getSession } from '../auth/session';
 
-export function monitoramentoWsUrl(atendimentoId: string) {
+export function monitoramentoWsUrl(conversationId: string) {
   const base = new URL(apiUrl);
   base.protocol = base.protocol === 'https:' ? 'wss:' : 'ws:';
-  base.pathname = `/atendimentos/${encodeURIComponent(atendimentoId)}/monitoramento`;
+  base.pathname = `/monitoramento/conversas/${encodeURIComponent(conversationId)}`;
   base.search = '';
   base.hash = '';
   return base.toString();

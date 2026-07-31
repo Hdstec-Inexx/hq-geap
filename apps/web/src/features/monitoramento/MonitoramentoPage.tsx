@@ -1,6 +1,6 @@
 import {
-  atendimentoListSchema
-} from '@hq-geap/contracts/atendimentos';
+  monitoramentoConversasSchema
+} from '@hq-geap/contracts/monitoramento';
 import { Link } from 'react-router-dom';
 import { useAuthenticatedResource } from '../atendimentos/api';
 
@@ -15,8 +15,8 @@ function formatDate(value: string | null) {
 
 export function MonitoramentoPage() {
   const state = useAuthenticatedResource(
-    '/atendimentos?status=em_andamento&limit=50&offset=0',
-    atendimentoListSchema
+    '/monitoramento/conversas',
+    monitoramentoConversasSchema
   );
 
   return (
@@ -26,46 +26,51 @@ export function MonitoramentoPage() {
           <p className="eyebrow">Operação / tempo real</p>
           <h1>Monitoramento ao Vivo</h1>
           <p className="summary">
-            Observe Atendimentos em andamento. Somente leitura — sem áudio e sem
-            intervenção.
+            Observe conversas em andamento na ElevenLabs. Somente leitura — sem
+            áudio e sem intervenção.
           </p>
         </div>
         <Link className="back-link" to="/">Voltar ao início</Link>
       </header>
 
       {state.status === 'loading' ? (
-        <p className="atendimentos-state">Carregando Atendimentos em andamento...</p>
+        <p className="atendimentos-state">Carregando conversas em andamento...</p>
       ) : null}
       {state.status === 'error' ? (
         <p className="atendimentos-state atendimentos-state-error">
-          Não foi possível carregar os Atendimentos em andamento.
+          Não foi possível listar as conversas ao vivo. Verifique
+          ELEVENLABS_API_KEY e a conectividade com a ElevenLabs.
         </p>
       ) : null}
       {state.status === 'ready' && state.data.length === 0 ? (
-        <p className="atendimentos-state">Nenhum Atendimento em andamento agora.</p>
+        <p className="atendimentos-state">Nenhuma conversa em andamento agora.</p>
       ) : null}
       {state.status === 'ready' && state.data.length > 0 ? (
         <div className="atendimentos-list">
-          {state.data.map((atendimento) => (
-            <article className="atendimento-row" key={atendimento.id}>
+          {state.data.map((conversa) => (
+            <article className="atendimento-row" key={conversa.conversationId}>
               <div className="atendimento-row-main">
-                <span className={`atendimento-status ${atendimento.status}`}>
+                <span className="atendimento-status em_andamento">
                   Em andamento
                 </span>
-                <Link to={`/monitoramento/${atendimento.id}`}>
-                  {atendimento.motivoContato ?? 'Motivo não informado'}
+                <Link to={`/monitoramento/${conversa.conversationId}`}>
+                  {conversa.conversationId}
                 </Link>
-                <span>{atendimento.agenteVoz.nome}</span>
+                <span>
+                  {conversa.agenteVozNome ?? conversa.agentId}
+                </span>
               </div>
               <dl className="atendimento-row-data">
                 <div>
                   <dt>Início</dt>
-                  <dd>{formatDate(atendimento.iniciadoEm)}</dd>
+                  <dd>{formatDate(conversa.iniciadoEm)}</dd>
                 </div>
                 <div>
                   <dt>Ação</dt>
                   <dd>
-                    <Link to={`/monitoramento/${atendimento.id}`}>Observar</Link>
+                    <Link to={`/monitoramento/${conversa.conversationId}`}>
+                      Observar
+                    </Link>
                   </dd>
                 </div>
               </dl>

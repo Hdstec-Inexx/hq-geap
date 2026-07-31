@@ -1,13 +1,9 @@
 import {
-  atendimentoDetailSchema
-} from '@hq-geap/contracts/atendimentos';
-import {
   monitoramentoEventSchema,
   type MonitoramentoEvent
 } from '@hq-geap/contracts/monitoramento';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useAuthenticatedResource } from '../atendimentos/api';
 import { monitoramentoAuthPayload, monitoramentoWsUrl } from './api';
 
 const maxLiveLines = 200;
@@ -25,21 +21,17 @@ type ConnectionState =
   | { status: 'error'; message: string };
 
 export function MonitoramentoLivePage() {
-  const { atendimentoId = '' } = useParams();
-  const detail = useAuthenticatedResource(
-    `/atendimentos/${atendimentoId}`,
-    atendimentoDetailSchema
-  );
+  const { conversationId = '' } = useParams();
   const [lines, setLines] = useState<LiveLine[]>([]);
   const [connection, setConnection] = useState<ConnectionState>({
     status: 'connecting'
   });
 
   useEffect(() => {
-    if (!atendimentoId) {
+    if (!conversationId) {
       setConnection({
         status: 'error',
-        message: 'Atendimento não informado'
+        message: 'Conversa não informada'
       });
       return;
     }
@@ -49,7 +41,7 @@ export function MonitoramentoLivePage() {
     let sawReady = false;
     let sawTerminal = false;
     try {
-      socket = new WebSocket(monitoramentoWsUrl(atendimentoId));
+      socket = new WebSocket(monitoramentoWsUrl(conversationId));
     } catch (error) {
       setConnection({
         status: 'error',
@@ -173,10 +165,7 @@ export function MonitoramentoLivePage() {
     return () => {
       socket.close();
     };
-  }, [atendimentoId]);
-
-  const agenteNome =
-    detail.status === 'ready' ? detail.data.agenteVoz.nome : 'Agente de Voz';
+  }, [conversationId]);
 
   return (
     <main className="atendimentos-page atendimento-detail">
@@ -184,11 +173,7 @@ export function MonitoramentoLivePage() {
         <div>
           <p className="eyebrow">Monitoramento ao Vivo / somente observação</p>
           <h1>Transcrição em tempo real</h1>
-          <p className="atendimento-id">
-            {detail.status === 'ready'
-              ? detail.data.conversationId
-              : atendimentoId}
-          </p>
+          <p className="atendimento-id">{conversationId}</p>
         </div>
         <Link className="back-link" to="/monitoramento">
           Voltar à lista
@@ -222,7 +207,7 @@ export function MonitoramentoLivePage() {
                 className={`transcript-line transcript-${line.role}`}
                 key={line.id}
               >
-                <span>{line.role === 'agent' ? agenteNome : 'Cliente'}</span>
+                <span>{line.role === 'agent' ? 'Agente' : 'Cliente'}</span>
                 <p>{line.message}</p>
               </article>
             ))

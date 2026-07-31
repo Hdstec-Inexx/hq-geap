@@ -5,12 +5,14 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { parseAppConfig } from '../../apps/api/src/plugins/config.js';
 import { parseMonitoramentoAuthMessage } from '../../apps/api/src/modules/monitoramento/auth.js';
 import {
+  buildElevenLabsConversationsUrl,
   buildElevenLabsMonitorUrl,
+  listLiveConversationsFromElevenLabs,
   mapObservationEvent,
+  maxObservationMessageChars,
   requireElevenLabsApiKey
 } from '../../apps/api/src/modules/monitoramento/service.js';
 import { createMonitoramentoProxy } from '../../apps/api/src/modules/monitoramento/proxy.js';
-import { atendimentosQuerySchema } from '../../packages/contracts/src/atendimentos.js';
 import { monitoramentoEventSchema } from '../../packages/contracts/src/monitoramento.js';
 
 const baseEnv = {
@@ -86,6 +88,14 @@ test('mapeia apenas eventos de texto/metadados para o contrato de observacao', (
     }),
     null
   );
+  const longMessage = 'x'.repeat(maxObservationMessageChars + 20);
+  assert.equal(
+    mapObservationEvent({
+      type: 'user_transcript',
+      user_transcription_event: { user_transcript: longMessage }
+    })?.message.length,
+    maxObservationMessageChars
+  );
   assert.equal(monitoramentoEventSchema.parse({
     type: 'transcript',
     role: 'user',
@@ -93,10 +103,53 @@ test('mapeia apenas eventos de texto/metadados para o contrato de observacao', (
   }).type, 'transcript');
 });
 
-test('lista de monitoramento filtra Atendimentos em andamento', () => {
+test('lista ao vivo usa o endpoint de conversas da ElevenLabs', () => {
+  const url = buildElevenLabsConversationsUrl('https://api.elevenlabs.io', 50);
+  assert.match(url, /^https:\/\/api\.elevenlabs\.io\/v1\/convai\/conversations\?/);
+  assert.match(url, /page_size=50/);
+  assert.match(url, /exclude_statuses=done/);
+  assert.match(url, /exclude_statuses=failed/);
+  assert.match(url, /exclude_statuses=processing/);
+  assert.doesNotMatch(url, /sk_|xi-api-key/i);
+});
+
+test('lista ao vivo filtra apenas conversas iniciadas ou em progresso', async () => {
+  const fetchImpl: typeof fetch = async () =>
+    new Response(
+      JSON.stringify({
+        conversations: [
+          {
+            conversation_id: 'conv_live',
+            agent_id: 'agent_1',
+            status: 'in-progress',
+            start_time_unix_secs: 1_700_000_000
+          },
+          {
+            conversation_id: 'conv_initiated',
+            agent_id: 'agent_1',
+            status: 'initiated',
+            start_time_unix_secs: 1_700_000_100
+          },
+          {
+            conversation_id: 'conv_done',
+            agent_id: 'agent_1',
+            status: 'done',
+            start_time_unix_secs: 1_700_000_200
+          }
+        ]
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } }
+    );
+
+  const live = await listLiveConversationsFromElevenLabs({
+    apiBaseUrl: 'https://api.elevenlabs.io',
+    apiKey: 'sk_test',
+    fetchImpl
+  });
+
   assert.deepEqual(
-    atendimentosQuerySchema.parse({ status: 'em_andamento' }),
-    { limit: 50, offset: 0, status: 'em_andamento' }
+    live.map((item) => item.conversationId),
+    ['conv_live', 'conv_initiated']
   );
 });
 
