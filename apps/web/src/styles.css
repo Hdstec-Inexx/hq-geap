@@ -1149,6 +1149,10 @@ h1 {
   line-height: 1.6;
 }
 
+.monitoramento-live-panel {
+  margin-top: 28px;
+}
+
 .transcript-panel,
 .audio-panel {
   padding: clamp(26px, 4vw, 42px);

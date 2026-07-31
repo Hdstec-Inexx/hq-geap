@@ -22,7 +22,9 @@ const configSchema = z.object({
   STORAGE_PUBLIC_URL: z.url().default('http://127.0.0.1:9000/hq-geap-audio'),
   STORAGE_ENDPOINT: z.url().optional(),
   STORAGE_ACCESS_KEY: z.string().trim().min(1).optional(),
-  STORAGE_SECRET_KEY: z.string().trim().min(1).optional()
+  STORAGE_SECRET_KEY: z.string().trim().min(1).optional(),
+  ELEVENLABS_API_KEY: z.string().trim().min(1).optional(),
+  ELEVENLABS_API_URL: z.url().default('https://api.elevenlabs.io')
 }).superRefine((config, context) => {
   if (
     config.NODE_ENV === 'production' &&
@@ -42,6 +44,16 @@ const configSchema = z.object({
       code: 'custom',
       path: ['INGESTION_API_KEY'],
       message: 'INGESTION_API_KEY must be configured in production'
+    });
+  }
+  if (
+    config.NODE_ENV === 'production' &&
+    !config.ELEVENLABS_API_KEY
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['ELEVENLABS_API_KEY'],
+      message: 'ELEVENLABS_API_KEY must be configured in production for Monitoramento ao Vivo'
     });
   }
   if (config.NODE_ENV === 'production' && config.STORAGE_PROVIDER === 'public') {
@@ -79,6 +91,10 @@ const configSchema = z.object({
 
 export type AppConfig = z.infer<typeof configSchema>;
 
+export function parseAppConfig(env: NodeJS.ProcessEnv | Record<string, string | undefined>) {
+  return configSchema.parse(env);
+}
+
 declare module 'fastify' {
   interface FastifyInstance {
     config: AppConfig;
@@ -88,7 +104,7 @@ declare module 'fastify' {
 export default fp(
   async (app) => {
     loadEnvironment();
-    app.decorate('config', configSchema.parse(process.env));
+    app.decorate('config', parseAppConfig(process.env));
   },
   { name: 'config' }
 );
