@@ -1,6 +1,6 @@
 # Deploy no Easypanel (VPS)
 
-O HQ GEAP sobe como **dois App services** (API + Web) mais um PostgreSQL. As rotas da API e da UI compartilham paths (`/atendimentos`, `/curadoria`, …), então não dá para servir os dois no mesmo host/porta sem prefixo `/api`.
+O HQ GEAP sobe como **dois App services** (API + Web) e conecta a um **PostgreSQL já provisionado** via `DATABASE_URL`. As rotas da API e da UI compartilham paths (`/atendimentos`, `/curadoria`, …), então não dá para servir os dois no mesmo host/porta sem prefixo `/api`.
 
 `compose.yaml` continua só para desenvolvimento local. Produção usa:
 
@@ -10,8 +10,8 @@ O HQ GEAP sobe como **dois App services** (API + Web) mais um PostgreSQL. As rot
 
 ## Serviços no painel
 
-1. **PostgreSQL** (Database do Easypanel ou Compose `db`)
-2. **hq-api** (App → `Dockerfile`, porta `3000`)
+1. **PostgreSQL** já provisionado (Database do Easypanel ou outro host acessível pela rede do Compose)
+2. **hq-api** (App → `Dockerfile`, porta `3000`) — conecta só via `DATABASE_URL`
 3. **hq-web** (App → `Dockerfile.web`, porta `8080`)
 4. Storage: MinIO com HTTPS público **ou** GCS (`STORAGE_PROVIDER=gcs`)
 5. **n8n** continua separado (Credentials próprias; ver `docs/n8n/credentials.md`)
@@ -58,8 +58,8 @@ Rebuild a Web sempre que mudar `VITE_API_URL` (é embutida no bundle Vite).
 
 ## Compose no Easypanel (alternativa)
 
-1. Serviço **Compose** com arquivo `compose.easypanel.yaml`
-2. Preencha as variáveis exigidas — modelo completo em `compose.easypanel.env.example` (`POSTGRES_PASSWORD`, `DATABASE_URL`, `CORS_ORIGIN`, secrets, storage, `VITE_API_URL`, …)
+1. Serviço **Compose** com arquivo `compose.easypanel.yaml` (só `api` + `web`; sem Postgres no Compose)
+2. Preencha as variáveis exigidas — modelo completo em `compose.easypanel.env.example` (`DATABASE_URL` do DB externo, `CORS_ORIGIN`, secrets, storage, `VITE_API_URL`, …)
 3. Domains do painel:
    - API → serviço interno `api`, porta `3000`
    - Web → serviço interno `web`, porta `8080`
@@ -83,4 +83,4 @@ O entrypoint **valida a config antes** de migrate/seed. Se faltar variável (ou 
 3. `JWT_SECRET` e `INGESTION_API_KEY`: mínimo 32 caracteres (não use os defaults de desenvolvimento)
 4. `STORAGE_PROVIDER`: `minio` ou `gcs` — nunca `public` em produção
 5. Com MinIO: `STORAGE_ENDPOINT` em **HTTPS** + access/secret keys + `STORAGE_PUBLIC_URL`
-6. `DATABASE_URL` no Compose deve usar o host do serviço DB (ex.: `db`), não `127.0.0.1`
+6. `DATABASE_URL` deve apontar para o PostgreSQL externo (hostname na rede do Easypanel / host do DB), não `127.0.0.1` nem um serviço `db` deste Compose
