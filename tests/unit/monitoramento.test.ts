@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import test from 'node:test';
 import { WebSocket, WebSocketServer } from 'ws';
 import { parseAppConfig } from '../../apps/api/src/plugins/config.js';
+import { parseMonitoramentoAuthMessage } from '../../apps/api/src/modules/monitoramento/auth.js';
 import {
   buildElevenLabsMonitorUrl,
   mapObservationEvent,
@@ -109,6 +110,23 @@ test('URL de monitoramento usa conversation_id sem expor a chave', () => {
     'wss://api.elevenlabs.io/v1/convai/conversations/conv_abc123/monitor'
   );
   assert.doesNotMatch(url, /sk_|xi-api-key/i);
+});
+
+test('auth do monitoramento vem na primeira mensagem e nao na URL', () => {
+  assert.deepEqual(
+    parseMonitoramentoAuthMessage(
+      JSON.stringify({ type: 'auth', token: 'jwt-session-token' })
+    ),
+    { type: 'auth', token: 'jwt-session-token' }
+  );
+  assert.equal(
+    parseMonitoramentoAuthMessage(JSON.stringify({ command_type: 'end_call' })),
+    null
+  );
+  assert.equal(
+    parseMonitoramentoAuthMessage({ type: 'auth', token: '' }),
+    null
+  );
 });
 
 test('proxy retransmite observacao e nunca envia comando de controle', async () => {

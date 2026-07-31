@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+export const monitoramentoAuthMessageSchema = z.object({
+  type: z.literal('auth'),
+  token: z.string().trim().min(1)
+});
+
 export const monitoramentoEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('ready')
@@ -22,4 +27,5 @@ export const monitoramentoEventSchema = z.discriminatedUnion('type', [
   })
 ]);
 
+export type MonitoramentoAuthMessage = z.infer<typeof monitoramentoAuthMessageSchema>;
 export type MonitoramentoEvent = z.infer<typeof monitoramentoEventSchema>;

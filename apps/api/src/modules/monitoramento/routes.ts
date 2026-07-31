@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import websocket from '@fastify/websocket';
 import { createAtendimentosRepository } from '../atendimentos/repository.js';
 import { createAuthRepository } from '../auth/repository.js';
+import { waitForMonitoramentoAuthToken } from './auth.js';
 import { createMonitoramentoProxy } from './proxy.js';
 import {
   MissingElevenLabsApiKeyError,
@@ -19,11 +20,11 @@ const routes: FastifyPluginAsync = async (app) => {
   const atendimentos = createAtendimentosRepository(app.db);
   const auth = createAuthRepository(app.db);
 
-  app.get<{ Params: { id: string }; Querystring: { token?: string } }>(
+  app.get<{ Params: { id: string } }>(
     '/atendimentos/:id/monitoramento',
     { websocket: true, config: { auth: false } },
     async (socket, request) => {
-      const token = request.query.token;
+      const token = await waitForMonitoramentoAuthToken(socket);
       if (!token) {
         sendError(socket, 'Autenticação necessária para o Monitoramento ao Vivo');
         return;

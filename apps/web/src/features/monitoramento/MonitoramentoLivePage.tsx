@@ -8,7 +8,9 @@ import {
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuthenticatedResource } from '../atendimentos/api';
-import { monitoramentoWsUrl } from './api';
+import { monitoramentoAuthPayload, monitoramentoWsUrl } from './api';
+
+const maxLiveLines = 200;
 
 type LiveLine = {
   id: number;
@@ -44,6 +46,8 @@ export function MonitoramentoLivePage() {
 
     let socket: WebSocket;
     let nextId = 0;
+    let sawReady = false;
+    let sawTerminal = false;
     try {
       socket = new WebSocket(monitoramentoWsUrl(atendimentoId));
     } catch (error) {
@@ -60,6 +64,22 @@ export function MonitoramentoLivePage() {
     setConnection({ status: 'connecting' });
     setLines([]);
 
+    socket.addEventListener('open', () => {
+      try {
+        socket.send(monitoramentoAuthPayload());
+      } catch (error) {
+        sawTerminal = true;
+        setConnection({
+          status: 'error',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Sessão necessária para o Monitoramento ao Vivo'
+        });
+        socket.close();
+      }
+    });
+
     socket.addEventListener('message', (event) => {
       let parsed: unknown;
       try {
@@ -75,6 +95,9 @@ export function MonitoramentoLivePage() {
     });
 
     socket.addEventListener('error', () => {
+      if (sawTerminal) {
+        return;
+      }
       setConnection((current) =>
         current.status === 'error'
           ? current
@@ -86,25 +109,42 @@ export function MonitoramentoLivePage() {
     });
 
     socket.addEventListener('close', () => {
-      setConnection((current) =>
-        current.status === 'error' || current.status === 'ended'
-          ? current
-          : { status: 'ended' }
-      );
+      if (sawTerminal) {
+        return;
+      }
+      setConnection((current) => {
+        if (current.status === 'error' || current.status === 'ended') {
+          return current;
+        }
+        if (!sawReady) {
+          return {
+            status: 'error',
+            message: 'Não foi possível iniciar o Monitoramento ao Vivo'
+          };
+        }
+        return { status: 'ended' };
+      });
     });
 
     function applyEvent(event: MonitoramentoEvent) {
       if (event.type === 'ready') {
+        sawReady = true;
         setConnection({ status: 'live' });
         return;
       }
       if (event.type === 'transcript') {
         const id = nextId++;
+        sawReady = true;
         setConnection({ status: 'live' });
-        setLines((current) => [
-          ...current,
-          { id, role: event.role, message: event.message }
-        ]);
+        setLines((current) => {
+          const next = [
+            ...current,
+            { id, role: event.role, message: event.message }
+          ];
+          return next.length > maxLiveLines
+            ? next.slice(next.length - maxLiveLines)
+            : next;
+        });
         return;
       }
       if (event.type === 'correction') {
@@ -122,9 +162,11 @@ export function MonitoramentoLivePage() {
         return;
       }
       if (event.type === 'ended') {
+        sawTerminal = true;
         setConnection({ status: 'ended' });
         return;
       }
+      sawTerminal = true;
       setConnection({ status: 'error', message: event.message });
     }
 

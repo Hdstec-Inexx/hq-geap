@@ -1,6 +1,9 @@
 import WebSocket, { type WebSocket as WsWebSocket } from 'ws';
 import { mapObservationEvent } from './service.js';
 
+const upstreamFailureMessage =
+  'Falha no monitoramento da ElevenLabs. Verifique se ELEVENLABS_API_KEY é válida e se o Atendimento ainda está ativo.';
+
 type ConnectFn = (
   url: string,
   protocols?: string | string[],
@@ -35,6 +38,28 @@ export function createMonitoramentoProxy({
   }
 
   let settled = false;
+  let finished = false;
+
+  function fail(message: string) {
+    if (finished) {
+      return;
+    }
+    finished = true;
+    sendSafe(client, { type: 'error', message });
+    closeBoth();
+  }
+
+  function closeBoth() {
+    if (client.readyState === client.OPEN || client.readyState === client.CONNECTING) {
+      client.close();
+    }
+    if (
+      upstream.readyState === upstream.OPEN ||
+      upstream.readyState === upstream.CONNECTING
+    ) {
+      upstream.close();
+    }
+  }
 
   upstream.on('open', () => {
     settled = true;
@@ -55,12 +80,12 @@ export function createMonitoramentoProxy({
   });
 
   upstream.on('close', () => {
+    if (finished) {
+      return;
+    }
+    finished = true;
     if (!settled) {
-      sendSafe(client, {
-        type: 'error',
-        message:
-          'Falha no monitoramento da ElevenLabs. Verifique se ELEVENLABS_API_KEY é válida e se o Atendimento ainda está ativo.'
-      });
+      sendSafe(client, { type: 'error', message: upstreamFailureMessage });
     } else {
       sendSafe(client, { type: 'ended' });
     }
@@ -70,33 +95,22 @@ export function createMonitoramentoProxy({
   });
 
   upstream.on('error', () => {
-    sendSafe(client, {
-      type: 'error',
-      message:
-        'Falha no monitoramento da ElevenLabs. Verifique se ELEVENLABS_API_KEY é válida e se o Atendimento ainda está ativo.'
-    });
-    if (client.readyState === client.OPEN) {
-      client.close();
-    }
+    fail(upstreamFailureMessage);
   });
 
   upstream.on('unexpected-response', (_request, response) => {
-    sendSafe(client, {
-      type: 'error',
-      message:
-        response.statusCode === 401 || response.statusCode === 403
-          ? 'ELEVENLABS_API_KEY inválida ou sem permissão para Monitoramento ao Vivo.'
-          : 'Falha no monitoramento da ElevenLabs. Verifique se ELEVENLABS_API_KEY é válida e se o Atendimento ainda está ativo.'
-    });
-    if (client.readyState === client.OPEN) {
-      client.close();
-    }
+    fail(
+      response.statusCode === 401 || response.statusCode === 403
+        ? 'ELEVENLABS_API_KEY inválida ou sem permissão para Monitoramento ao Vivo.'
+        : upstreamFailureMessage
+    );
   });
 
   // Observation only: ignore any client payloads (never forward control commands).
   client.on('message', () => undefined);
 
   client.on('close', () => {
+    finished = true;
     if (
       upstream.readyState === upstream.OPEN ||
       upstream.readyState === upstream.CONNECTING
@@ -106,6 +120,7 @@ export function createMonitoramentoProxy({
   });
 
   client.on('error', () => {
+    finished = true;
     if (
       upstream.readyState === upstream.OPEN ||
       upstream.readyState === upstream.CONNECTING
