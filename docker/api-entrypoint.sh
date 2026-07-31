@@ -2,8 +2,6 @@
 set -eu
 
 cd /app
-# pnpm coloca `pg` sob apps/api; scripts precisam resolver a partir daí.
-export NODE_PATH="/app/apps/api/node_modules${NODE_PATH:+:$NODE_PATH}"
 
 echo "Applying database migrations..."
 node /app/scripts/database.js migrate

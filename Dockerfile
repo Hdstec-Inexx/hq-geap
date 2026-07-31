@@ -47,6 +47,9 @@ COPY --from=build /app/scripts-dist scripts
 COPY --from=build /app/db db
 COPY docker/api-entrypoint.sh /app/docker/api-entrypoint.sh
 RUN chmod +x /app/docker/api-entrypoint.sh \
+  && node /app/scripts/database.js >/tmp/database-cli.txt 2>&1 || true \
+  && grep -q 'Usage:' /tmp/database-cli.txt \
+  && rm /tmp/database-cli.txt \
   && chown -R hq:hq /app
 USER hq
 EXPOSE 3000
