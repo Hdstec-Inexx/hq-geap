@@ -64,17 +64,28 @@
     },
     {
       "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const conversationIds = $input.all().map(item => item.json.conversation_id).filter(Boolean);\nif (conversationIds.length === 0) return [];\nreturn [{ json: { conversation_ids: conversationIds } }];"
+      },
+      "id": "d2a1f8c0-5b3e-4c91-9e7a-1f0b6d4a2c88",
+      "name": "Agregar candidatos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, -120]
+    },
+    {
+      "parameters": {
         "operation": "executeQuery",
-        "query": "select $1::text as conversation_id\nwhere not exists (\n  select 1\n  from atendimentos\n  where elevenlabs_conversation_id = $1\n)",
+        "query": "select c.conversation_id\nfrom unnest($1::text[]) as c(conversation_id)\nwhere not exists (\n  select 1\n  from atendimentos\n  where elevenlabs_conversation_id = c.conversation_id\n)",
         "options": {
-          "queryReplacement": "={{ [$json.conversation_id] }}"
+          "queryReplacement": "={{ [$json.conversation_ids] }}"
         }
       },
       "id": "11e3ba63-e374-4b68-b4d5-c13ead125664",
       "name": "Manter somente ausentes",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
-      "position": [880, -120],
+      "position": [1100, -120],
       "credentials": {
         "postgres": {
           "id": "CONFIGURE_NO_N8N",
@@ -93,10 +104,11 @@
       "name": "Buscar Conversa ElevenLabs",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1100, -120],
+      "position": [1320, -120],
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 2000,
+      "continueOnFail": true,
       "credentials": {
         "httpHeaderAuth": {
           "id": "CONFIGURE_NO_N8N",
@@ -107,13 +119,14 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const data = $json;\nif (data?.status !== 'done') throw new Error('Only completed ElevenLabs conversations can be ingested');\nconst transferToolName = $env.ELEVENLABS_TRANSFER_TOOL_NAME;\nif (!transferToolName) throw new Error('ELEVENLABS_TRANSFER_TOOL_NAME is required');\nconst startedAt = new Date(data.metadata.start_time_unix_secs * 1000);\nconst duration = data.metadata.call_duration_secs;\nconst contactReason = data.analysis?.data_collection_results?.['Classificação']?.value ?? null;\nconst transferred = data.transcript.some(turn => turn.tool_calls?.some(call => call.tool_name === transferToolName && call.tool_has_been_called === true));\nreturn [{ json: {\n  conversation_id: data.conversation_id,\n  agent_id: data.agent_id,\n  event_timestamp: data.metadata.start_time_unix_secs + duration,\n  status: 'concluido',\n  started_at: startedAt.toISOString(),\n  completed_at: new Date(startedAt.getTime() + duration * 1000).toISOString(),\n  duration_seconds: duration,\n  transcript: data.transcript.filter(turn => turn.role === 'agent' || turn.role === 'user').map(({ role, message, time_in_call_secs }) => ({ role, message, time_in_call_secs })),\n  audio_reference: null,\n  contact_reason: contactReason,\n  transferred,\n  cost: data.metadata.cost_fiat ?? null\n} }];"
+        "jsCode": "const data = $json;\nif (data?.error || !data?.conversation_id) return [];\nif (data.status !== 'done') return [];\nconst transferToolName = $env.ELEVENLABS_TRANSFER_TOOL_NAME;\nif (!transferToolName) throw new Error('ELEVENLABS_TRANSFER_TOOL_NAME is required');\nconst startedAt = new Date(data.metadata.start_time_unix_secs * 1000);\nconst duration = data.metadata.call_duration_secs;\nconst contactReason = data.analysis?.data_collection_results?.['Classificação']?.value ?? null;\nconst transferred = data.transcript.some(turn => turn.tool_calls?.some(call => call.tool_name === transferToolName && call.tool_has_been_called === true));\nreturn [{ json: {\n  conversation_id: data.conversation_id,\n  agent_id: data.agent_id,\n  event_timestamp: data.metadata.start_time_unix_secs + duration,\n  status: 'concluido',\n  started_at: startedAt.toISOString(),\n  completed_at: new Date(startedAt.getTime() + duration * 1000).toISOString(),\n  duration_seconds: duration,\n  transcript: data.transcript.filter(turn => turn.role === 'agent' || turn.role === 'user').map(({ role, message, time_in_call_secs }) => ({ role, message, time_in_call_secs })),\n  audio_reference: null,\n  contact_reason: contactReason,\n  transferred,\n  cost: data.metadata.cost_fiat ?? null\n} }];"
       },
       "id": "9b8f626b-00f1-4bb4-8440-9d250c0ccf10",
       "name": "Contrato normalizado",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1320, -120]
+      "position": [1540, -120],
+      "continueOnFail": true
     },
     {
       "parameters": {
@@ -131,10 +144,11 @@
       "name": "Persistir Atendimento",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1540, -120],
+      "position": [1760, -120],
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 2000,
+      "continueOnFail": true,
       "credentials": {
         "httpHeaderAuth": {
           "id": "CONFIGURE_NO_N8N",
@@ -199,6 +213,9 @@
       ]]
     },
     "Extrair Atendimentos concluídos": {
+      "main": [[{ "node": "Agregar candidatos", "type": "main", "index": 0 }]]
+    },
+    "Agregar candidatos": {
       "main": [[{ "node": "Manter somente ausentes", "type": "main", "index": 0 }]]
     },
     "Manter somente ausentes": {

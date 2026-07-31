@@ -26,6 +26,8 @@ Os exports sanitizados em `n8n/workflows/` referenciam as Credentials apenas pel
 
 Para os Code nodes acessarem essas variáveis, defina `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`. Para a validação HMAC, habilite também `crypto` com `NODE_FUNCTION_ALLOW_BUILTIN=crypto`. Restrinja a edição dos workflows a administradores, pois essas opções dão aos Code nodes acesso ao ambiente do processo.
 
+Não adicione chaves da ElevenLabs nem do OpenRouter ao `.env` do HQ — elas existem só no Credentials do n8n. Proteja o Form Trigger “Buscar Conversa” com Basic Auth da instância ou restrinja-o à rede interna; o formulário reprocessa Atendimentos e não deve ficar público.
+
 No ambiente local, configure `HQ Audio Storage` para o endpoint S3 `http://localhost:9000`, região `us-east-1`, access key `minioadmin` e secret key `minioadmin`. O Compose cria o bucket `hq-geap-audio`; produção deve usar credenciais próprias e bucket privado.
 
 ## Verificação antes da ativação
@@ -40,5 +42,6 @@ No ambiente local, configure `HQ Audio Storage` para o endpoint S3 `http://local
 8. Configure um Error Workflow para alertar execuções que esgotarem as três tentativas de download, upload ou atualização da referência. Essas execuções podem ser retomadas com segurança porque a ingestão e a chave do objeto são idempotentes.
 9. Importe `reconciliacao-atendimentos.json` e `reprocessar-atendimento.json`, associe as Credentials nomeadas e confirme que ambos publicam em `/atendimentos/ingestao`.
 10. Execute “Buscar Conversa” duas vezes com o mesmo `conversation_id` e confirme uma única linha em `atendimentos` e uma única Avaliação da IA.
+11. Na reconciliação, force uma falha pontual na ElevenLabs e confirme que a execução registra o erro do item, segue os demais ausentes e não altera Atendimentos já persistidos.
 
 As Credentials são objetos locais da instância n8n e não são exportadas com o workflow. Por isso, sua existência e associação aos nodes são verificações de implantação, não configuração do HQ GEAP.

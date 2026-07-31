@@ -28,6 +28,8 @@ type WorkflowNode = {
   type: string;
   parameters: Record<string, unknown> & { jsCode?: string };
   credentials?: Record<string, { id: string; name: string }>;
+  continueOnFail?: boolean;
+  retryOnFail?: boolean;
 };
 
 type Workflow = {
@@ -57,6 +59,10 @@ test('reconciliacao usa janela configuravel, pagina a ElevenLabs e seleciona som
   const execute = new Function('$json', extrairCode) as (
     input: unknown
   ) => Array<{ json: { conversation_id: string } }>;
+  const agregarCode = node(workflow, 'Agregar candidatos')?.parameters.jsCode ?? '';
+  const agregar = new Function('$input', agregarCode) as (input: {
+    all: () => Array<{ json: { conversation_id: string } }>;
+  }) => Array<{ json: { conversation_ids: string[] } }>;
 
   assert.ok(workflow.nodes.some((candidate) => candidate.type === 'n8n-nodes-base.scheduleTrigger'));
   assert.match(serialized, /RECONCILIATION_LOOKBACK_MINUTES/);
@@ -69,11 +75,22 @@ test('reconciliacao usa janela configuravel, pagina a ElevenLabs e seleciona som
     'conv-fixture-concluido-001',
     'conv-ja-persistido-002'
   ]);
+  assert.deepEqual(
+    agregar({
+      all: () => execute(lista)
+    })[0]?.json.conversation_ids,
+    ['conv-fixture-concluido-001', 'conv-ja-persistido-002']
+  );
 
   const filter = node(workflow, 'Manter somente ausentes');
   assert.equal(filter?.credentials?.postgres?.name, 'HQ GEAP PostgreSQL');
+  assert.match(JSON.stringify(filter?.parameters), /unnest/i);
   assert.match(JSON.stringify(filter?.parameters), /not exists/i);
   assert.match(JSON.stringify(filter?.parameters), /elevenlabs_conversation_id/);
+  assert.equal(
+    workflow.connections['Extrair Atendimentos concluídos']?.main[0]?.[0]?.node,
+    'Agregar candidatos'
+  );
   assert.equal(
     workflow.connections['Há próxima página?']?.main[0]?.[0]?.node,
     'Preparar próxima página'
@@ -82,6 +99,15 @@ test('reconciliacao usa janela configuravel, pagina a ElevenLabs e seleciona som
     workflow.connections['Preparar próxima página']?.main[0]?.[0]?.node,
     'Listar Atendimentos ElevenLabs'
   );
+
+  for (const name of [
+    'Buscar Conversa ElevenLabs',
+    'Contrato normalizado',
+    'Persistir Atendimento'
+  ] as const) {
+    assert.equal(node(workflow, name)?.continueOnFail, true);
+  }
+  assert.equal(node(workflow, 'Listar Atendimentos ElevenLabs')?.retryOnFail, true);
 });
 
 test('webhook, reconciliacao e Buscar Conversa convergem para a ingestao idempotente', async () => {
@@ -133,5 +159,15 @@ test('webhook, reconciliacao e Buscar Conversa convergem para a ingestao idempot
     reprocessamento.nodes.some(
       (candidate) => candidate.type === 'n8n-nodes-base.formTrigger'
     )
+  );
+
+  const skipFailure = node(reconciliacao, 'Contrato normalizado')?.parameters.jsCode ?? '';
+  const skipNormalizar = new Function('$json', '$env', skipFailure) as (
+    input: unknown,
+    environment: unknown
+  ) => unknown[];
+  assert.deepEqual(
+    skipNormalizar({ error: 'provider down' }, { ELEVENLABS_TRANSFER_TOOL_NAME: 'x' }),
+    []
   );
 });
