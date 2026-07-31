@@ -3,6 +3,9 @@ set -eu
 
 cd /app
 
+echo "Validating API config..."
+node /app/apps/api/dist/check-config.js
+
 echo "Applying database migrations..."
 node /app/scripts/database.js migrate
 

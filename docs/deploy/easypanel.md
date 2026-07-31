@@ -40,7 +40,7 @@ STORAGE_SECRET_KEY=...
 STORAGE_PUBLIC_URL=https://minio.seudominio.com/hq-geap-audio
 ```
 
-O entrypoint aplica `migrate` e, por padrão, `seed` antes de subir a API. O seed é idempotente e cria o Admin `admin@hq.local` / `senha-admin` se ainda não houver Admin ativo — **troque a senha no primeiro acesso**. Depois do primeiro deploy, defina `SKIP_DB_SEED=1` para não reexecutar seeds a cada restart.
+O entrypoint valida a config de produção, aplica `migrate` e, por padrão, `seed` antes de subir a API. O seed é idempotente e cria o Admin `admin@hq.local` / `senha-admin` se ainda não houver Admin ativo — **troque a senha no primeiro acesso**. Depois do primeiro deploy, defina `SKIP_DB_SEED=1` para não reexecutar seeds a cada restart.
 
 Em produção, se `HOST` não for definido, a API escuta em `0.0.0.0` (necessário para o proxy do Easypanel).
 
@@ -59,7 +59,7 @@ Rebuild a Web sempre que mudar `VITE_API_URL` (é embutida no bundle Vite).
 ## Compose no Easypanel (alternativa)
 
 1. Serviço **Compose** com arquivo `compose.easypanel.yaml`
-2. Preencha as variáveis exigidas (`POSTGRES_PASSWORD`, `DATABASE_URL`, `CORS_ORIGIN`, secrets, `VITE_API_URL`, …)
+2. Preencha as variáveis exigidas — modelo completo em `compose.easypanel.env.example` (`POSTGRES_PASSWORD`, `DATABASE_URL`, `CORS_ORIGIN`, secrets, storage, `VITE_API_URL`, …)
 3. Domains do painel:
    - API → serviço interno `api`, porta `3000`
    - Web → serviço interno `web`, porta `8080`
@@ -73,3 +73,14 @@ Rebuild a Web sempre que mudar `VITE_API_URL` (é embutida no bundle Vite).
 - [ ] `SKIP_DB_SEED=1` após o primeiro seed (recomendado)
 - [ ] n8n aponta ingestão para a API com `x-ingestion-key`
 - [ ] Áudio acessível via storage assinado (não use `STORAGE_PROVIDER=public` em produção)
+
+## API `unhealthy` no Compose
+
+O entrypoint **valida a config antes** de migrate/seed. Se faltar variável (ou `STORAGE_PROVIDER=public`, secrets com menos de 32 caracteres, MinIO sem HTTPS), o container reinicia e o healthcheck falha — o `web` não sobe (`depends_on: service_healthy`).
+
+1. `docker logs <api-container> --tail 100` — procure `Invalid API config`
+2. Confira no painel **todas** as envs do bloco `hq-api` acima (não basta `DATABASE_URL` + `ELEVENLABS_API_KEY`)
+3. `JWT_SECRET` e `INGESTION_API_KEY`: mínimo 32 caracteres (não use os defaults de desenvolvimento)
+4. `STORAGE_PROVIDER`: `minio` ou `gcs` — nunca `public` em produção
+5. Com MinIO: `STORAGE_ENDPOINT` em **HTTPS** + access/secret keys + `STORAGE_PUBLIC_URL`
+6. `DATABASE_URL` no Compose deve usar o host do serviço DB (ex.: `db`), não `127.0.0.1`
