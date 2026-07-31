@@ -68,7 +68,8 @@ export const atendimentoListSchema = z.array(atendimentoSummarySchema);
 
 export const atendimentosQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
-  offset: z.coerce.number().int().min(0).max(10_000).default(0)
+  offset: z.coerce.number().int().min(0).max(10_000).default(0),
+  status: z.enum(['em_andamento', 'concluido']).optional()
 });
 
 export type IngestAtendimento = z.infer<typeof ingestAtendimentoSchema>;

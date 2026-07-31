@@ -7,7 +7,7 @@ O workflow de avaliação é implantado e mantido no n8n, fora deste repositóri
 | `HQ GEAP PostgreSQL` | Postgres | Ler a configuração ativa e persistir a Avaliação e seus checks |
 | `HQ GEAP OpenRouter` | Header Auth | Enviar `Authorization: Bearer <token>` nas chamadas ao OpenRouter |
 | `HQ Ingestion API Key` | Header Auth | Enviar `x-ingestion-key` com o valor de `INGESTION_API_KEY` para a API do HQ |
-| `ElevenLabs API Key` | Header Auth | Enviar `xi-api-key` para listar, buscar e baixar Atendimentos |
+| `ElevenLabs API Key` | Header Auth | Enviar `xi-api-key` para listar, buscar e baixar Atendimentos (ingestão/reconciliação — não é a chave do Monitoramento ao Vivo do HQ) |
 | `HQ Audio Storage` | S3 | Gravar o MP3 em MinIO ou storage compatível com S3 |
 
 Os nodes Postgres e HTTP Request devem selecionar essas Credentials pelo seletor do n8n. Não grave senha, token ou connection string em parâmetros dos nodes, Code nodes, variáveis do workflow ou exports JSON.
@@ -26,7 +26,7 @@ Os exports sanitizados em `n8n/workflows/` referenciam as Credentials apenas pel
 
 Para os Code nodes acessarem essas variáveis, defina `N8N_BLOCK_ENV_ACCESS_IN_NODE=false`. Para a validação HMAC, habilite também `crypto` com `NODE_FUNCTION_ALLOW_BUILTIN=crypto`. Restrinja a edição dos workflows a administradores, pois essas opções dão aos Code nodes acesso ao ambiente do processo.
 
-Não adicione chaves da ElevenLabs nem do OpenRouter ao `.env` do HQ — elas existem só no Credentials do n8n. Proteja o Form Trigger “Buscar Conversa” com Basic Auth da instância ou restrinja-o à rede interna; o formulário reprocessa Atendimentos e não deve ficar público.
+Distinga as chaves ElevenLabs: `ELEVENLABS_API_KEY` no `.env` do HQ serve **somente** ao Monitoramento ao Vivo (proxy WebSocket no servidor; a chave nunca chega ao browser; ADR-0005). A Credential `ElevenLabs API Key` do n8n serve **somente** à ingestão/reconciliação. A chave do OpenRouter permanece só no Credentials do n8n. Proteja o Form Trigger “Buscar Conversa” com Basic Auth da instância ou restrinja-o à rede interna; o formulário reprocessa Atendimentos e não deve ficar público.
 
 No ambiente local, configure `HQ Audio Storage` para o endpoint S3 `http://localhost:9000`, região `us-east-1`, access key `minioadmin` e secret key `minioadmin`. O Compose cria o bucket `hq-geap-audio`; produção deve usar credenciais próprias e bucket privado.
 

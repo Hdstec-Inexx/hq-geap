@@ -55,9 +55,13 @@ const routes: FastifyPluginAsync = async (app) => {
     if (!query.success) {
       throw app.httpErrors.badRequest('Invalid pagination');
     }
-    return (await repository.list(query.data.limit, query.data.offset)).map(
-      toAtendimentoSummary
-    );
+    return (
+      await repository.list(
+        query.data.limit,
+        query.data.offset,
+        query.data.status
+      )
+    ).map(toAtendimentoSummary);
   });
 
   app.get<{ Params: { id: string } }>(

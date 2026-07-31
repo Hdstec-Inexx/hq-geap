@@ -14,6 +14,10 @@ import {
   FilaCuradoriaRoute
 } from '../features/curadoria/routes';
 import { DashboardRoute } from '../features/dashboards/routes';
+import {
+  MonitoramentoLiveRoute,
+  MonitoramentoRoute
+} from '../features/monitoramento/routes';
 
 export const router = createBrowserRouter([
   {
@@ -30,6 +34,11 @@ export const router = createBrowserRouter([
           {
             path: '/atendimentos/:atendimentoId',
             element: <AtendimentoPage />
+          },
+          { path: '/monitoramento', element: MonitoramentoRoute },
+          {
+            path: '/monitoramento/:atendimentoId',
+            element: MonitoramentoLiveRoute
           },
           {
             element: <RequireRole roles={['admin']} />,
