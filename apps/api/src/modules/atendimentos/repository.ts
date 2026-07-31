@@ -1,4 +1,7 @@
-import type { IngestAtendimento } from '@hq-geap/contracts/atendimentos';
+import type {
+  AtendimentoSummary,
+  IngestAtendimento
+} from '@hq-geap/contracts/atendimentos';
 import type pg from 'pg';
 
 export type AtendimentoSummaryRow = {
@@ -7,7 +10,7 @@ export type AtendimentoSummaryRow = {
   agenteVozId: string;
   agenteVozNome: string;
   agentId: string;
-  status: 'em_andamento' | 'concluido';
+  status: AtendimentoSummary['status'];
   iniciadoEm: Date | null;
   concluidoEm: Date | null;
   duracaoSegundos: number | null;
@@ -160,12 +163,17 @@ export function createAtendimentosRepository(db: pg.Pool) {
       }
     },
 
-    async list(limit: number, offset: number): Promise<AtendimentoSummaryRow[]> {
+    async list(
+      limit: number,
+      offset: number,
+      status?: AtendimentoSummary['status']
+    ): Promise<AtendimentoSummaryRow[]> {
       const result = await db.query<AtendimentoSummaryRow>(`
         ${selectAtendimentoSummary}
+        where ($3::text is null or a.status = $3)
         order by a.criado_em desc, a.id desc
         limit $1 offset $2
-      `, [limit, offset]);
+      `, [limit, offset, status ?? null]);
       return result.rows;
     },
 

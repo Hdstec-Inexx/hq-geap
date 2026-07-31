@@ -134,6 +134,9 @@ export function HomePage() {
         <Link className="admin-feature-link" to="/atendimentos">
           Consultar Atendimentos
         </Link>
+        <Link className="admin-feature-link" to="/monitoramento">
+          Monitoramento ao Vivo
+        </Link>
         <Link className="admin-feature-link" to="/curadoria">
           {session.user.role === 'gestao'
             ? 'Consultar Fila de Curadoria'

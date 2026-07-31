@@ -40,6 +40,10 @@
       "types": "./src/health.ts",
       "default": "./dist/health.js"
     },
+    "./monitoramento": {
+      "types": "./src/monitoramento.ts",
+      "default": "./dist/monitoramento.js"
+    },
     "./usuarios": {
       "types": "./src/usuarios.ts",
       "default": "./dist/usuarios.js"

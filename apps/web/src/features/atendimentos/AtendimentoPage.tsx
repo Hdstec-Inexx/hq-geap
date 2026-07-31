@@ -51,6 +51,14 @@ export function AtendimentoPage() {
         {atendimento.custo !== undefined ? <div><span>Custo</span><strong>{atendimento.custo === null ? 'Não disponível' : currency.format(atendimento.custo)}</strong></div> : null}
       </section>
 
+      {atendimento.status === 'em_andamento' ? (
+        <p className="atendimentos-state">
+          <Link to={`/monitoramento/${atendimento.conversationId}`}>
+            Abrir Monitoramento ao Vivo
+          </Link>
+        </p>
+      ) : null}
+
       {atendimento.status === 'concluido' ? (
         <div className="avaliacoes-lado-a-lado">
           <AvaliacaoIaPanel atendimentoId={atendimento.id} />
