@@ -1,0 +1,31 @@
+{
+  "name": "hq-geap",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.18.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "corepack pnpm db:up && corepack pnpm db:migrate && corepack pnpm db:seed && corepack pnpm --filter @hq-geap/contracts build && concurrently -n api,web -c cyan,magenta \"corepack pnpm --filter @hq-geap/api dev\" \"corepack pnpm --filter @hq-geap/web dev\"",
+    "build": "corepack pnpm --recursive build",
+    "typecheck": "tsc -p tsconfig.json && corepack pnpm --recursive typecheck",
+    "test": "corepack pnpm test:unit && playwright test",
+    "test:unit": "tsx --test tests/unit/*.test.ts",
+    "test:e2e": "playwright test",
+    "db:up": "docker compose up -d --wait db minio minio-init",
+    "db:down": "docker compose down",
+    "db:migrate": "tsx scripts/database.ts migrate",
+    "db:seed": "tsx scripts/database.ts seed",
+    "db:validate": "tsx scripts/database.ts validate"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.1",
+    "@types/node": "^24.1.0",
+    "@types/pg": "^8.15.5",
+    "concurrently": "^9.2.0",
+    "pg": "^8.16.3",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}

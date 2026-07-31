@@ -1,0 +1,13 @@
+{
+  "checklist": {
+    "saudacao_e_intencao": "atendido",
+    "solicitou_cpf": "atendido",
+    "informou_protocolo_email": "nao_atendido",
+    "resolveu_solicitacao": "atendido",
+    "validou_email_por_extenso": "atendido",
+    "sem_diminutivos": "atendido",
+    "encerramento_geap": "atendido"
+  },
+  "falhas_identificadas": ["Nao informou o envio do protocolo por e-mail."],
+  "resumo_atendimento": "Solicitacao resolvida sem informar o protocolo."
+}

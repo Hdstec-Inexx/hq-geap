@@ -1,0 +1,13 @@
+{
+  "checklist": {
+    "saudacao_e_intencao": "atendido",
+    "solicitou_cpf": "atendido",
+    "informou_protocolo_email": "atendido",
+    "resolveu_solicitacao": "atendido",
+    "validou_email_por_extenso": "atendido",
+    "sem_diminutivos": "nao_atendido",
+    "encerramento_geap": "atendido"
+  },
+  "falhas_identificadas": ["Usou um diminutivo durante o contato."],
+  "resumo_atendimento": "Cliente solicitou a segunda via e recebeu o boleto."
+}

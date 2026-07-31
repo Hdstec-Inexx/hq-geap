@@ -1,0 +1,34 @@
+{
+  "name": "@hq-geap/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "corepack pnpm --filter @hq-geap/contracts build",
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc --noEmit false --outDir dist",
+    "start": "node dist/server.js",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@fastify/autoload": "^6.3.1",
+    "@fastify/cors": "^11.0.1",
+    "@fastify/jwt": "^10.0.0",
+    "@fastify/sensible": "^6.0.3",
+    "@google-cloud/storage": "^7.17.0",
+    "@hq-geap/contracts": "workspace:*",
+    "bcryptjs": "^3.0.2",
+    "fastify": "^5.4.0",
+    "fastify-plugin": "^5.0.1",
+    "ioredis": "^5.7.0",
+    "minio": "^8.0.5",
+    "pg": "^8.16.3",
+    "zod": "^4.0.10"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "@types/pg": "^8.15.5",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}
