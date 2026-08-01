@@ -40,7 +40,10 @@ O custo do Atendimento na ElevenLabs, tal qual exibido por ela após a conclusã
 ### Avaliação
 
 **Avaliação**:
-O veredito sobre um Atendimento, produzido pela IA Avaliadora ou pelo Curador — as duas coexistem lado a lado, sem hierarquia, e são snapshots imutáveis. A da IA carrega: checklist de critérios, nota de 0–10 (soma dos atendidos), falhas identificadas e resumo do atendimento. A do Curador é a **conferência da avaliação da IA**: ele confirma ou corrige cada check (sua nota deriva da mesma soma) e pode adicionar um Comentário.
+O veredito sobre um Atendimento, produzido pela IA Avaliadora ou pelo Curador — as duas coexistem lado a lado, sem hierarquia, e são snapshots imutáveis. A da IA carrega: checklist de critérios, nota de 0–10 (soma dos atendidos), falhas identificadas e resumo do atendimento. A do Curador é a **conferência da avaliação da IA** em registro separado: ele confirma ou corrige o shape espelho (checklist, falhas e resumo), sua nota deriva da mesma soma da Régua, registra a **Nota da Avaliação da IA** (0–10, qualidade da própria IA Avaliadora) e pode adicionar um comentário opcional na revisão. Concordância não é flag gravada — deriva da comparação dos dois snapshots.
+
+**Nota da Avaliação da IA**:
+Nota de 0–10 que o Curador atribui à qualidade da Avaliação da IA num Atendimento (calibração do avaliador), distinta da nota do Atendimento na Régua.
 
 **Aprovação**:
 O veredito final derivado de uma Avaliação: `Aprovado` quando a nota é ≥ 7.0 **e** não houve Falha Crítica; caso contrário, `Reprovado`. Não é dado gravado — é regra de leitura sobre o snapshot.

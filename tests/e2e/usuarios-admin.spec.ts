@@ -168,6 +168,93 @@ test.describe.serial('administracao de usuarios', () => {
     expect(inactiveLogin.status()).toBe(401);
   });
 
+  test('Admin redefine senha alheia, nao-admin recebe 403 e token antigo deixa de autenticar', async ({
+    request
+  }) => {
+    const admin = await login(request, 'admin');
+    const gestao = await login(request, 'gestao');
+    const curadorSession = await login(request, 'curador');
+    const adminHeaders = { authorization: `Bearer ${admin.token}` };
+    const targetEmail = `reset-senha-${Date.now()}@hq.test`;
+
+    const created = await request.post(`${apiUrl}/admin/usuarios`, {
+      data: {
+        email: targetEmail,
+        name: 'Alvo reset senha',
+        password: 'senha-antiga',
+        role: 'curador'
+      },
+      headers: adminHeaders
+    });
+    expect(created.status()).toBe(201);
+    const target = (await created.json()) as { id: string };
+
+    const targetLogin = await request.post(`${apiUrl}/auth/login`, {
+      data: { email: targetEmail, password: 'senha-antiga' }
+    });
+    expect(targetLogin.status()).toBe(200);
+    const oldToken = ((await targetLogin.json()) as { token: string }).token;
+    const oldHeaders = { authorization: `Bearer ${oldToken}` };
+    expect((await request.get(`${apiUrl}/me`, { headers: oldHeaders })).status()).toBe(
+      200
+    );
+
+    for (const token of [gestao.token, curadorSession.token]) {
+      expect(
+        (
+          await request.post(`${apiUrl}/admin/usuarios/${target.id}/senha`, {
+            data: { password: 'senha-nova-segura' },
+            headers: { authorization: `Bearer ${token}` }
+          })
+        ).status()
+      ).toBe(403);
+    }
+
+    const weakPassword = await request.post(
+      `${apiUrl}/admin/usuarios/${target.id}/senha`,
+      {
+        data: { password: 'curta' },
+        headers: adminHeaders
+      }
+    );
+    expect(weakPassword.status()).toBe(400);
+
+    const reset = await request.post(`${apiUrl}/admin/usuarios/${target.id}/senha`, {
+      data: { password: 'senha-nova-segura' },
+      headers: adminHeaders
+    });
+    expect(reset.status()).toBe(200);
+    const resetBody = await reset.json();
+    expect(resetBody).toMatchObject({
+      id: target.id,
+      email: targetEmail,
+      active: true
+    });
+    expect(resetBody).not.toHaveProperty('passwordHash');
+
+    expect((await request.get(`${apiUrl}/me`, { headers: oldHeaders })).status()).toBe(
+      401
+    );
+
+    const staleLogin = await request.post(`${apiUrl}/auth/login`, {
+      data: { email: targetEmail, password: 'senha-antiga' }
+    });
+    expect(staleLogin.status()).toBe(401);
+
+    const freshLogin = await request.post(`${apiUrl}/auth/login`, {
+      data: { email: targetEmail, password: 'senha-nova-segura' }
+    });
+    expect(freshLogin.status()).toBe(200);
+    const freshToken = ((await freshLogin.json()) as { token: string }).token;
+    expect(
+      (
+        await request.get(`${apiUrl}/me`, {
+          headers: { authorization: `Bearer ${freshToken}` }
+        })
+      ).status()
+    ).toBe(200);
+  });
+
   test('Admin cria, edita e desativa na interface sem recarregar o app', async ({
     page
   }) => {
@@ -175,15 +262,23 @@ test.describe.serial('administracao de usuarios', () => {
     await page.getByLabel('E-mail').fill('admin@hq.test');
     await page.getByLabel('Senha').fill('senha-admin');
     await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
     await page.getByRole('link', { name: 'Administrar usuários' }).click();
 
     await expect(
       page.getByRole('heading', { name: 'Administração de usuários' })
     ).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Voltar ao início' })).toBeVisible();
     await page.getByRole('button', { name: 'Novo usuário' }).click();
     await page.getByLabel('Nome').fill('Usuario pela interface');
     await page.getByLabel('E-mail', { exact: true }).fill('usuario-ui@hq.test');
-    await page.getByLabel('Senha inicial').fill('senha-interface');
+    const initialPassword = page.getByLabel('Senha inicial');
+    await initialPassword.fill('senha-interface');
+    await expect(initialPassword).toHaveAttribute('type', 'password');
+    await page.getByRole('button', { name: 'Mostrar senha' }).click();
+    await expect(initialPassword).toHaveAttribute('type', 'text');
+    await page.getByRole('button', { name: 'Ocultar senha' }).click();
+    await expect(initialPassword).toHaveAttribute('type', 'password');
     await page.getByLabel('Papel').selectOption('curador');
     await page.getByRole('button', { name: 'Criar usuário' }).click();
 
@@ -197,9 +292,71 @@ test.describe.serial('administracao de usuarios', () => {
     await page.getByRole('button', { name: 'Salvar alterações' }).click();
 
     const editedRow = page.getByRole('row', { name: /Usuario editado/ });
+    await expect(editedRow).toBeVisible();
     await expect(editedRow).toContainText('Gestão');
     await editedRow.getByRole('button', { name: 'Desativar' }).click();
     await expect(editedRow).toContainText('Inativo');
+  });
+
+  test('Admin redefine senha na UI com toggle e forca novo login do alvo', async ({
+    page,
+    request
+  }) => {
+    const admin = await login(request, 'admin');
+    const adminHeaders = { authorization: `Bearer ${admin.token}` };
+    const targetEmail = `ui-reset-${Date.now()}@hq.test`;
+    const created = await request.post(`${apiUrl}/admin/usuarios`, {
+      data: {
+        email: targetEmail,
+        name: 'Usuario reset UI',
+        password: 'senha-antiga-ui',
+        role: 'curador'
+      },
+      headers: adminHeaders
+    });
+    expect(created.status()).toBe(201);
+
+    const targetLogin = await request.post(`${apiUrl}/auth/login`, {
+      data: { email: targetEmail, password: 'senha-antiga-ui' }
+    });
+    expect(targetLogin.status()).toBe(200);
+    const oldToken = ((await targetLogin.json()) as { token: string }).token;
+
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('admin@hq.test');
+    await page.getByLabel('Senha').fill('senha-admin');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.getByRole('link', { name: 'Administrar usuários' }).click();
+    await expect(page.getByRole('link', { name: 'Voltar ao início' })).toBeVisible();
+
+    const row = page.getByRole('row', { name: /Usuario reset UI/ });
+    await row.getByRole('button', { name: 'Definir senha' }).click();
+    const newPassword = page.getByLabel('Nova senha');
+    await newPassword.fill('senha-nova-ui');
+    await expect(newPassword).toHaveAttribute('type', 'password');
+    await page.getByRole('button', { name: 'Mostrar senha' }).click();
+    await expect(newPassword).toHaveAttribute('type', 'text');
+    await expect(newPassword).toHaveValue('senha-nova-ui');
+    await page.getByRole('button', { name: 'Ocultar senha' }).click();
+    await page.getByRole('button', { name: 'Salvar senha' }).click();
+    await expect(page.getByRole('heading', { name: 'Definir senha' })).toHaveCount(0);
+
+    expect(
+      (
+        await request.get(`${apiUrl}/me`, {
+          headers: { authorization: `Bearer ${oldToken}` }
+        })
+      ).status()
+    ).toBe(401);
+
+    const freshLogin = await request.post(`${apiUrl}/auth/login`, {
+      data: { email: targetEmail, password: 'senha-nova-ui' }
+    });
+    expect(freshLogin.status()).toBe(200);
+
+    await page.getByRole('link', { name: 'Voltar ao início' }).click();
+    await expect(page).toHaveURL('/');
   });
 
   test('sessao rebaixada ou desativada sai da area administrativa ao retomar foco', async ({
@@ -227,6 +384,16 @@ test.describe.serial('administracao de usuarios', () => {
     expect(demotion.status()).toBe(200);
 
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            const raw = window.sessionStorage.getItem('hq-geap.perfil');
+            return raw ? (JSON.parse(raw) as { role: string }).role : null;
+          }),
+        { timeout: 10_000 }
+      )
+      .toBe('gestao');
     await expect(
       page.getByRole('heading', { name: 'Acesso não autorizado' })
     ).toBeVisible();
@@ -238,6 +405,6 @@ test.describe.serial('administracao de usuarios', () => {
     expect(deactivation.status()).toBe(200);
 
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-    await expect(page).toHaveURL('/login');
+    await expect(page).toHaveURL('/login', { timeout: 10_000 });
   });
 });

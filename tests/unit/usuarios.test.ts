@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   createUsuarioSchema,
-  listUsuariosQuerySchema
+  listUsuariosQuerySchema,
+  setUsuarioPasswordSchema
 } from '../../packages/contracts/src/usuarios.js';
 
 const validUser = {
@@ -10,6 +11,23 @@ const validUser = {
   email: 'pessoa@hq.test',
   role: 'curador' as const
 };
+
+test('admin set-password reutiliza as regras de senha existentes', () => {
+  assert.equal(
+    setUsuarioPasswordSchema.safeParse({ password: 'senha-ok' }).success,
+    true
+  );
+  assert.equal(
+    setUsuarioPasswordSchema.safeParse({ password: 'curta' }).success,
+    false
+  );
+  assert.equal(
+    setUsuarioPasswordSchema.safeParse({
+      password: 'á'.repeat(37)
+    }).success,
+    false
+  );
+});
 
 test('rejeita senha que excede o limite de 72 bytes do bcrypt', () => {
   const password = 'á'.repeat(37);

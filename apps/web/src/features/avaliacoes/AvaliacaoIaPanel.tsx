@@ -1,14 +1,5 @@
-import {
-  avaliacaoIaResponseSchema,
-  type AvaliacaoIa
-} from '@hq-geap/contracts/avaliacoes';
+import { avaliacaoIaResponseSchema } from '@hq-geap/contracts/avaliacoes';
 import { useAuthenticatedResource } from '../atendimentos/api';
-
-const estadoLabels: Record<AvaliacaoIa['checklist'][number]['estado'], string> = {
-  atendido: 'Atendido',
-  nao_atendido: 'Não atendido',
-  nao_se_aplica: 'Não se aplica'
-};
 
 export function AvaliacaoIaPanel({ atendimentoId }: { atendimentoId: string }) {
   const state = useAuthenticatedResource(
@@ -40,14 +31,32 @@ export function AvaliacaoIaPanel({ atendimentoId }: { atendimentoId: string }) {
         </div>
       </header>
 
+      <div className="avaliacao-notes">
+        <div>
+          <p className="panel-label">Claims da LLM (não canônicos)</p>
+          <p>
+            Nota claim {avaliacao.notaQualidade.toLocaleString('pt-BR')} ·{' '}
+            {avaliacao.atendimentoAprovado
+              ? 'Aprovação claim: sim'
+              : 'Aprovação claim: não'}
+          </p>
+        </div>
+      </div>
+
       <div className="avaliacao-checklist">
-        {avaliacao.checklist.map((criterio) => (
-          <article className={`criterio-check criterio-${criterio.estado}`} key={criterio.chave}>
+        {avaliacao.criterios.map((criterio) => (
+          <article
+            className={`criterio-check criterio-${criterio.atendido ? 'atendido' : 'nao_atendido'}`}
+            key={criterio.chave}
+          >
             <div>
               <h3>{criterio.nome}</h3>
               {criterio.critico ? <span className="critical-label">Crítico</span> : null}
             </div>
-            <p>{estadoLabels[criterio.estado]} · {criterio.valor.toLocaleString('pt-BR')} pt</p>
+            <p>
+              {criterio.atendido ? 'Atendido' : 'Não atendido'} ·{' '}
+              {criterio.valor.toLocaleString('pt-BR')} pt
+            </p>
           </article>
         ))}
       </div>

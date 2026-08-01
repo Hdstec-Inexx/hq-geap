@@ -11,7 +11,10 @@ export async function buildApp() {
   const app = Fastify({ logger: true });
 
   await app.register(config);
-  await app.register(cors, { origin: app.config.CORS_ORIGIN });
+  await app.register(cors, {
+    origin: app.config.CORS_ORIGIN,
+    methods: ['GET', 'HEAD', 'POST', 'PATCH', 'PUT', 'DELETE']
+  });
   await app.register(sensible);
   await app.register(database);
   await app.register(storage);

@@ -14,19 +14,33 @@ export type AvaliacaoIaRow = {
   id: string;
   atendimentoId: string;
   nota: string;
+  notaQualidade: string;
+  atendimentoAprovado: boolean;
   falhasIdentificadas: unknown;
   resumoAtendimento: string | null;
   promptVersao: number;
   criadoEm: Date;
+  saudacaoEIntencao: boolean;
+  solicitouCpf: boolean;
+  informouProtocoloEmail: boolean;
+  resolveuSolicitacao: boolean;
+  validouEmailPorExtenso: boolean;
+  semDiminutivos: boolean;
+  encerramentoGeap: boolean;
   checklist: ChecklistItem[];
 };
 
 export type AvaliacaoCuradorResumoRow = {
   id: string;
   atendimentoId: string;
+  avaliacaoIaId: string;
   autorId: string;
   autorNome: string;
   nota: string;
+  falhasIdentificadas: string[];
+  resumoAtendimento: string | null;
+  notaAvaliacaoIa: string;
+  comentario: string | null;
   criadoEm: Date;
   checklist: ChecklistItem[];
 };
@@ -60,10 +74,19 @@ export function createAvaliacoesRepository(db: pg.Pool) {
           a.id,
           a.atendimento_id as "atendimentoId",
           a.nota,
+          a.nota_qualidade as "notaQualidade",
+          a.atendimento_aprovado as "atendimentoAprovado",
           a.falhas_identificadas as "falhasIdentificadas",
           a.resumo_atendimento as "resumoAtendimento",
           p.versao as "promptVersao",
-          a.criado_em as "criadoEm"
+          a.criado_em as "criadoEm",
+          a.saudacao_e_intencao as "saudacaoEIntencao",
+          a.solicitou_cpf as "solicitouCpf",
+          a.informou_protocolo_email as "informouProtocoloEmail",
+          a.resolveu_solicitacao as "resolveuSolicitacao",
+          a.validou_email_por_extenso as "validouEmailPorExtenso",
+          a.sem_diminutivos as "semDiminutivos",
+          a.encerramento_geap as "encerramentoGeap"
         from avaliacoes a
         join prompts_ia_avaliadora p on p.id = a.prompt_id
         where a.atendimento_id = $1 and a.autor = 'ia'
@@ -83,12 +106,17 @@ export function createAvaliacoesRepository(db: pg.Pool) {
         select
           a.id,
           a.atendimento_id as "atendimentoId",
+          a.avaliacao_ia_id as "avaliacaoIaId",
           a.autor_usuario_id as "autorId",
           a.autor_usuario_nome as "autorNome",
           a.nota,
+          a.falhas_identificadas as "falhasIdentificadas",
+          a.resumo_atendimento as "resumoAtendimento",
+          a.nota_avaliacao_ia as "notaAvaliacaoIa",
+          a.comentario,
           a.criado_em as "criadoEm"
-        from avaliacoes a
-        where a.atendimento_id = $1 and a.autor = 'curador'
+        from avaliacoes_curador a
+        where a.atendimento_id = $1
         order by a.criado_em desc, a.id desc
         limit 1
       `, [atendimentoId]);
@@ -97,7 +125,26 @@ export function createAvaliacoesRepository(db: pg.Pool) {
         return null;
       }
 
-      return { ...row, checklist: await findChecklist(db, row.id) };
+      const checklist = await db.query<ChecklistItem>(`
+        select
+          ac.criterio_chave as chave,
+          ac.criterio_nome as nome,
+          ac.estado,
+          ac.valor_criterio as valor,
+          ac.criterio_critico as critico,
+          ac.criterio_ordem as ordem
+        from avaliacao_curador_criterios ac
+        where ac.avaliacao_curador_id = $1
+        order by ac.criterio_ordem
+      `, [row.id]);
+
+      return {
+        ...row,
+        falhasIdentificadas: Array.isArray(row.falhasIdentificadas)
+          ? row.falhasIdentificadas
+          : [],
+        checklist: checklist.rows
+      };
     }
   };
 }

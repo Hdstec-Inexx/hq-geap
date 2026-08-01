@@ -68,12 +68,17 @@ const routes: FastifyPluginAsync = async (app) => {
           error instanceof Error ? error.message : 'Conferencia invalida'
         );
       }
-      const created = await repository.createEvaluation(
-        request.params.atendimentoId,
-        request.authUser!.id,
-        conferencia.nota,
-        conferencia.checklist
-      );
+      const created = await repository.createEvaluation({
+        atendimentoId: request.params.atendimentoId,
+        avaliacaoIaId: detail.avaliacaoIa.id,
+        autorUsuarioId: request.authUser!.id,
+        nota: conferencia.nota,
+        falhasIdentificadas: parsed.data.falhasIdentificadas,
+        resumoAtendimento: parsed.data.resumoAtendimento ?? null,
+        notaAvaliacaoIa: parsed.data.notaAvaliacaoIa,
+        comentario: parsed.data.comentario ?? null,
+        checklist: conferencia.checklist
+      });
       reply.code(201);
       return toAvaliacaoCurador(created);
     }

@@ -6,7 +6,7 @@ import {
 import type { EstadoCriterio } from '@hq-geap/contracts/avaliacoes';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { apiUrl, getSession } from '../auth/session';
+import { apiUrl, getPerfil, getSession } from '../auth/session';
 import { formatDuration, useAuthenticatedResource } from '../atendimentos/api';
 import { ComentariosPanel } from '../comentarios/ComentariosPanel';
 
@@ -33,6 +33,14 @@ function ReviewForm({
       detail.avaliacaoIa.checklist.map(({ chave, estado }) => [chave, estado])
     )
   );
+  const [notaAvaliacaoIa, setNotaAvaliacaoIa] = useState('');
+  const [falhasIdentificadas, setFalhasIdentificadas] = useState(
+    detail.avaliacaoIa.falhasIdentificadas.join('\n')
+  );
+  const [resumoAtendimento, setResumoAtendimento] = useState(
+    detail.avaliacaoIa.resumoAtendimento ?? ''
+  );
+  const [comentario, setComentario] = useState('');
   const [submitState, setSubmitState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const checklist = detail.avaliacaoIa.checklist.map((criterio) => ({
     ...criterio,
@@ -46,11 +54,16 @@ function ReviewForm({
     (criterio) => criterio.critico && criterio.estado === 'nao_atendido'
   );
   const aprovacao = nota >= 7 && !falhaCritica ? 'aprovado' : 'reprovado';
+  const notaAvaliacaoIaNumero = Number(notaAvaliacaoIa);
+  const notaAvaliacaoIaValida =
+    Number.isFinite(notaAvaliacaoIaNumero) &&
+    notaAvaliacaoIaNumero >= 0 &&
+    notaAvaliacaoIaNumero <= 10;
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
     const session = getSession();
-    if (!session) return;
+    if (!session || !notaAvaliacaoIaValida) return;
     setSubmitState('saving');
     try {
       const response = await fetch(
@@ -62,7 +75,14 @@ function ReviewForm({
             'content-type': 'application/json'
           },
           body: JSON.stringify({
-            checklist: checklist.map(({ chave, estado }) => ({ chave, estado }))
+            checklist: checklist.map(({ chave, estado }) => ({ chave, estado })),
+            notaAvaliacaoIa: notaAvaliacaoIaNumero,
+            falhasIdentificadas: falhasIdentificadas
+              .split('\n')
+              .map((linha) => linha.trim())
+              .filter(Boolean),
+            resumoAtendimento: resumoAtendimento.trim() || null,
+            comentario: comentario.trim() || null
           })
         }
       );
@@ -116,12 +136,56 @@ function ReviewForm({
         ))}
       </div>
 
+      <div className="review-mirror-fields">
+        <label>
+          Nota da Avaliação da IA
+          <input
+            inputMode="decimal"
+            max={10}
+            min={0}
+            onChange={(event) => setNotaAvaliacaoIa(event.target.value)}
+            required
+            step="0.1"
+            type="number"
+            value={notaAvaliacaoIa}
+          />
+        </label>
+        <label>
+          Falhas identificadas
+          <textarea
+            onChange={(event) => setFalhasIdentificadas(event.target.value)}
+            rows={3}
+            value={falhasIdentificadas}
+          />
+        </label>
+        <label>
+          Resumo do atendimento
+          <textarea
+            onChange={(event) => setResumoAtendimento(event.target.value)}
+            rows={3}
+            value={resumoAtendimento}
+          />
+        </label>
+        <label>
+          Comentário da revisão (opcional)
+          <textarea
+            onChange={(event) => setComentario(event.target.value)}
+            rows={2}
+            value={comentario}
+          />
+        </label>
+      </div>
+
       <div className="review-actions">
         <p aria-live="polite">
           {submitState === 'saved' ? 'Conferência salva' : null}
           {submitState === 'error' ? 'Não foi possível salvar a conferência.' : null}
         </p>
-        <button className="primary-action" disabled={submitState === 'saving'} type="submit">
+        <button
+          className="primary-action"
+          disabled={submitState === 'saving' || !notaAvaliacaoIaValida}
+          type="submit"
+        >
           {submitState === 'saving' ? 'Salvando...' : 'Salvar conferência'}
         </button>
       </div>
@@ -131,7 +195,7 @@ function ReviewForm({
 
 function ReviewContent({ detail, onSaved }: { detail: CuradoriaDetail; onSaved: () => void }) {
   const atendimento = detail.atendimento;
-  const role = getSession()?.user.role;
+  const role = getPerfil()?.role;
   const canWrite = role === 'admin' || role === 'curador';
   return (
     <main className="atendimentos-page curadoria-review-page">
@@ -164,17 +228,26 @@ function ReviewContent({ detail, onSaved }: { detail: CuradoriaDetail; onSaved: 
           <p className="panel-label">Consulta somente leitura</p>
           <h2>Conferência humana</h2>
           {detail.avaliacaoMaisRecente ? (
-            <dl className="readonly-checklist">
-              {detail.avaliacaoMaisRecente.checklist.map((criterio) => (
-                <div key={criterio.chave}>
-                  <dt>
-                    {criterio.nome}
-                    {criterio.critico ? ' (crítico)' : ''}
-                  </dt>
-                  <dd>{stateLabels[criterio.estado]}</dd>
-                </div>
-              ))}
-            </dl>
+            <>
+              <p>
+                Nota da Avaliação da IA:{' '}
+                {detail.avaliacaoMaisRecente.notaAvaliacaoIa.toLocaleString('pt-BR')}
+              </p>
+              {detail.avaliacaoMaisRecente.comentario ? (
+                <p>{detail.avaliacaoMaisRecente.comentario}</p>
+              ) : null}
+              <dl className="readonly-checklist">
+                {detail.avaliacaoMaisRecente.checklist.map((criterio) => (
+                  <div key={criterio.chave}>
+                    <dt>
+                      {criterio.nome}
+                      {criterio.critico ? ' (crítico)' : ''}
+                    </dt>
+                    <dd>{stateLabels[criterio.estado]}</dd>
+                  </div>
+                ))}
+              </dl>
+            </>
           ) : (
             <p>Ainda não há conferência do Curador para este Atendimento.</p>
           )}
@@ -211,6 +284,23 @@ function ReviewContent({ detail, onSaved }: { detail: CuradoriaDetail; onSaved: 
             <strong>{detail.avaliacaoMaisRecente.autor.nome}</strong>
             <span>{dateTime.format(new Date(detail.avaliacaoMaisRecente.criadoEm))}</span>
             <b>{detail.avaliacaoMaisRecente.nota.toLocaleString('pt-BR')} / {detail.avaliacaoMaisRecente.aprovacao === 'aprovado' ? 'Aprovado' : 'Reprovado'}</b>
+            <p>
+              Nota da Avaliação da IA:{' '}
+              <span>{detail.avaliacaoMaisRecente.notaAvaliacaoIa.toLocaleString('pt-BR')}</span>
+            </p>
+            {detail.avaliacaoMaisRecente.resumoAtendimento ? (
+              <p>{detail.avaliacaoMaisRecente.resumoAtendimento}</p>
+            ) : null}
+            {detail.avaliacaoMaisRecente.falhasIdentificadas.length > 0 ? (
+              <ul>
+                {detail.avaliacaoMaisRecente.falhasIdentificadas.map((falha) => (
+                  <li key={falha}>{falha}</li>
+                ))}
+              </ul>
+            ) : null}
+            {detail.avaliacaoMaisRecente.comentario ? (
+              <p>{detail.avaliacaoMaisRecente.comentario}</p>
+            ) : null}
             <dl>
               {detail.avaliacaoMaisRecente.checklist.map((criterio) => (
                 <div key={criterio.chave}>
@@ -230,8 +320,10 @@ function ReviewContent({ detail, onSaved }: { detail: CuradoriaDetail; onSaved: 
                   <p>
                     {dateTime.format(new Date(avaliacao.criadoEm))} ·{' '}
                     {avaliacao.autor.nome} · Nota{' '}
-                    {avaliacao.nota.toLocaleString('pt-BR')}
+                    {avaliacao.nota.toLocaleString('pt-BR')} · Nota da Avaliação da IA{' '}
+                    {avaliacao.notaAvaliacaoIa.toLocaleString('pt-BR')}
                   </p>
+                  {avaliacao.comentario ? <p>{avaliacao.comentario}</p> : null}
                   <dl>
                     {avaliacao.checklist.map((criterio) => (
                       <div key={criterio.chave}>

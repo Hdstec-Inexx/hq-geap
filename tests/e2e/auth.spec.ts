@@ -49,7 +49,7 @@ async function tokenFor(email: string, password: string) {
 }
 
 for (const fixture of authUsers) {
-  test(`${fixture.role} autentica com credenciais validas`, async ({
+  test(`${fixture.role} autentica com sessao magra e carrega Perfil`, async ({
     request
   }) => {
     const loginResponse = await request.post(`${apiUrl}/auth/login`, {
@@ -58,22 +58,38 @@ for (const fixture of authUsers) {
 
     expect(loginResponse.status()).toBe(200);
     const login = await loginResponse.json();
-    expect(login).toMatchObject({
+    expect(login).toEqual({
       token: expect.any(String),
       user: {
-        id: expect.any(String),
-        email: fixture.email,
-        name: fixture.name,
-        role: fixture.role
+        id: expect.any(String)
       }
     });
+    expect(login.user).not.toHaveProperty('name');
+    expect(login.user).not.toHaveProperty('email');
+    expect(login.user).not.toHaveProperty('role');
 
     const sessionResponse = await request.get(`${apiUrl}/auth/session`, {
       headers: { authorization: `Bearer ${login.token}` }
     });
 
     expect(sessionResponse.status()).toBe(200);
-    await expect(sessionResponse.json()).resolves.toEqual(login.user);
+    const session = await sessionResponse.json();
+    expect(session).toEqual({ id: login.user.id });
+    expect(session).not.toHaveProperty('name');
+    expect(session).not.toHaveProperty('email');
+    expect(session).not.toHaveProperty('role');
+
+    const meResponse = await request.get(`${apiUrl}/me`, {
+      headers: { authorization: `Bearer ${login.token}` }
+    });
+
+    expect(meResponse.status()).toBe(200);
+    await expect(meResponse.json()).resolves.toEqual({
+      id: login.user.id,
+      email: fixture.email,
+      name: fixture.name,
+      role: fixture.role
+    });
   });
 }
 
@@ -89,9 +105,11 @@ test('credenciais invalidas nao iniciam sessao', async ({ request }) => {
 });
 
 test('rota protegida rejeita usuario anonimo', async ({ request }) => {
-  const response = await request.get(`${apiUrl}/auth/session`);
+  const sessionResponse = await request.get(`${apiUrl}/auth/session`);
+  const meResponse = await request.get(`${apiUrl}/me`);
 
-  expect(response.status()).toBe(401);
+  expect(sessionResponse.status()).toBe(401);
+  expect(meResponse.status()).toBe(401);
 });
 
 test('papel sem permissao recebe 403', async () => {
@@ -151,6 +169,20 @@ test('respostas para Curador omitem Custo em qualquer nivel', async () => {
   });
 });
 
+test('login tem controle mostrar/ocultar senha', async ({ page }) => {
+  await page.goto('/login');
+  const password = page.getByLabel('Senha');
+  await password.fill('senha-secreta');
+  await expect(password).toHaveAttribute('type', 'password');
+
+  await page.getByRole('button', { name: 'Mostrar senha' }).click();
+  await expect(password).toHaveAttribute('type', 'text');
+  await expect(password).toHaveValue('senha-secreta');
+
+  await page.getByRole('button', { name: 'Ocultar senha' }).click();
+  await expect(password).toHaveAttribute('type', 'password');
+});
+
 test('rota do app rejeita papel sem permissao', async ({ page }) => {
   await page.goto('/login');
   await page.getByLabel('E-mail').fill('curador@hq.test');
@@ -166,7 +198,7 @@ test('rota do app rejeita papel sem permissao', async ({ page }) => {
   ).toBeVisible();
 });
 
-test('login pela interface restaura a sessao e permite sair', async ({
+test('login pela interface usa Perfil e guarda so identidade opaca', async ({
   page
 }) => {
   await page.goto('/');
@@ -181,6 +213,27 @@ test('login pela interface restaura a sessao e permite sair', async ({
   await expect(
     page.getByRole('heading', { name: 'Olá, Ana Admin' })
   ).toBeVisible();
+  await expect(page.getByText('admin@hq.test')).toBeVisible();
+  await expect(page.getByText('Admin', { exact: true }).first()).toBeVisible();
+
+  const stored = await page.evaluate(() => ({
+    session: JSON.parse(window.sessionStorage.getItem('hq-geap.session') ?? 'null'),
+    perfil: JSON.parse(window.sessionStorage.getItem('hq-geap.perfil') ?? 'null')
+  }));
+  expect(stored.session).toEqual({
+    token: expect.any(String),
+    user: { id: expect.any(String) }
+  });
+  expect(stored.session.user).not.toHaveProperty('name');
+  expect(stored.session.user).not.toHaveProperty('email');
+  expect(stored.session.user).not.toHaveProperty('role');
+  expect(stored.perfil).toEqual({
+    id: stored.session.user.id,
+    name: 'Ana Admin',
+    email: 'admin@hq.test',
+    role: 'admin'
+  });
+
   await page.reload();
   await expect(
     page.getByRole('heading', { name: 'Olá, Ana Admin' })

@@ -17,9 +17,14 @@ export type FilaCuradoriaRow = {
 export type AvaliacaoCuradorRow = {
   id: string;
   atendimentoId: string;
+  avaliacaoIaId: string;
   autorId: string;
   autorNome: string;
   nota: string;
+  falhasIdentificadas: string[];
+  resumoAtendimento: string | null;
+  notaAvaliacaoIa: string;
+  comentario: string | null;
   criadoEm: Date;
   checklist: CriterioConferencia[];
 };
@@ -29,7 +34,19 @@ export type CuradoriaAtendimentoRow = AtendimentoRow & {
   historico: AvaliacaoCuradorRow[];
 };
 
-async function findChecklists(
+export type CreateAvaliacaoCuradorInput = {
+  atendimentoId: string;
+  avaliacaoIaId: string;
+  autorUsuarioId: string;
+  nota: number;
+  falhasIdentificadas: string[];
+  resumoAtendimento: string | null;
+  notaAvaliacaoIa: number;
+  comentario: string | null;
+  checklist: Array<CriterioConferencia & { estado: EstadoCriterio }>;
+};
+
+async function findIaChecklists(
   queryable: pg.Pool | pg.PoolClient,
   avaliacaoIds: string[]
 ): Promise<Map<string, CriterioConferencia[]>> {
@@ -55,6 +72,41 @@ async function findChecklists(
     from avaliacao_criterios ac
     where ac.avaliacao_id = any($1::uuid[])
     order by ac.avaliacao_id, ac.criterio_ordem
+  `, [avaliacaoIds]);
+
+  for (const row of result.rows) {
+    const { avaliacaoId, ...criterio } = row;
+    byId.get(avaliacaoId)?.push(criterio);
+  }
+  return byId;
+}
+
+async function findCuradorChecklists(
+  queryable: pg.Pool | pg.PoolClient,
+  avaliacaoIds: string[]
+): Promise<Map<string, CriterioConferencia[]>> {
+  const byId = new Map<string, CriterioConferencia[]>();
+  for (const id of avaliacaoIds) {
+    byId.set(id, []);
+  }
+  if (avaliacaoIds.length === 0) {
+    return byId;
+  }
+
+  const result = await queryable.query<CriterioConferencia & { avaliacaoId: string }>(`
+    select
+      ac.avaliacao_curador_id as "avaliacaoId",
+      ac.criterio_id as "criterioId",
+      ac.criterio_chave as chave,
+      ac.criterio_nome as nome,
+      ac.estado,
+      ac.valor_criterio as valor,
+      ac.criterio_critico as critico,
+      ac.criterio_condicional as condicional,
+      ac.criterio_ordem as ordem
+    from avaliacao_curador_criterios ac
+    where ac.avaliacao_curador_id = any($1::uuid[])
+    order by ac.avaliacao_curador_id, ac.criterio_ordem
   `, [avaliacaoIds]);
 
   for (const row of result.rows) {
@@ -118,10 +170,19 @@ export function createCuradoriaRepository(db: pg.Pool) {
           a.id,
           a.atendimento_id as "atendimentoId",
           a.nota,
+          a.nota_qualidade as "notaQualidade",
+          a.atendimento_aprovado as "atendimentoAprovado",
           a.falhas_identificadas as "falhasIdentificadas",
           a.resumo_atendimento as "resumoAtendimento",
           p.versao as "promptVersao",
-          a.criado_em as "criadoEm"
+          a.criado_em as "criadoEm",
+          a.saudacao_e_intencao as "saudacaoEIntencao",
+          a.solicitou_cpf as "solicitouCpf",
+          a.informou_protocolo_email as "informouProtocoloEmail",
+          a.resolveu_solicitacao as "resolveuSolicitacao",
+          a.validou_email_por_extenso as "validouEmailPorExtenso",
+          a.sem_diminutivos as "semDiminutivos",
+          a.encerramento_geap as "encerramentoGeap"
         from avaliacoes a
         join prompts_ia_avaliadora p on p.id = a.prompt_id
         where a.atendimento_id = $1 and a.autor = 'ia'
@@ -133,58 +194,94 @@ export function createCuradoriaRepository(db: pg.Pool) {
         select
           a.id,
           a.atendimento_id as "atendimentoId",
+          a.avaliacao_ia_id as "avaliacaoIaId",
           a.autor_usuario_id as "autorId",
           a.autor_usuario_nome as "autorNome",
           a.nota,
+          a.falhas_identificadas as "falhasIdentificadas",
+          a.resumo_atendimento as "resumoAtendimento",
+          a.nota_avaliacao_ia as "notaAvaliacaoIa",
+          a.comentario,
           a.criado_em as "criadoEm"
-        from avaliacoes a
-        where a.atendimento_id = $1 and a.autor = 'curador'
+        from avaliacoes_curador a
+        where a.atendimento_id = $1
         order by a.criado_em desc, a.id desc
       `, [atendimentoId]);
 
-      const checklists = await findChecklists(db, [
-        ia.id,
-        ...avaliacoes.rows.map((avaliacao) => avaliacao.id)
-      ]);
+      const iaChecklists = await findIaChecklists(db, [ia.id]);
+      const curadorChecklists = await findCuradorChecklists(
+        db,
+        avaliacoes.rows.map((avaliacao) => avaliacao.id)
+      );
 
       return {
         ...atendimentoRow,
-        avaliacaoIa: { ...ia, checklist: checklists.get(ia.id) ?? [] },
+        avaliacaoIa: { ...ia, checklist: iaChecklists.get(ia.id) ?? [] },
         historico: avaliacoes.rows.map((avaliacao) => ({
           ...avaliacao,
-          checklist: checklists.get(avaliacao.id) ?? []
+          falhasIdentificadas: Array.isArray(avaliacao.falhasIdentificadas)
+            ? avaliacao.falhasIdentificadas
+            : [],
+          checklist: curadorChecklists.get(avaliacao.id) ?? []
         }))
       };
     },
 
     async createEvaluation(
-      atendimentoId: string,
-      autorUsuarioId: string,
-      nota: number,
-      checklist: Array<CriterioConferencia & { estado: EstadoCriterio }>
+      input: CreateAvaliacaoCuradorInput
     ): Promise<AvaliacaoCuradorRow> {
       const client = await db.connect();
       try {
         await client.query('begin');
         const result = await client.query<Omit<AvaliacaoCuradorRow, 'checklist'>>(`
-          insert into avaliacoes (
-            atendimento_id, autor, autor_usuario_id, autor_usuario_nome, nota
+          insert into avaliacoes_curador (
+            atendimento_id,
+            avaliacao_ia_id,
+            autor_usuario_id,
+            autor_usuario_nome,
+            nota,
+            falhas_identificadas,
+            resumo_atendimento,
+            nota_avaliacao_ia,
+            comentario
           ) values (
-            $1, 'curador', $2, (select nome from usuarios where id = $2), $3
+            $1,
+            $2,
+            $3,
+            (select nome from usuarios where id = $3),
+            $4,
+            $5::jsonb,
+            $6,
+            $7,
+            $8
           )
           returning
             id,
             atendimento_id as "atendimentoId",
+            avaliacao_ia_id as "avaliacaoIaId",
             autor_usuario_id as "autorId",
             autor_usuario_nome as "autorNome",
             nota,
+            falhas_identificadas as "falhasIdentificadas",
+            resumo_atendimento as "resumoAtendimento",
+            nota_avaliacao_ia as "notaAvaliacaoIa",
+            comentario,
             criado_em as "criadoEm"
-        `, [atendimentoId, autorUsuarioId, nota]);
+        `, [
+          input.atendimentoId,
+          input.avaliacaoIaId,
+          input.autorUsuarioId,
+          input.nota,
+          JSON.stringify(input.falhasIdentificadas),
+          input.resumoAtendimento,
+          input.notaAvaliacaoIa,
+          input.comentario
+        ]);
         const avaliacao = result.rows[0]!;
-        if (checklist.length > 0) {
+        if (input.checklist.length > 0) {
           await client.query(`
-            insert into avaliacao_criterios (
-              avaliacao_id, criterio_id, criterio_chave, criterio_nome,
+            insert into avaliacao_curador_criterios (
+              avaliacao_curador_id, criterio_id, criterio_chave, criterio_nome,
               criterio_critico, criterio_condicional, criterio_ordem, estado,
               valor_criterio
             )
@@ -213,18 +310,24 @@ export function createCuradoriaRepository(db: pg.Pool) {
             )
           `, [
             avaliacao.id,
-            checklist.map((c) => c.criterioId),
-            checklist.map((c) => c.chave),
-            checklist.map((c) => c.nome),
-            checklist.map((c) => c.critico),
-            checklist.map((c) => c.condicional),
-            checklist.map((c) => c.ordem),
-            checklist.map((c) => c.estado),
-            checklist.map((c) => c.valor)
+            input.checklist.map((c) => c.criterioId),
+            input.checklist.map((c) => c.chave),
+            input.checklist.map((c) => c.nome),
+            input.checklist.map((c) => c.critico),
+            input.checklist.map((c) => c.condicional),
+            input.checklist.map((c) => c.ordem),
+            input.checklist.map((c) => c.estado),
+            input.checklist.map((c) => c.valor)
           ]);
         }
         await client.query('commit');
-        return { ...avaliacao, checklist };
+        return {
+          ...avaliacao,
+          falhasIdentificadas: Array.isArray(avaliacao.falhasIdentificadas)
+            ? avaliacao.falhasIdentificadas
+            : input.falhasIdentificadas,
+          checklist: input.checklist
+        };
       } catch (error) {
         await client.query('rollback');
         throw error;

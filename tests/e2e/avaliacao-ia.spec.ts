@@ -50,9 +50,11 @@ async function createAtendimento(conversationId: string) {
 async function persistirAvaliacao(
   atendimentoId: string,
   fixture: {
-    checklist: Record<string, string>;
+    checklist: Record<string, boolean>;
     falhas_identificadas: string[];
     resumo_atendimento: string;
+    atendimento_aprovado: boolean;
+    nota_qualidade: number;
   }
 ) {
   return queryDatabase<{ avaliacao_id: string; nota: string }>(`
@@ -61,13 +63,17 @@ async function persistirAvaliacao(
       (select id from prompts_ia_avaliadora where ativo),
       $2::jsonb,
       $3::jsonb,
-      $4
+      $4,
+      $5,
+      $6
     )
   `, [
     atendimentoId,
     JSON.stringify(fixture.checklist),
     JSON.stringify(fixture.falhas_identificadas),
-    fixture.resumo_atendimento
+    fixture.resumo_atendimento,
+    fixture.atendimento_aprovado,
+    fixture.nota_qualidade
   ]);
 }
 
@@ -80,15 +86,27 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
     `);
   });
 
-  test('reivindica pendencias distintas e entrega o contrato canonico da Regua', async () => {
+  test('reivindica pendencias distintas e entrega o contrato booleano da LLM', async () => {
     const firstAtendimentoId = await createAtendimento('conv-claim-primeiro');
     const secondAtendimentoId = await createAtendimento('conv-claim-segundo');
     const claimedIds = [firstAtendimentoId, secondAtendimentoId];
 
     try {
+      // Isolate from leftover pending Atendimentos left by other e2e files.
+      await queryDatabase(`
+        delete from atendimentos a
+        where a.status = 'concluido'
+          and a.id <> all($1::uuid[])
+          and not exists (
+            select 1 from avaliacoes av
+            where av.atendimento_id = a.id and av.autor = 'ia'
+          )
+      `, [claimedIds]);
+      await queryDatabase('delete from avaliacoes_ia_execucoes');
+
       const first = await queryDatabase<{
         atendimento_id: string;
-        checklist_schema: Record<string, { enum: string[] }>;
+        checklist_schema: Record<string, { type: string }>;
         criterio_chaves: string[];
       }>('select * from reivindicar_avaliacoes_ia(1)');
       const second = await queryDatabase<{ atendimento_id: string }>(
@@ -99,12 +117,10 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
       expect(claimedIds).toContain(first.rows[0]?.atendimento_id);
       expect(claimedIds).toContain(second.rows[0]?.atendimento_id);
       expect(first.rows[0]?.criterio_chaves).toContain('solicitou_cpf');
-      expect(first.rows[0]?.checklist_schema.validou_email_por_extenso?.enum).toContain(
-        'nao_se_aplica'
+      expect(first.rows[0]?.checklist_schema.validou_email_por_extenso?.type).toBe(
+        'boolean'
       );
-      expect(first.rows[0]?.checklist_schema.solicitou_cpf?.enum).not.toContain(
-        'nao_se_aplica'
-      );
+      expect(first.rows[0]?.checklist_schema.solicitou_cpf?.type).toBe('boolean');
     } finally {
       await queryDatabase(
         'delete from atendimentos where id = any($1::uuid[])',
@@ -113,11 +129,32 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
     }
   });
 
-  test('persiste checklist e nota recalculada sem estado parcial', async () => {
+  test('persiste checklist tipado, claims da LLM e nota canonica da Regua', async () => {
     const atendimentoId = await createAtendimento('conv-avaliacao-aprovada');
     const result = await persistirAvaliacao(atendimentoId, aprovada);
 
     expect(Number(result.rows[0]?.nota)).toBe(9.5);
+    const typed = await queryDatabase<{
+      saudacao_e_intencao: boolean;
+      sem_diminutivos: boolean;
+      atendimento_aprovado: boolean;
+      nota_qualidade: string;
+    }>(`
+      select
+        saudacao_e_intencao,
+        sem_diminutivos,
+        atendimento_aprovado,
+        nota_qualidade
+      from avaliacoes
+      where atendimento_id = $1 and autor = 'ia'
+    `, [atendimentoId]);
+    expect(typed.rows[0]).toMatchObject({
+      saudacao_e_intencao: true,
+      sem_diminutivos: false,
+      atendimento_aprovado: true
+    });
+    expect(Number(typed.rows[0]?.nota_qualidade)).toBe(9.5);
+
     const checks = await queryDatabase<{ count: string }>(
       `select count(*) from avaliacao_criterios ac
        join avaliacoes a on a.id = ac.avaliacao_id
@@ -130,7 +167,7 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
     await expect(
       persistirAvaliacao(invalidId, {
         ...aprovada,
-        checklist: { ...aprovada.checklist, criterio_inexistente: 'atendido' }
+        checklist: { ...aprovada.checklist, criterio_inexistente: true }
       })
     ).rejects.toThrow();
     const invalidState = await queryDatabase<{ count: string }>(
@@ -140,7 +177,7 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
     expect(invalidState.rows[0]?.count).toBe('0');
   });
 
-  test('pontua Nao se aplica e preserva o estado no snapshot', async () => {
+  test('email nao aplicavel marcado true pontua na Regua e mapeia para atendido', async () => {
     const atendimentoId = await createAtendimento('conv-avaliacao-na');
     const result = await persistirAvaliacao(atendimentoId, naoAplicavel);
     expect(Number(result.rows[0]?.nota)).toBe(10);
@@ -152,7 +189,7 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
       join criterios c on c.id = ac.criterio_id
       where a.atendimento_id = $1 and c.chave = 'validou_email_por_extenso'
     `, [atendimentoId]);
-    expect(check.rows[0]?.estado).toBe('nao_se_aplica');
+    expect(check.rows[0]?.estado).toBe('atendido');
   });
 
   test('reprocessamento nao cria outra Avaliacao da IA', async () => {
@@ -169,7 +206,7 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
     expect(count.rows[0]?.count).toBe('1');
   });
 
-  test('HQ consulta o snapshot, deriva Falha Critica e nao oferece escrita', async ({
+  test('HQ consulta o snapshot tipado, deriva Falha Critica e nao oferece escrita', async ({
     request
   }) => {
     const atendimentoId = await createAtendimento('conv-avaliacao-critica');
@@ -185,14 +222,22 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
     await expect(response.json()).resolves.toMatchObject({
       aprovacao: 'reprovado',
       nota: 7.5,
+      notaQualidade: 7.5,
+      atendimentoAprovado: false,
       falhasIdentificadas: falhaCritica.falhas_identificadas,
       resumoAtendimento: falhaCritica.resumo_atendimento,
-      promptVersao: 2,
-      checklist: expect.arrayContaining([
+      promptVersao: 3,
+      checklist: {
+        informou_protocolo_email: false,
+        resolveu_solicitacao: true
+      },
+      criterios: expect.arrayContaining([
         expect.objectContaining({
           chave: 'informou_protocolo_email',
+          nome: 'Informação de Protocolo',
+          atendido: false,
           critico: true,
-          estado: 'nao_atendido'
+          valor: 2.5
         })
       ])
     });
@@ -209,16 +254,9 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
       );
       await expect(snapshotResponse.json()).resolves.toMatchObject({
         aprovacao: 'reprovado',
-        checklist: expect.arrayContaining([
-          expect.objectContaining({
-            chave: 'informou_protocolo_email',
-            nome: 'Informação de Protocolo',
-            valor: 2.5,
-            critico: true,
-            estado: 'nao_atendido',
-            ordem: 3
-          })
-        ])
+        checklist: {
+          informou_protocolo_email: false
+        }
       });
     } finally {
       await queryDatabase(`
@@ -244,12 +282,15 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
     await page.getByLabel('E-mail').fill('admin@hq.test');
     await page.getByLabel('Senha').fill('senha-admin');
     await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
     await page.goto(`/atendimentos/${result.rows[0]!.id}`);
 
     await expect(page.getByRole('heading', { name: 'Avaliação da IA' })).toBeVisible();
-    await expect(page.getByText('Reprovado')).toBeVisible();
-    await expect(page.getByText('7,5')).toBeVisible();
+    await expect(page.getByText('Reprovado', { exact: true })).toBeVisible();
+    await expect(page.getByText('7,5').first()).toBeVisible();
+    await expect(page.getByText(/Claim da LLM/i)).toBeVisible();
+    await expect(page.getByText(/Atendimento reprovado/i)).toBeVisible();
     await expect(page.getByText('Informação de Protocolo')).toBeVisible();
-    await expect(page.getByText('Prompt v2')).toBeVisible();
+    await expect(page.getByText('Prompt v3')).toBeVisible();
   });
 });

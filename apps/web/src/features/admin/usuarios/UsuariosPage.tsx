@@ -6,8 +6,8 @@ import {
   type Usuario
 } from '@hq-geap/contracts/usuarios';
 import { useEffect, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { apiUrl, clearSession, getSession } from '../../auth/session';
+import { Link, useNavigate } from 'react-router-dom';
+import { apiUrl, clearSession, getPerfil, getSession } from '../../auth/session';
 
 const roleNames = {
   admin: 'Admin',
@@ -17,7 +17,8 @@ const roleNames = {
 
 type Editor =
   | { mode: 'create'; user: CreateUsuario }
-  | { mode: 'edit'; id: string; user: UpdateUsuario };
+  | { mode: 'edit'; id: string; user: UpdateUsuario }
+  | { mode: 'password'; id: string; name: string; password: string };
 
 const emptyUser: CreateUsuario = {
   name: '',
@@ -41,6 +42,47 @@ function isRevokedSession(error: unknown) {
   );
 }
 
+function PasswordField({
+  id,
+  label,
+  value,
+  onChange,
+  required = false
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+}) {
+  const [showPassword, setShowPassword] = useState(false);
+
+  return (
+    <div className="password-field user-password-field">
+      <label htmlFor={id}>
+        <span>{label}</span>
+        <input
+          id={id}
+          minLength={8}
+          required={required}
+          type={showPassword ? 'text' : 'password'}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </label>
+      <button
+        aria-controls={id}
+        aria-pressed={showPassword}
+        className="password-toggle"
+        onClick={() => setShowPassword((current) => !current)}
+        type="button"
+      >
+        {showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+      </button>
+    </div>
+  );
+}
+
 export function UsuariosPage() {
   const [users, setUsers] = useState<Usuario[]>([]);
   const [page, setPage] = useState(1);
@@ -51,6 +93,7 @@ export function UsuariosPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [session] = useState(() => getSession()!);
+  const [perfil] = useState(() => getPerfil()!);
   const token = session.token;
   const navigate = useNavigate();
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -105,19 +148,34 @@ export function UsuariosPage() {
     });
   }
 
+  function setPassword(user: Usuario) {
+    setError(null);
+    setEditor({
+      mode: 'password',
+      id: user.id,
+      name: user.name,
+      password: ''
+    });
+  }
+
   function updateUser(change: Partial<UpdateUsuario>) {
     setEditor((current) => {
-      if (!current) return current;
+      if (!current || current.mode === 'password') return current;
       return { ...current, user: { ...current.user, ...change } } as Editor;
     });
   }
 
   function updatePassword(password: string) {
-    setEditor((current) =>
-      current?.mode === 'create'
-        ? { ...current, user: { ...current.user, password } }
-        : current
-    );
+    setEditor((current) => {
+      if (!current) return current;
+      if (current.mode === 'create') {
+        return { ...current, user: { ...current.user, password } };
+      }
+      if (current.mode === 'password') {
+        return { ...current, password };
+      }
+      return current;
+    });
   }
 
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -127,6 +185,25 @@ export function UsuariosPage() {
     setError(null);
 
     try {
+      if (editor.mode === 'password') {
+        const response = await fetch(
+          `${apiUrl}/admin/usuarios/${editor.id}/senha`,
+          {
+            method: 'POST',
+            headers: {
+              authorization: `Bearer ${token}`,
+              'content-type': 'application/json'
+            },
+            body: JSON.stringify({ password: editor.password })
+          }
+        );
+        await requireSuccessfulResponse(response);
+        usuarioSchema.parse(await response.json());
+        setRevision((current) => current + 1);
+        setEditor(null);
+        return;
+      }
+
       const creating = editor.mode === 'create';
       const response = await fetch(
         creating ? `${apiUrl}/admin/usuarios` : `${apiUrl}/admin/usuarios/${editor.id}`,
@@ -157,7 +234,11 @@ export function UsuariosPage() {
             : 'A operação removeria o último acesso de Admin.'
         );
       } else {
-        setError('Não foi possível salvar o usuário.');
+        setError(
+          editor.mode === 'password'
+            ? 'Não foi possível redefinir a senha.'
+            : 'Não foi possível salvar o usuário.'
+        );
       }
     } finally {
       setSubmitting(false);
@@ -184,6 +265,19 @@ export function UsuariosPage() {
     }
   }
 
+  const editorTitle =
+    editor?.mode === 'create'
+      ? 'Criar usuário'
+      : editor?.mode === 'password'
+        ? 'Definir senha'
+        : 'Editar usuário';
+  const editorEyebrow =
+    editor?.mode === 'create'
+      ? 'Novo acesso'
+      : editor?.mode === 'password'
+        ? 'Redefinição de senha'
+        : 'Editar acesso';
+
   return (
     <section className="users-page">
       <header className="users-heading">
@@ -194,16 +288,21 @@ export function UsuariosPage() {
             Controle quem acessa o HQ e qual papel cada pessoa desempenha.
           </p>
         </div>
-        <button
-          className="primary-action"
-          onClick={() => {
-            setError(null);
-            setEditor({ mode: 'create', user: { ...emptyUser } });
-          }}
-          type="button"
-        >
-          Novo usuário
-        </button>
+        <div className="users-heading-actions">
+          <Link className="back-link" to="/">
+            Voltar ao início
+          </Link>
+          <button
+            className="primary-action"
+            onClick={() => {
+              setError(null);
+              setEditor({ mode: 'create', user: { ...emptyUser } });
+            }}
+            type="button"
+          >
+            Novo usuário
+          </button>
+        </div>
       </header>
 
       {error ? <p className="users-error" role="alert">{error}</p> : null}
@@ -228,7 +327,10 @@ export function UsuariosPage() {
                   <td><span className={`user-status ${user.active ? '' : 'inactive'}`}>{user.active ? 'Ativo' : 'Inativo'}</span></td>
                   <td className="user-actions">
                     <button onClick={() => edit(user)} type="button">Editar</button>
-                    {user.active && user.id !== session.user.id ? (
+                    <button onClick={() => setPassword(user)} type="button">
+                      Definir senha
+                    </button>
+                    {user.active && user.id !== perfil.id ? (
                       <button className="danger-action" onClick={() => deactivate(user)} type="button">Desativar</button>
                     ) : null}
                   </td>
@@ -256,35 +358,57 @@ export function UsuariosPage() {
         <div className="user-editor-backdrop">
           <form aria-labelledby="user-editor-title" className="user-editor" onSubmit={save}>
             <header>
-              <p className="eyebrow">{editor.mode === 'create' ? 'Novo acesso' : 'Editar acesso'}</p>
-              <h2 id="user-editor-title">{editor.mode === 'create' ? 'Criar usuário' : 'Editar usuário'}</h2>
+              <p className="eyebrow">{editorEyebrow}</p>
+              <h2 id="user-editor-title">{editorTitle}</h2>
+              {editor.mode === 'password' ? (
+                <p className="users-summary">Nova senha para {editor.name}.</p>
+              ) : null}
             </header>
-            <label>
-              <span>Nome</span>
-              <input required value={editor.user.name} onChange={(event) => updateUser({ name: event.target.value })} />
-            </label>
-            <label>
-              <span>E-mail</span>
-              <input required type="email" value={editor.user.email} onChange={(event) => updateUser({ email: event.target.value })} />
-            </label>
-            {editor.mode === 'create' ? (
-              <label>
-                <span>Senha inicial</span>
-                <input minLength={8} required type="password" value={editor.user.password} onChange={(event) => updatePassword(event.target.value)} />
-              </label>
-            ) : null}
-            <label>
-              <span>Papel</span>
-              <select disabled={editor.mode === 'edit' && editor.id === session.user.id} value={editor.user.role} onChange={(event) => updateUser({ role: event.target.value as UpdateUsuario['role'] })}>
-                <option value="admin">Admin</option>
-                <option value="gestao">Gestão</option>
-                <option value="curador">Curador</option>
-              </select>
-            </label>
+            {editor.mode === 'password' ? (
+              <PasswordField
+                id="user-set-password"
+                label="Nova senha"
+                required
+                value={editor.password}
+                onChange={updatePassword}
+              />
+            ) : (
+              <>
+                <label>
+                  <span>Nome</span>
+                  <input required value={editor.user.name} onChange={(event) => updateUser({ name: event.target.value })} />
+                </label>
+                <label>
+                  <span>E-mail</span>
+                  <input required type="email" value={editor.user.email} onChange={(event) => updateUser({ email: event.target.value })} />
+                </label>
+                {editor.mode === 'create' ? (
+                  <PasswordField
+                    id="user-create-password"
+                    label="Senha inicial"
+                    required
+                    value={editor.user.password}
+                    onChange={updatePassword}
+                  />
+                ) : null}
+                <label>
+                  <span>Papel</span>
+                  <select disabled={editor.mode === 'edit' && editor.id === perfil.id} value={editor.user.role} onChange={(event) => updateUser({ role: event.target.value as UpdateUsuario['role'] })}>
+                    <option value="admin">Admin</option>
+                    <option value="gestao">Gestão</option>
+                    <option value="curador">Curador</option>
+                  </select>
+                </label>
+              </>
+            )}
             <footer>
               <button className="editor-cancel" onClick={() => setEditor(null)} type="button">Cancelar</button>
               <button disabled={submitting} type="submit">
-                {editor.mode === 'create' ? 'Criar usuário' : 'Salvar alterações'}
+                {editor.mode === 'create'
+                  ? 'Criar usuário'
+                  : editor.mode === 'password'
+                    ? 'Salvar senha'
+                    : 'Salvar alterações'}
               </button>
             </footer>
           </form>
