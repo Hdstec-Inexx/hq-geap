@@ -27,6 +27,8 @@ export function RequireSession() {
     if (!session) return 'anonymous';
     return getPerfil() ? 'authenticated' : 'checking';
   });
+  // Bump when Perfil changes so RequireRole re-reads role gates after refresh.
+  const [perfilEpoch, setPerfilEpoch] = useState(0);
 
   useEffect(() => {
     if (!session) {
@@ -47,6 +49,7 @@ export function RequireSession() {
         const perfil = await fetchPerfil(activeSession.token, controller.signal);
         if (controller.signal.aborted || revoked) return;
         savePerfil(perfil);
+        setPerfilEpoch((epoch) => epoch + 1);
         setState('authenticated');
       } catch (error) {
         if (controller.signal.aborted || revoked) return;
@@ -95,7 +98,7 @@ export function RequireSession() {
   if (state === 'checking') {
     return <p className="session-check">Validando acesso...</p>;
   }
-  return <Outlet />;
+  return <Outlet key={perfilEpoch} />;
 }
 
 export function RequireRole({ roles }: { roles: UserRole[] }) {

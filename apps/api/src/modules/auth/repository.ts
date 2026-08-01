@@ -6,10 +6,14 @@ type UserRow = {
   name: string;
   email: string;
   passwordHash: string;
+  passwordVersion: number;
   role: UserRole;
 };
 
-export type AuthUser = Perfil & { passwordHash: string };
+export type AuthUser = Perfil & {
+  passwordHash: string;
+  passwordVersion: number;
+};
 
 const selectUser = `
   select
@@ -17,6 +21,7 @@ const selectUser = `
     nome as name,
     email,
     senha_hash as "passwordHash",
+    senha_versao as "passwordVersion",
     papel as role
   from usuarios
 `;

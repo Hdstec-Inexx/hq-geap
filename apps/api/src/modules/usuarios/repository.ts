@@ -152,6 +152,23 @@ export function createUsuariosRepository(db: pg.Pool) {
         );
         return result.rows[0] ?? null;
       });
+    },
+
+    async setPassword(
+      id: string,
+      passwordHash: string
+    ): Promise<UsuarioRow | null> {
+      const result = await db.query<UsuarioRow>(
+        `update usuarios
+         set senha_hash = $2,
+             senha_versao = senha_versao + 1,
+             atualizado_em = now()
+         where id = $1
+         returning id, nome as name, email, papel as role, ativo as active,
+           criado_em as "createdAt", atualizado_em as "updatedAt"`,
+        [id, passwordHash]
+      );
+      return result.rows[0] ?? null;
     }
   };
 }
