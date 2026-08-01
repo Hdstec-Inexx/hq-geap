@@ -117,6 +117,7 @@ test.describe('consulta da Regua de Avaliacao', () => {
       await page.getByLabel('E-mail').fill(user.email);
       await page.getByLabel('Senha').fill(user.password);
       await page.getByRole('button', { name: 'Entrar' }).click();
+      await expect(page).toHaveURL('/');
       await expect(
         page.getByRole('link', { name: 'Consultar Régua de Avaliação' })
       ).toHaveCount(0);

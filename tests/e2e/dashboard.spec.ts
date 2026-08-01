@@ -73,10 +73,20 @@ async function createDashboardAtendimento(input: {
   ]);
   const atendimentoId = atendimento.rows[0]!.id;
   const ia = await queryDatabase<{ id: string }>(`
-    insert into avaliacoes (atendimento_id, autor, prompt_id, nota)
-    select $1, 'ia', id, $2 from prompts_ia_avaliadora where ativo
+    insert into avaliacoes (
+      atendimento_id, autor, prompt_id, nota,
+      saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
+      resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
+      encerramento_geap, atendimento_aprovado, nota_qualidade
+    )
+    select $1::uuid, 'ia', id, $2::numeric,
+      true, true, true, true,
+      ($3::text in ('atendido', 'nao_se_aplica')),
+      true, true,
+      $2::numeric >= 7, $2::numeric
+    from prompts_ia_avaliadora where ativo
     returning id
-  `, [atendimentoId, input.notaIa]);
+  `, [atendimentoId, input.notaIa, input.estadoIa]);
   await queryDatabase(`
     insert into avaliacao_criterios (
       avaliacao_id, criterio_id, criterio_chave, criterio_nome,
@@ -116,6 +126,14 @@ test.describe.serial('Dashboard da Gestao', () => {
       insert into agentes_voz (nome, elevenlabs_agent_id)
       values ('Livia Dashboard', 'agent-dashboard')
       on conflict (elevenlabs_agent_id) do nothing
+    `);
+    // Isolate KPIs from other e2e files that park Atendimentos inside this window.
+    // Avaliações are immutable, so move rows out instead of deleting them.
+    await queryDatabase(`
+      update atendimentos
+      set concluido_em = '2024-06-01T00:00:00Z'
+      where concluido_em >= '2025-01-01T00:00:00Z'
+        and concluido_em < '2025-02-02T00:00:00Z'
     `);
     await createDashboardAtendimento({
       conversationId: 'conv-dashboard-1',
@@ -245,7 +263,7 @@ test.describe.serial('Dashboard da Gestao', () => {
 
     await expect(page.getByRole('heading', { name: 'Pulso da operação' })).toBeVisible();
     await expect(page.getByText('2', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Financeiro / Boletos')).toBeVisible();
+    await expect(page.getByText('Financeiro / Boletos').first()).toBeVisible();
     await expect(page.getByText('Concordância')).toBeVisible();
     await expect(page.getByRole('button', { name: /salvar|editar|excluir/i })).toHaveCount(0);
   });

@@ -137,6 +137,7 @@ export function createAtendimentosRepository(db: pg.Pool) {
                 elevenlabs_event_timestamp = $12,
                 atualizado_em = now()
             where elevenlabs_conversation_id = $2
+              and agente_voz_id = $1
           `, values);
         } else {
           await client.query(`
@@ -170,7 +171,7 @@ export function createAtendimentosRepository(db: pg.Pool) {
     ): Promise<AtendimentoSummaryRow[]> {
       const result = await db.query<AtendimentoSummaryRow>(`
         ${selectAtendimentoSummary}
-        where ($3::text is null or a.status = $3)
+        where ($3::status_atendimento is null or a.status = $3::status_atendimento)
         order by a.criado_em desc, a.id desc
         limit $1 offset $2
       `, [limit, offset, status ?? null]);

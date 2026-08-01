@@ -121,13 +121,17 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
         (select id from prompts_ia_avaliadora where ativo),
         $2::jsonb,
         $3::jsonb,
-        $4
+        $4,
+        $5,
+        $6
       )
     `, [
       created.id,
       JSON.stringify(aprovada.checklist),
       JSON.stringify(aprovada.falhas_identificadas),
-      aprovada.resumo_atendimento
+      aprovada.resumo_atendimento,
+      aprovada.atendimento_aprovado,
+      aprovada.nota_qualidade
     ]);
 
     const afterAvaliacao = await request.post(`${apiUrl}/atendimentos/ingestao`, {
@@ -278,7 +282,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       custo: atendimento.cost,
       duracaoSegundos: atendimento.duration_seconds,
       houveTransferencia: atendimento.transferred,
-      motivoContato: 'Segunda via de boleto',
+      motivoContato: atendimento.contact_reason,
       status: 'concluido'
     });
     expect(summary).not.toHaveProperty('transcricao');
@@ -326,9 +330,12 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await page.getByRole('link', { name: 'Consultar Atendimentos' }).click();
 
     await expect(page.getByRole('heading', { name: 'Atendimentos' })).toBeVisible();
-    await page.getByRole('link', { name: /Segunda via de boleto/ }).click();
+    await page
+      .getByRole('link', { name: new RegExp(atendimento.contact_reason!) })
+      .first()
+      .click();
     await expect(page.getByRole('heading', { name: /Atendimento/ })).toBeVisible();
-    await expect(page.getByText('Segunda via de boleto')).toBeVisible();
+    await expect(page.getByText(atendimento.contact_reason!).first()).toBeVisible();
     await expect(page.getByText(/US\$\s*0,18/)).toBeVisible();
     await expect(page.getByText(/Preciso da segunda via do boleto/)).toBeVisible();
   });
