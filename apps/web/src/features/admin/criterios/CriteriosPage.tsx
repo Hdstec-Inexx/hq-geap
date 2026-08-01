@@ -3,6 +3,7 @@ import {
   type ReguaAvaliacao
 } from '@hq-geap/contracts/criterios';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { apiUrl, getSession } from '../../auth/session';
 
 type PageState = 'loading' | 'ready' | 'error';
@@ -47,6 +48,9 @@ export function CriteriosPage() {
       <section className="criteria-page">
         <p className="eyebrow">Administração / Qualidade</p>
         <h1>Régua de Avaliação</h1>
+        <Link className="back-link" to="/">
+          Voltar ao início
+        </Link>
         <p className={state === 'error' ? 'criteria-error' : 'session-check'}>
           {state === 'error'
             ? 'Não foi possível carregar a Régua vigente.'
@@ -66,6 +70,9 @@ export function CriteriosPage() {
             Definição vigente e somente leitura dos critérios usados nas
             Avaliações.
           </p>
+          <Link className="back-link" to="/">
+            Voltar ao início
+          </Link>
         </div>
         <div className="ruler-total" aria-label="Pontuação total da Régua">
           <span>Régua vigente</span>

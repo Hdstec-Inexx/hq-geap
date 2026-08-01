@@ -24,6 +24,9 @@ export function FilaCuradoriaPage() {
           <p className="curadoria-intro">
             Atendimentos concluídos aguardando revisão do checklist da IA.
           </p>
+          <Link className="back-link" to="/">
+            Voltar ao início
+          </Link>
         </div>
         {state.status === 'ready' ? (
           <span className="queue-count">{state.data.length} pendente{state.data.length === 1 ? '' : 's'}</span>
