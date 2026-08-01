@@ -175,6 +175,7 @@ test.describe.serial('administracao de usuarios', () => {
     await page.getByLabel('E-mail').fill('admin@hq.test');
     await page.getByLabel('Senha').fill('senha-admin');
     await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
     await page.getByRole('link', { name: 'Administrar usuários' }).click();
 
     await expect(
@@ -197,6 +198,7 @@ test.describe.serial('administracao de usuarios', () => {
     await page.getByRole('button', { name: 'Salvar alterações' }).click();
 
     const editedRow = page.getByRole('row', { name: /Usuario editado/ });
+    await expect(editedRow).toBeVisible();
     await expect(editedRow).toContainText('Gestão');
     await editedRow.getByRole('button', { name: 'Desativar' }).click();
     await expect(editedRow).toContainText('Inativo');

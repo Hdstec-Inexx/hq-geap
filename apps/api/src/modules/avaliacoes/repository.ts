@@ -14,10 +14,19 @@ export type AvaliacaoIaRow = {
   id: string;
   atendimentoId: string;
   nota: string;
+  notaQualidade: string;
+  atendimentoAprovado: boolean;
   falhasIdentificadas: unknown;
   resumoAtendimento: string | null;
   promptVersao: number;
   criadoEm: Date;
+  saudacaoEIntencao: boolean;
+  solicitouCpf: boolean;
+  informouProtocoloEmail: boolean;
+  resolveuSolicitacao: boolean;
+  validouEmailPorExtenso: boolean;
+  semDiminutivos: boolean;
+  encerramentoGeap: boolean;
   checklist: ChecklistItem[];
 };
 
@@ -60,10 +69,19 @@ export function createAvaliacoesRepository(db: pg.Pool) {
           a.id,
           a.atendimento_id as "atendimentoId",
           a.nota,
+          a.nota_qualidade as "notaQualidade",
+          a.atendimento_aprovado as "atendimentoAprovado",
           a.falhas_identificadas as "falhasIdentificadas",
           a.resumo_atendimento as "resumoAtendimento",
           p.versao as "promptVersao",
-          a.criado_em as "criadoEm"
+          a.criado_em as "criadoEm",
+          a.saudacao_e_intencao as "saudacaoEIntencao",
+          a.solicitou_cpf as "solicitouCpf",
+          a.informou_protocolo_email as "informouProtocoloEmail",
+          a.resolveu_solicitacao as "resolveuSolicitacao",
+          a.validou_email_por_extenso as "validouEmailPorExtenso",
+          a.sem_diminutivos as "semDiminutivos",
+          a.encerramento_geap as "encerramentoGeap"
         from avaliacoes a
         join prompts_ia_avaliadora p on p.id = a.prompt_id
         where a.atendimento_id = $1 and a.autor = 'ia'

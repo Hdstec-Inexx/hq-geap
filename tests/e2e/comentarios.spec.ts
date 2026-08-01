@@ -55,9 +55,16 @@ async function persistirAvaliacaoIa(atendimentoId: string) {
       (select id from prompts_ia_avaliadora where ativo),
       $2::jsonb,
       '[]'::jsonb,
-      'Atendimento com comentario.'
+      'Atendimento com comentario.',
+      $3,
+      $4
     )
-  `, [atendimentoId, JSON.stringify(aprovada.checklist)]);
+  `, [
+    atendimentoId,
+    JSON.stringify(aprovada.checklist),
+    aprovada.atendimento_aprovado,
+    aprovada.nota_qualidade
+  ]);
 }
 
 test.describe.serial('Comentarios e fila de manutencao', () => {
@@ -162,7 +169,7 @@ test.describe.serial('Comentarios e fila de manutencao', () => {
     await expect(resolved.json()).resolves.toMatchObject({
       id: comentario.id,
       status: 'resolvido',
-      resolucao: { responsavel: { nome: 'Alice Admin' } }
+      resolucao: { responsavel: { nome: 'Ana Admin' } }
     });
 
     const persisted = await queryDatabase<{
@@ -259,6 +266,7 @@ test.describe.serial('Comentarios e fila de manutencao', () => {
     await page.getByLabel('E-mail').fill('curador@hq.test');
     await page.getByLabel('Senha').fill('senha-curador');
     await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
 
     await page.goto(`/atendimentos/${atendimentoId}`);
     await expect(page.getByRole('heading', { name: 'Comentários' })).toBeVisible();
@@ -281,11 +289,15 @@ test.describe.serial('Comentarios e fila de manutencao', () => {
     await page.getByLabel('E-mail').fill('admin@hq.test');
     await page.getByLabel('Senha').fill('senha-admin');
     await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
     await page.goto('/admin/comentarios');
 
     await expect(page.getByRole('heading', { name: 'Fila de manutenção' })).toBeVisible();
-    await expect(page.getByText('Item pendente para a fila administrativa.')).toBeVisible();
-    await page.getByRole('button', { name: 'Marcar como resolvido' }).click();
+    const item = page.getByRole('article').filter({
+      hasText: 'Item pendente para a fila administrativa.'
+    });
+    await expect(item).toBeVisible();
+    await item.getByRole('button', { name: 'Marcar como resolvido' }).click();
     await expect(page.getByText('Item pendente para a fila administrativa.')).toHaveCount(0);
 
     await page.getByLabel('Status').selectOption('resolvido');

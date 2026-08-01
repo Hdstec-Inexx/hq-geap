@@ -44,9 +44,10 @@ async function createAtendimento(
       audio_url, houve_transferencia, concluido_em, duracao_segundos,
       motivo_contato
     )
-    select id, $1, $2, '[{"role":"agent","message":"Ola","time_in_call_secs":0}]'::jsonb,
+    select id, $1, $2::status_atendimento,
+      '[{"role":"agent","message":"Ola","time_in_call_secs":0}]'::jsonb,
       'atendimentos/teste.mp3', false,
-      case when $2 = 'concluido' then now() else null end,
+      case when $2::text = 'concluido' then now() else null end,
       42, 'Rede credenciada'
     from agentes_voz
     where elevenlabs_agent_id = 'agent-livia-curadoria'
@@ -62,9 +63,16 @@ async function persistirAvaliacaoIa(atendimentoId: string) {
       (select id from prompts_ia_avaliadora where ativo),
       $2::jsonb,
       '[]'::jsonb,
-      'Atendimento objetivo.'
+      'Atendimento objetivo.',
+      $3,
+      $4
     )
-  `, [atendimentoId, JSON.stringify(aprovada.checklist)]);
+  `, [
+    atendimentoId,
+    JSON.stringify(aprovada.checklist),
+    aprovada.atendimento_aprovado,
+    aprovada.nota_qualidade
+  ]);
 }
 
 test.describe.serial('Fila de Curadoria e conferencia humana', () => {
@@ -87,8 +95,15 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     );
     await persistirAvaliacaoIa(pendenteId);
     await queryDatabase(`
-      insert into avaliacoes (atendimento_id, autor, prompt_id, nota)
-      select $1, 'ia', id, 10 from prompts_ia_avaliadora where ativo
+      insert into avaliacoes (
+        atendimento_id, autor, prompt_id, nota,
+        saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
+        resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
+        encerramento_geap, atendimento_aprovado, nota_qualidade
+      )
+      select $1, 'ia', id, 10,
+        true, true, true, true, true, true, true, true, 10
+      from prompts_ia_avaliadora where ativo
     `, [emAndamentoId]);
 
     const curador = await login(request, 'curador');
@@ -226,8 +241,15 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     );
     await queryDatabase(`
       with avaliacao as (
-        insert into avaliacoes (atendimento_id, autor, prompt_id, nota)
-        select $1, 'ia', id, 10 from prompts_ia_avaliadora where ativo
+        insert into avaliacoes (
+          atendimento_id, autor, prompt_id, nota,
+          saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
+          resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
+          encerramento_geap, atendimento_aprovado, nota_qualidade
+        )
+        select $1, 'ia', id, 10,
+          true, true, true, true, true, true, true, true, 10
+        from prompts_ia_avaliadora where ativo
         returning id
       )
       insert into avaliacao_criterios (
@@ -284,7 +306,7 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     );
     expect(salvoPorAdmin.status()).toBe(201);
     await expect(salvoPorAdmin.json()).resolves.toMatchObject({
-      autor: { nome: 'Alice Admin' }
+      autor: { nome: 'Ana Admin' }
     });
   });
 
@@ -298,6 +320,7 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await page.getByLabel('E-mail').fill('gestao@hq.test');
     await page.getByLabel('Senha').fill('senha-gestao');
     await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
     await page.goto(`/curadoria/${atendimentoId}`);
 
     await expect(page.getByRole('heading', { name: 'Revisar Atendimento' })).toBeVisible();
@@ -315,6 +338,7 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await page.getByLabel('E-mail').fill('curador@hq.test');
     await page.getByLabel('Senha').fill('senha-curador');
     await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
     await page.goto('/curadoria');
 
     await expect(page.getByRole('heading', { name: 'Fila de Curadoria' })).toBeVisible();
@@ -323,17 +347,24 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.getByText('Atendimento objetivo.')).toBeVisible();
     await expect(page.getByText('Ola')).toBeVisible();
 
-    const protocolo = page.getByRole('group', { name: 'Informação de Protocolo' });
+    const protocolo = page.getByRole('group', { name: /Informação de Protocolo/ });
     await protocolo.getByLabel('Não atendido').check();
     await expect(page.getByText('Reprovado', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Salvar conferência' }).click();
 
-    await expect(page.getByText('Conferência salva')).toBeVisible();
+    // onSaved remounts the form (flash "Conferência salva" is ephemeral).
     await expect(page.getByRole('heading', { name: 'Revisão mais recente' })).toBeVisible();
     await expect(page.getByText('Caio Curador')).toBeVisible();
     await expect(page.getByText('1 revisão')).toBeVisible();
+    await expect(
+      page
+        .getByRole('article')
+        .filter({ hasText: 'Caio Curador' })
+        .getByText('Não atendido')
+        .first()
+    ).toBeVisible();
 
-    await protocolo.getByLabel('Atendido').check();
+    await protocolo.getByLabel('Atendido', { exact: true }).check();
     await page.getByRole('button', { name: 'Salvar conferência' }).click();
     await expect(page.getByText('2 revisões')).toBeVisible();
 

@@ -53,3 +53,15 @@ test('workflow usa chaves canonicas e trata a transcricao como dado nao confiave
   assert.match(workflow, /mensagem inteira do usuario/i);
   assert.doesNotMatch(workflow, /<\/DADOS_NAO_CONFIAVEIS>/);
 });
+
+test('workflow persiste o contrato tipado com claims da LLM', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+
+  assert.match(workflow, /atendimento_aprovado/);
+  assert.match(workflow, /nota_qualidade/);
+  assert.match(
+    workflow,
+    /persistir_avaliacao_ia\(\$1::uuid, \$2::uuid, \$3::jsonb, \$4::jsonb, \$5::text, \$6::boolean, \$7::numeric\)/
+  );
+  assert.match(workflow, /chaves booleanas/i);
+});

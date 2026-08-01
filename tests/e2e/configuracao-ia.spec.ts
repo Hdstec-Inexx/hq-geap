@@ -134,8 +134,16 @@ test.describe.serial('configuracao versionada da IA Avaliadora', () => {
       `, [agent.rows[0]!.id]);
       await expect(
         client.query(
-          `insert into avaliacoes (atendimento_id, autor, nota)
-           values ($1, 'ia', 0)`,
+          `insert into avaliacoes (
+             atendimento_id, autor, nota,
+             saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
+             resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
+             encerramento_geap, atendimento_aprovado, nota_qualidade
+           )
+           values (
+             $1, 'ia', 0,
+             true, true, true, true, true, true, true, false, 0
+           )`,
           [atendimento.rows[0]!.id]
         )
       ).rejects.toThrow(/avaliacoes_ia_exigem_prompt/i);
