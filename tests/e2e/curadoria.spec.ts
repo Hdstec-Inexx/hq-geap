@@ -131,7 +131,10 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     );
     expect(detalheInicial.status()).toBe(200);
     const inicial = (await detalheInicial.json()) as {
-      avaliacaoIa: { checklist: Array<{ chave: string; estado: string }> };
+      avaliacaoIa: {
+        id: string;
+        checklist: Array<{ chave: string; estado: string }>;
+      };
       avaliacaoMaisRecente: null;
       historico: unknown[];
     };
@@ -147,15 +150,30 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     }));
     const primeira = await request.post(
       `${apiUrl}/curadoria/${atendimentoId}/avaliacoes`,
-      { headers, data: { checklist: primeiraChecklist } }
+      {
+        headers,
+        data: {
+          checklist: primeiraChecklist,
+          notaAvaliacaoIa: 4,
+          falhasIdentificadas: ['Protocolo omitido'],
+          resumoAtendimento: 'Curador corrigiu o protocolo.',
+          comentario: 'IA errou o protocolo.'
+        }
+      }
     );
     expect(primeira.status()).toBe(201);
     const primeiraAvaliacao = await primeira.json();
     expect(primeiraAvaliacao).toMatchObject({
       autor: { nome: 'Caio Curador' },
       aprovacao: 'reprovado',
-      nota: 7
+      nota: 7,
+      avaliacaoIaId: inicial.avaliacaoIa.id,
+      notaAvaliacaoIa: 4,
+      falhasIdentificadas: ['Protocolo omitido'],
+      resumoAtendimento: 'Curador corrigiu o protocolo.',
+      comentario: 'IA errou o protocolo.'
     });
+    expect(primeiraAvaliacao).not.toHaveProperty('concordou');
 
     const segunda = await request.post(
       `${apiUrl}/curadoria/${atendimentoId}/avaliacoes`,
@@ -165,13 +183,21 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
           checklist: inicial.avaliacaoIa.checklist.map(({ chave, estado }) => ({
             chave,
             estado
-          }))
+          })),
+          notaAvaliacaoIa: 9,
+          falhasIdentificadas: [],
+          resumoAtendimento: null
         }
       }
     );
     expect(segunda.status()).toBe(201);
     const segundaAvaliacao = await segunda.json();
-    expect(segundaAvaliacao).toMatchObject({ aprovacao: 'aprovado', nota: 9.5 });
+    expect(segundaAvaliacao).toMatchObject({
+      aprovacao: 'aprovado',
+      nota: 9.5,
+      notaAvaliacaoIa: 9,
+      comentario: null
+    });
     expect(segundaAvaliacao.id).not.toBe(primeiraAvaliacao.id);
 
     const detalheFinal = await request.get(
@@ -185,26 +211,36 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
       primeiraAvaliacao.id
     ]);
 
-    const persistidas = await queryDatabase<{ count: string }>(`
-      select count(*) from avaliacoes
-      where atendimento_id = $1 and autor = 'curador'
+    const persistidas = await queryDatabase<{
+      count: string;
+      avaliacaoIaId: string;
+    }>(`
+      select count(*)::text as count, max(avaliacao_ia_id::text) as "avaliacaoIaId"
+      from avaliacoes_curador
+      where atendimento_id = $1
     `, [atendimentoId]);
     expect(persistidas.rows[0]?.count).toBe('2');
+    expect(persistidas.rows[0]?.avaliacaoIaId).toBe(inicial.avaliacaoIa.id);
+    const iaIntacta = await queryDatabase<{ count: string }>(`
+      select count(*)::text as count from avaliacoes
+      where atendimento_id = $1 and autor = 'ia'
+    `, [atendimentoId]);
+    expect(iaIntacta.rows[0]?.count).toBe('1');
     await expect(
-      queryDatabase('update avaliacoes set nota = 0 where id = $1', [
+      queryDatabase('update avaliacoes_curador set nota = 0 where id = $1', [
         primeiraAvaliacao.id
       ])
     ).rejects.toThrow(/imutavel/i);
     await expect(
-      queryDatabase('delete from avaliacoes where id = $1', [
+      queryDatabase('delete from avaliacoes_curador where id = $1', [
         primeiraAvaliacao.id
       ])
     ).rejects.toThrow(/imutavel/i);
     await expect(
       queryDatabase(
-        `update avaliacao_criterios
+        `update avaliacao_curador_criterios
          set estado = 'atendido'
-         where avaliacao_id = $1`,
+         where avaliacao_curador_id = $1`,
         [primeiraAvaliacao.id]
       )
     ).rejects.toThrow(/imutavel/i);
@@ -280,7 +316,7 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
       `${apiUrl}/curadoria/${atendimentoId}/avaliacoes`,
       {
         headers: { authorization: `Bearer ${gestao.token}` },
-        data: { checklist }
+        data: { checklist, notaAvaliacaoIa: 8 }
       }
     );
     expect(forbidden.status()).toBe(403);
@@ -290,7 +326,7 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
       `${apiUrl}/curadoria/${atendimentoId}/avaliacoes`,
       {
         headers: { authorization: `Bearer ${admin.token}` },
-        data: { checklist }
+        data: { checklist, notaAvaliacaoIa: 8 }
       }
     );
     expect(conflict.status()).toBe(409);
@@ -301,7 +337,7 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
       `${apiUrl}/curadoria/${concluidoId}/avaliacoes`,
       {
         headers: { authorization: `Bearer ${admin.token}` },
-        data: { checklist }
+        data: { checklist, notaAvaliacaoIa: 8, comentario: null }
       }
     );
     expect(salvoPorAdmin.status()).toBe(201);
@@ -344,27 +380,33 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.getByRole('heading', { name: 'Fila de Curadoria' })).toBeVisible();
     await page.getByRole('link', { name: /conv-curadoria-interface/ }).click();
     await expect(page.getByRole('heading', { name: 'Conferência humana' })).toBeVisible();
-    await expect(page.getByText('Atendimento objetivo.')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Avaliação original' }).locator('..').getByText('Atendimento objetivo.')
+    ).toBeVisible();
     await expect(page.getByText('Ola')).toBeVisible();
 
     const protocolo = page.getByRole('group', { name: /Informação de Protocolo/ });
     await protocolo.getByLabel('Não atendido').check();
     await expect(page.getByText('Reprovado', { exact: true })).toBeVisible();
+    await page.getByLabel('Nota da Avaliação da IA').fill('3');
+    await page.getByLabel('Comentário da revisão (opcional)').fill('Corrigir protocolo.');
     await page.getByRole('button', { name: 'Salvar conferência' }).click();
 
     // onSaved remounts the form (flash "Conferência salva" is ephemeral).
     await expect(page.getByRole('heading', { name: 'Revisão mais recente' })).toBeVisible();
     await expect(page.getByText('Caio Curador')).toBeVisible();
     await expect(page.getByText('1 revisão')).toBeVisible();
-    await expect(
-      page
-        .getByRole('article')
-        .filter({ hasText: 'Caio Curador' })
-        .getByText('Não atendido')
-        .first()
-    ).toBeVisible();
+    const revisaoRecente = page
+      .locator('.review-history article')
+      .filter({ hasText: 'Caio Curador' });
+    await expect(revisaoRecente.getByText('Nota da Avaliação da IA:')).toBeVisible();
+    await expect(revisaoRecente.getByText('3', { exact: true })).toBeVisible();
+    await expect(revisaoRecente.getByText('Corrigir protocolo.')).toBeVisible();
+    await expect(revisaoRecente.getByText('Não atendido').first()).toBeVisible();
 
     await protocolo.getByLabel('Atendido', { exact: true }).check();
+    await page.getByLabel('Nota da Avaliação da IA').fill('8');
+    await page.getByLabel('Comentário da revisão (opcional)').fill('');
     await page.getByRole('button', { name: 'Salvar conferência' }).click();
     await expect(page.getByText('2 revisões')).toBeVisible();
 
