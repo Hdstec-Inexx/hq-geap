@@ -4,6 +4,7 @@ import {
   type PublishConfiguracaoIa
 } from '@hq-geap/contracts/configuracao-ia';
 import { useEffect, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { apiUrl, getSession } from '../../auth/session';
 
 type PageState = 'loading' | 'ready' | 'submitting' | 'published' | 'error';
@@ -71,6 +72,9 @@ export function ConfiguracaoIaPage() {
       <section className="configuration-page">
         <p className="eyebrow">Administração / IA Avaliadora</p>
         <h1>Configuração da IA Avaliadora</h1>
+        <Link className="back-link" to="/">
+          Voltar ao início
+        </Link>
         <p className={state === 'error' ? 'configuration-error' : 'session-check'}>
           {state === 'error'
             ? 'Não foi possível carregar a configuração ativa.'
@@ -86,6 +90,9 @@ export function ConfiguracaoIaPage() {
         <div>
           <p className="eyebrow">Administração / IA Avaliadora</p>
           <h1>Configuração da IA Avaliadora</h1>
+          <Link className="back-link" to="/">
+            Voltar ao início
+          </Link>
         </div>
         <div className="version-badge">
           <span>Versão ativa {configuration.version}</span>

@@ -156,6 +156,9 @@ export function ComentariosPendentesPage() {
           <p className="eyebrow">Administração / Agente de Voz</p>
           <h1>Fila de manutenção</h1>
           <p>Trabalhe os comentários usados para melhorar continuamente o agente.</p>
+          <Link className="back-link" to="/">
+            Voltar ao início
+          </Link>
         </div>
         <label className="manutencao-filter">
           Status
