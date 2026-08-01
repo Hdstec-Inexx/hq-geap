@@ -318,7 +318,8 @@ h1 {
   cursor: pointer;
 }
 
-.login-card .password-toggle {
+.login-card .password-toggle,
+.user-editor .password-toggle {
   min-height: 40px;
   padding: 0 4px;
   color: #9ed9c7;
@@ -333,8 +334,23 @@ h1 {
   cursor: pointer;
 }
 
+.user-editor .password-toggle {
+  color: #08735f;
+  align-self: end;
+  margin-bottom: 4px;
+}
+
+.user-editor .user-password-field {
+  align-items: end;
+}
+
+.user-editor .user-password-field label {
+  gap: 9px;
+}
+
 .login-card button[type='submit']:focus-visible,
 .login-card .password-toggle:focus-visible,
+.user-editor .password-toggle:focus-visible,
 .secondary-button:focus-visible {
   outline: 3px solid #e5b85c;
   outline-offset: 3px;
@@ -690,6 +706,14 @@ h1 {
   justify-content: space-between;
   gap: 48px;
   margin-bottom: 46px;
+}
+
+.users-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
 }
 
 .users-heading h1 {

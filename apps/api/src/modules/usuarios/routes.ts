@@ -1,6 +1,7 @@
 import {
   createUsuarioSchema,
   listUsuariosQuerySchema,
+  setUsuarioPasswordSchema,
   updateUsuarioSchema,
   type ListUsuariosResponse,
   type Usuario
@@ -14,6 +15,7 @@ import {
 import {
   createUsuario,
   isDuplicateEmail,
+  setUsuarioPassword,
   toUsuario
 } from './service.js';
 
@@ -121,6 +123,31 @@ const usuariosRoutes: FastifyPluginAsync = async (app) => {
         throw app.httpErrors.notFound('User not found');
       }
       return toUsuario(deactivated);
+    }
+  );
+
+  app.post(
+    '/admin/usuarios/:id/senha',
+    adminOnly,
+    async (request): Promise<Usuario> => {
+      const params = paramsSchema.safeParse(request.params);
+      const input = setUsuarioPasswordSchema.safeParse(request.body);
+      if (!params.success) {
+        throw app.httpErrors.badRequest('Invalid user id');
+      }
+      if (!input.success) {
+        throw app.httpErrors.badRequest('Invalid password');
+      }
+
+      const updated = await setUsuarioPassword(
+        repository,
+        params.data.id,
+        input.data
+      );
+      if (!updated) {
+        throw app.httpErrors.notFound('User not found');
+      }
+      return toUsuario(updated);
     }
   );
 };

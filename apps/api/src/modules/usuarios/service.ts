@@ -1,6 +1,16 @@
-import type { CreateUsuario, Usuario } from '@hq-geap/contracts/usuarios';
+import type {
+  CreateUsuario,
+  SetUsuarioPassword,
+  Usuario
+} from '@hq-geap/contracts/usuarios';
 import { hash } from 'bcryptjs';
 import type { UsuarioRow, UsuariosRepository } from './repository.js';
+
+const passwordHashRounds = 10;
+
+async function hashPassword(password: string) {
+  return hash(password, passwordHashRounds);
+}
 
 export function toUsuario(row: UsuarioRow): Usuario {
   return {
@@ -18,8 +28,17 @@ export async function createUsuario(
   repository: UsuariosRepository,
   input: CreateUsuario
 ) {
-  const passwordHash = await hash(input.password, 10);
+  const passwordHash = await hashPassword(input.password);
   return repository.create({ ...input, passwordHash });
+}
+
+export async function setUsuarioPassword(
+  repository: UsuariosRepository,
+  id: string,
+  input: SetUsuarioPassword
+) {
+  const passwordHash = await hashPassword(input.password);
+  return repository.setPassword(id, passwordHash);
 }
 
 export function isDuplicateEmail(error: unknown) {

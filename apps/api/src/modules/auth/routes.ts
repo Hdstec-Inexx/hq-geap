@@ -11,8 +11,8 @@ import type { FastifyPluginAsync } from 'fastify';
 import { createAuthRepository } from './repository.js';
 import {
   authenticateUser,
-  toPerfil,
-  toSessionIdentity
+  toSessionIdentity,
+  toSessionTokenClaims
 } from './service.js';
 
 const authRoutes: FastifyPluginAsync = async (app) => {
@@ -30,10 +30,9 @@ const authRoutes: FastifyPluginAsync = async (app) => {
     }
 
     return loginResponseSchema.parse({
-      token: app.jwt.sign(
-        { sub: user.id },
-        { expiresIn: app.config.JWT_EXPIRES_IN_SECONDS }
-      ),
+      token: app.jwt.sign(toSessionTokenClaims(user), {
+        expiresIn: app.config.JWT_EXPIRES_IN_SECONDS
+      }),
       user: toSessionIdentity(user)
     });
   });

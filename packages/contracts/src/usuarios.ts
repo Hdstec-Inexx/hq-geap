@@ -39,8 +39,13 @@ export const createUsuarioSchema = z.object({
 
 export const updateUsuarioSchema = createUsuarioSchema.omit({ password: true });
 
+export const setUsuarioPasswordSchema = z.object({
+  password: passwordSchema
+});
+
 export type Usuario = z.infer<typeof usuarioSchema>;
 export type ListUsuariosQuery = z.infer<typeof listUsuariosQuerySchema>;
 export type ListUsuariosResponse = z.infer<typeof listUsuariosResponseSchema>;
 export type CreateUsuario = z.infer<typeof createUsuarioSchema>;
 export type UpdateUsuario = z.infer<typeof updateUsuarioSchema>;
+export type SetUsuarioPassword = z.infer<typeof setUsuarioPasswordSchema>;
