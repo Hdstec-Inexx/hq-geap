@@ -89,11 +89,13 @@ test('mapeia apenas eventos de texto/metadados para o contrato de observacao', (
     null
   );
   const longMessage = 'x'.repeat(maxObservationMessageChars + 20);
+  const clipped = mapObservationEvent({
+    type: 'user_transcript',
+    user_transcription_event: { user_transcript: longMessage }
+  });
+  assert.equal(clipped?.type, 'transcript');
   assert.equal(
-    mapObservationEvent({
-      type: 'user_transcript',
-      user_transcription_event: { user_transcript: longMessage }
-    })?.message.length,
+    clipped && 'message' in clipped ? clipped.message.length : -1,
     maxObservationMessageChars
   );
   assert.equal(monitoramentoEventSchema.parse({
@@ -103,6 +105,9 @@ test('mapeia apenas eventos de texto/metadados para o contrato de observacao', (
   }).type, 'transcript');
 });
 
+const noCalendarDayFilter =
+  /call_start|start_after|start_before|start_time|today|date|inicio|fim|after_unix|before_unix/i;
+
 test('lista ao vivo usa o endpoint de conversas da ElevenLabs', () => {
   const url = buildElevenLabsConversationsUrl('https://api.elevenlabs.io', 50);
   assert.match(url, /^https:\/\/api\.elevenlabs\.io\/v1\/convai\/conversations\?/);
@@ -111,11 +116,14 @@ test('lista ao vivo usa o endpoint de conversas da ElevenLabs', () => {
   assert.match(url, /exclude_statuses=failed/);
   assert.match(url, /exclude_statuses=processing/);
   assert.doesNotMatch(url, /sk_|xi-api-key/i);
+  assert.doesNotMatch(url, noCalendarDayFilter);
 });
 
 test('lista ao vivo filtra apenas conversas iniciadas ou em progresso', async () => {
-  const fetchImpl: typeof fetch = async () =>
-    new Response(
+  const requestedUrls: string[] = [];
+  const fetchImpl: typeof fetch = async (input) => {
+    requestedUrls.push(String(input));
+    return new Response(
       JSON.stringify({
         conversations: [
           {
@@ -128,18 +136,31 @@ test('lista ao vivo filtra apenas conversas iniciadas ou em progresso', async ()
             conversation_id: 'conv_initiated',
             agent_id: 'agent_1',
             status: 'initiated',
-            start_time_unix_secs: 1_700_000_100
+            start_time_unix_secs: 1_600_000_000
           },
           {
             conversation_id: 'conv_done',
             agent_id: 'agent_1',
             status: 'done',
             start_time_unix_secs: 1_700_000_200
+          },
+          {
+            conversation_id: 'conv_failed',
+            agent_id: 'agent_1',
+            status: 'failed',
+            start_time_unix_secs: 1_700_000_300
+          },
+          {
+            conversation_id: 'conv_processing',
+            agent_id: 'agent_1',
+            status: 'processing',
+            start_time_unix_secs: 1_700_000_400
           }
         ]
       }),
       { status: 200, headers: { 'content-type': 'application/json' } }
     );
+  };
 
   const live = await listLiveConversationsFromElevenLabs({
     apiBaseUrl: 'https://api.elevenlabs.io',
@@ -147,10 +168,20 @@ test('lista ao vivo filtra apenas conversas iniciadas ou em progresso', async ()
     fetchImpl
   });
 
+  assert.equal(requestedUrls.length, 1);
+  assert.match(requestedUrls[0]!, /exclude_statuses=done/);
+  assert.match(requestedUrls[0]!, /exclude_statuses=failed/);
+  assert.match(requestedUrls[0]!, /exclude_statuses=processing/);
+  assert.doesNotMatch(requestedUrls[0]!, noCalendarDayFilter);
   assert.deepEqual(
     live.map((item) => item.conversationId),
     ['conv_live', 'conv_initiated']
   );
+  assert.deepEqual(
+    live.map((item) => item.status),
+    ['in-progress', 'initiated']
+  );
+  assert.equal(live[1]?.iniciadoEm, '2020-09-13T12:26:40.000Z');
 });
 
 test('URL de monitoramento usa conversation_id sem expor a chave', () => {
