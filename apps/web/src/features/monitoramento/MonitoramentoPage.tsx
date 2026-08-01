@@ -13,10 +13,6 @@ function formatDate(value: string | null) {
     : 'Início não informado';
 }
 
-function statusLabel(status: 'initiated' | 'in-progress') {
-  return status === 'initiated' ? 'Iniciada' : 'Em progresso';
-}
-
 export function MonitoramentoPage() {
   const state = useAuthenticatedResource(
     '/monitoramento/conversas',
@@ -55,7 +51,7 @@ export function MonitoramentoPage() {
             <article className="atendimento-row" key={conversa.conversationId}>
               <div className="atendimento-row-main">
                 <span className="atendimento-status em_andamento">
-                  {statusLabel(conversa.status)}
+                  Em andamento
                 </span>
                 <Link to={`/monitoramento/${conversa.conversationId}`}>
                   {conversa.conversationId}

@@ -33,10 +33,12 @@ export function AvaliacaoIaPanel({ atendimentoId }: { atendimentoId: string }) {
 
       <div className="avaliacao-notes">
         <div>
-          <p className="panel-label">Claim da LLM</p>
+          <p className="panel-label">Claims da LLM (não canônicos)</p>
           <p>
-            Nota qualidade {avaliacao.notaQualidade.toLocaleString('pt-BR')} ·{' '}
-            {avaliacao.atendimentoAprovado ? 'Atendimento aprovado' : 'Atendimento reprovado'}
+            Nota claim {avaliacao.notaQualidade.toLocaleString('pt-BR')} ·{' '}
+            {avaliacao.atendimentoAprovado
+              ? 'Aprovação claim: sim'
+              : 'Aprovação claim: não'}
           </p>
         </div>
       </div>

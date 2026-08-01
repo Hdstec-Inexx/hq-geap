@@ -5,12 +5,15 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { parseAppConfig } from '../../apps/api/src/plugins/config.js';
 import { parseMonitoramentoAuthMessage } from '../../apps/api/src/modules/monitoramento/auth.js';
 import {
+  ConversationNotOpenError,
+  buildElevenLabsConversationUrl,
   buildElevenLabsConversationsUrl,
   buildElevenLabsMonitorUrl,
   listLiveConversationsFromElevenLabs,
   mapObservationEvent,
   maxObservationMessageChars,
-  requireElevenLabsApiKey
+  requireElevenLabsApiKey,
+  requireOpenConversationAtElevenLabs
 } from '../../apps/api/src/modules/monitoramento/service.js';
 import { createMonitoramentoProxy } from '../../apps/api/src/modules/monitoramento/proxy.js';
 import { monitoramentoEventSchema } from '../../packages/contracts/src/monitoramento.js';
@@ -194,6 +197,48 @@ test('URL de monitoramento usa conversation_id sem expor a chave', () => {
     'wss://api.elevenlabs.io/v1/convai/conversations/conv_abc123/monitor'
   );
   assert.doesNotMatch(url, /sk_|xi-api-key/i);
+});
+
+test('observe exige conversa aberta na ElevenLabs antes do proxy', async () => {
+  const requestedUrls: string[] = [];
+  const fetchImpl: typeof fetch = async (input) => {
+    requestedUrls.push(String(input));
+    return new Response(JSON.stringify({ status: 'done' }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' }
+    });
+  };
+
+  await assert.rejects(
+    () =>
+      requireOpenConversationAtElevenLabs({
+        apiBaseUrl: 'https://api.elevenlabs.io',
+        apiKey: 'sk_test',
+        conversationId: 'conv_closed',
+        fetchImpl
+      }),
+    (error: unknown) =>
+      error instanceof ConversationNotOpenError &&
+      /não está mais aberta/i.test(error.message)
+  );
+
+  assert.equal(
+    requestedUrls[0],
+    buildElevenLabsConversationUrl('https://api.elevenlabs.io', 'conv_closed')
+  );
+  assert.doesNotMatch(requestedUrls[0]!, /sk_|xi-api-key/i);
+
+  const open = await requireOpenConversationAtElevenLabs({
+    apiBaseUrl: 'https://api.elevenlabs.io',
+    apiKey: 'sk_test',
+    conversationId: 'conv_live',
+    fetchImpl: async () =>
+      new Response(JSON.stringify({ status: 'in-progress' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+  });
+  assert.equal(open, 'in-progress');
 });
 
 test('auth do monitoramento vem na primeira mensagem e nao na URL', () => {

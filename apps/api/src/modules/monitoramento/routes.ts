@@ -14,11 +14,13 @@ import {
 import { waitForMonitoramentoAuthToken } from './auth.js';
 import { createMonitoramentoProxy } from './proxy.js';
 import {
+  ConversationNotOpenError,
   ElevenLabsListError,
   MissingElevenLabsApiKeyError,
   buildElevenLabsMonitorUrl,
   listLiveConversationsFromElevenLabs,
-  requireElevenLabsApiKey
+  requireElevenLabsApiKey,
+  requireOpenConversationAtElevenLabs
 } from './service.js';
 
 function sendError(socket: WsWebSocket, message: string) {
@@ -76,6 +78,32 @@ async function authenticateMonitorClient(
     return false;
   }
   return true;
+}
+
+async function requireOpenUpstreamConversation(
+  app: FastifyInstance,
+  socket: WsWebSocket,
+  apiKey: string,
+  conversationId: string
+): Promise<boolean> {
+  try {
+    await requireOpenConversationAtElevenLabs({
+      apiBaseUrl: app.config.ELEVENLABS_API_URL,
+      apiKey,
+      conversationId
+    });
+    return true;
+  } catch (error) {
+    if (error instanceof ConversationNotOpenError) {
+      sendError(socket, error.message);
+      return false;
+    }
+    if (error instanceof ElevenLabsListError) {
+      sendError(socket, error.message);
+      return false;
+    }
+    throw error;
+  }
 }
 
 const routes: FastifyPluginAsync = async (app) => {
@@ -155,6 +183,16 @@ const routes: FastifyPluginAsync = async (app) => {
       if (!apiKey) {
         return;
       }
+      if (
+        !(await requireOpenUpstreamConversation(
+          app,
+          socket,
+          apiKey,
+          parsed.data
+        ))
+      ) {
+        return;
+      }
       createMonitoramentoProxy({
         client: socket,
         apiKey,
@@ -183,11 +221,14 @@ const routes: FastifyPluginAsync = async (app) => {
         sendError(socket, 'Atendimento não encontrado');
         return;
       }
-      if (atendimento.status !== 'em_andamento') {
-        sendError(
+      if (
+        !(await requireOpenUpstreamConversation(
+          app,
           socket,
-          'Monitoramento ao Vivo só está disponível para Atendimentos em andamento'
-        );
+          apiKey,
+          atendimento.conversationId
+        ))
+      ) {
         return;
       }
 
