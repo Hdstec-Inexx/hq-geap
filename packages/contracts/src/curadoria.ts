@@ -32,9 +32,14 @@ export const filaCuradoriaQuerySchema = z.object({
 export const avaliacaoCuradorSchema = z.object({
   id: z.uuid(),
   atendimentoId: z.uuid(),
+  avaliacaoIaId: z.uuid(),
   autor: z.object({ id: z.uuid(), nome: z.string() }),
   nota: z.number().min(0).max(10),
   aprovacao: z.enum(['aprovado', 'reprovado']),
+  falhasIdentificadas: z.array(z.string()),
+  resumoAtendimento: z.string().nullable(),
+  notaAvaliacaoIa: z.number().min(0).max(10),
+  comentario: z.string().nullable(),
   criadoEm: z.iso.datetime(),
   checklist: z.array(criterioCuradoriaSchema)
 });
@@ -56,7 +61,16 @@ export const salvarConferenciaSchema = z.object({
       chave: z.string().trim().min(1),
       estado: estadoCriterioSchema
     })
-  )
+  ),
+  notaAvaliacaoIa: z.number().min(0).max(10),
+  falhasIdentificadas: z.array(z.string()).default([]),
+  resumoAtendimento: z.string().nullable().optional(),
+  comentario: z
+    .string()
+    .trim()
+    .nullable()
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : null))
 });
 
 export type FilaCuradoriaItem = z.infer<typeof filaCuradoriaItemSchema>;

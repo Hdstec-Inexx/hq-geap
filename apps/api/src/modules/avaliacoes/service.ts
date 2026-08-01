@@ -60,9 +60,14 @@ export function toAvaliacaoCuradorResumo(
   return avaliacaoCuradorResumoSchema.parse({
     id: row.id,
     atendimentoId: row.atendimentoId,
+    avaliacaoIaId: row.avaliacaoIaId,
     autor: { id: row.autorId, nome: row.autorNome },
     nota,
     aprovacao: derivarAprovacao(nota, row.checklist),
+    falhasIdentificadas: row.falhasIdentificadas,
+    resumoAtendimento: row.resumoAtendimento,
+    notaAvaliacaoIa: Number(row.notaAvaliacaoIa),
+    comentario: row.comentario,
     criadoEm: row.criadoEm.toISOString(),
     checklist: checklistValues(row.checklist)
   });

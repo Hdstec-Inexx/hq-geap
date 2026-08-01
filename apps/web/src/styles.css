@@ -1481,6 +1481,29 @@ h1 {
   outline-offset: -4px;
 }
 
+.review-mirror-fields {
+  display: grid;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.review-mirror-fields label {
+  display: grid;
+  gap: 8px;
+  color: #123b4a;
+  font-weight: 700;
+}
+
+.review-mirror-fields input,
+.review-mirror-fields textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #9db5ae;
+  background: #fff;
+  color: #123b4a;
+  font: inherit;
+}
+
 .review-actions {
   display: flex;
   align-items: center;

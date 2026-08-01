@@ -61,6 +61,20 @@ export function AvaliacaoCuradorPanel({
         </div>
       </header>
 
+      <p>
+        Nota da Avaliação da IA:{' '}
+        {avaliacao.notaAvaliacaoIa.toLocaleString('pt-BR')}
+      </p>
+      {avaliacao.resumoAtendimento ? <p>{avaliacao.resumoAtendimento}</p> : null}
+      {avaliacao.falhasIdentificadas.length > 0 ? (
+        <ul>
+          {avaliacao.falhasIdentificadas.map((falha) => (
+            <li key={falha}>{falha}</li>
+          ))}
+        </ul>
+      ) : null}
+      {avaliacao.comentario ? <p>{avaliacao.comentario}</p> : null}
+
       <div className="avaliacao-checklist">
         {avaliacao.checklist.map((criterio) => (
           <article

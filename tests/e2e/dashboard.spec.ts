@@ -100,16 +100,17 @@ async function createDashboardAtendimento(input: {
 
   if (input.notaCurador !== undefined && input.estadoCurador) {
     const curador = await queryDatabase<{ id: string }>(`
-      insert into avaliacoes (
-        atendimento_id, autor, autor_usuario_id, autor_usuario_nome, nota
+      insert into avaliacoes_curador (
+        atendimento_id, avaliacao_ia_id, autor_usuario_id, autor_usuario_nome,
+        nota, nota_avaliacao_ia
       )
-      select $1, 'curador', id, nome, $2
+      select $1, $2, id, nome, $3, 8
       from usuarios where papel = 'curador' limit 1
       returning id
-    `, [atendimentoId, input.notaCurador]);
+    `, [atendimentoId, ia.rows[0]!.id, input.notaCurador]);
     await queryDatabase(`
-      insert into avaliacao_criterios (
-        avaliacao_id, criterio_id, criterio_chave, criterio_nome,
+      insert into avaliacao_curador_criterios (
+        avaliacao_curador_id, criterio_id, criterio_chave, criterio_nome,
         criterio_critico, criterio_condicional, criterio_ordem, estado,
         valor_criterio
       )
