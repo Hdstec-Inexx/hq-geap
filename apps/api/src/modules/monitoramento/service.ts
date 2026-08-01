@@ -20,6 +20,13 @@ export class ElevenLabsListError extends Error {
   }
 }
 
+export class ConversationNotOpenError extends Error {
+  constructor(message = 'Esta conversa não está mais aberta na ElevenLabs') {
+    super(message);
+    this.name = 'ConversationNotOpenError';
+  }
+}
+
 export function requireElevenLabsApiKey(config: AppConfig): string {
   const key = config.ELEVENLABS_API_KEY?.trim();
   if (!key) {
@@ -50,6 +57,23 @@ export function buildElevenLabsConversationsUrl(
     url.searchParams.append('exclude_statuses', status);
   }
   return url.toString();
+}
+
+export function buildElevenLabsConversationUrl(
+  apiBaseUrl: string,
+  conversationId: string
+): string {
+  const url = new URL(
+    `/v1/convai/conversations/${encodeURIComponent(conversationId)}`,
+    apiBaseUrl
+  );
+  return url.toString();
+}
+
+export function isLiveConversationStatus(
+  status: string | null | undefined
+): status is 'initiated' | 'in-progress' {
+  return liveStatuses.has(status ?? '');
 }
 
 type UpstreamEvent = {
@@ -112,6 +136,63 @@ export type LiveConversation = {
   status: 'initiated' | 'in-progress';
   iniciadoEm: string | null;
 };
+
+export async function requireOpenConversationAtElevenLabs(options: {
+  apiBaseUrl: string;
+  apiKey: string;
+  conversationId: string;
+  fetchImpl?: typeof fetch;
+  timeoutMs?: number;
+}): Promise<'initiated' | 'in-progress'> {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const url = buildElevenLabsConversationUrl(
+    options.apiBaseUrl,
+    options.conversationId
+  );
+  let response: Response;
+  try {
+    response = await fetchImpl(url, {
+      headers: { 'xi-api-key': options.apiKey },
+      signal: AbortSignal.timeout(options.timeoutMs ?? 10_000)
+    });
+  } catch {
+    throw new ElevenLabsListError(
+      'Não foi possível verificar o status da conversa na ElevenLabs'
+    );
+  }
+
+  if (response.status === 404) {
+    throw new ConversationNotOpenError(
+      'Conversa não encontrada na ElevenLabs — não é possível observar'
+    );
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new ElevenLabsListError(
+      'ELEVENLABS_API_KEY inválida ou sem permissão para consultar conversas'
+    );
+  }
+  if (!response.ok) {
+    throw new ElevenLabsListError(
+      'Falha ao consultar o status da conversa na ElevenLabs'
+    );
+  }
+
+  let body: { status?: string };
+  try {
+    body = (await response.json()) as { status?: string };
+  } catch {
+    throw new ElevenLabsListError(
+      'Resposta inválida ao consultar conversa na ElevenLabs'
+    );
+  }
+
+  if (!isLiveConversationStatus(body.status)) {
+    throw new ConversationNotOpenError(
+      'Esta conversa não está mais aberta na ElevenLabs'
+    );
+  }
+  return body.status;
+}
 
 export async function listLiveConversationsFromElevenLabs(options: {
   apiBaseUrl: string;
