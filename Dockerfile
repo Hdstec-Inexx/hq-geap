@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Imagem da API. No Easypanel use este arquivo no App hq-api (porta 3000).
+# Imagem da API. No Easypanel use este arquivo no App hq-api (porta 3015).
 
 FROM node:24-alpine AS base
 RUN corepack enable
@@ -34,7 +34,7 @@ RUN pnpm --filter @hq-geap/contracts build \
 FROM base AS api
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
-ENV PORT=3000
+ENV PORT=3015
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
@@ -52,7 +52,7 @@ RUN chmod +x /app/docker/api-entrypoint.sh \
   && rm /tmp/database-cli.txt \
   && chown -R hq:hq /app
 USER hq
-EXPOSE 3000
+EXPOSE 3015
 HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=5 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3015)+'/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 ENTRYPOINT ["/app/docker/api-entrypoint.sh"]

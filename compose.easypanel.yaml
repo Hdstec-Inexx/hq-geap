@@ -1,5 +1,5 @@
 # Referência para serviço Compose no Easypanel.
-# Preferência do painel: Domains apontando para api:3000 e web:8080 (sem publicar ports no host).
+# Preferência do painel: Domains apontando para api:3015 e web:8025 (sem publicar ports no host).
 # Credenciais e URLs públicas vêm das Environment Variables do Easypanel.
 # PostgreSQL é externo: informe DATABASE_URL apontando para o DB já provisionado.
 
@@ -12,7 +12,7 @@ services:
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
-      PORT: 3000
+      PORT: 3015
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
       CORS_ORIGIN: ${CORS_ORIGIN:?set CORS_ORIGIN}
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
@@ -28,7 +28,7 @@ services:
       ELEVENLABS_API_URL: ${ELEVENLABS_API_URL:-https://api.elevenlabs.io}
       SKIP_DB_SEED: ${SKIP_DB_SEED:-0}
     expose:
-      - '3000'
+      - '3015'
     security_opt:
       - no-new-privileges:true
     healthcheck:
@@ -37,7 +37,7 @@ services:
           'CMD',
           'node',
           '-e',
-          "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:'+(process.env.PORT||3015)+'/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
         ]
       interval: 30s
       timeout: 5s
@@ -55,11 +55,11 @@ services:
       api:
         condition: service_healthy
     expose:
-      - '8080'
+      - '8025'
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8080/healthz']
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:8025/healthz']
       interval: 30s
       timeout: 3s
       retries: 3
