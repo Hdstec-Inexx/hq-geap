@@ -18,6 +18,7 @@ import {
   ElevenLabsListError,
   MissingElevenLabsApiKeyError,
   buildElevenLabsMonitorUrl,
+  excludeLocallyConcludedConversations,
   listLiveConversationsFromElevenLabs,
   requireElevenLabsApiKey,
   requireOpenConversationAtElevenLabs
@@ -138,6 +139,24 @@ const routes: FastifyPluginAsync = async (app) => {
         }
         throw error;
       }
+
+      const conversationIds = live.map((item) => item.conversationId);
+      const concluded =
+        conversationIds.length === 0
+          ? { rows: [] as Array<{ conversationId: string }> }
+          : await app.db.query<{ conversationId: string }>(
+              `
+                select elevenlabs_conversation_id as "conversationId"
+                from atendimentos
+                where status = 'concluido'
+                  and elevenlabs_conversation_id = any($1::text[])
+              `,
+              [conversationIds]
+            );
+      live = excludeLocallyConcludedConversations(
+        live,
+        new Set(concluded.rows.map((row) => row.conversationId))
+      );
 
       const agentIds = [...new Set(live.map((item) => item.agentId))];
       const agents =

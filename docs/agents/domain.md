@@ -18,7 +18,7 @@ Single-context repo (this repo):
 ├── CONTEXT.md
 ├── docs/adr/
 │   ├── 0001-avaliacoes-ia-e-curador-sem-hierarquia.md
-│   └── ... (0002–0008)
+│   └── ... (0002–0011)
 └── src/
 ```
 

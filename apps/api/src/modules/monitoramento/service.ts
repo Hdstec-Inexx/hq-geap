@@ -5,6 +5,10 @@ export const maxUpstreamMessageBytes = 64_000;
 export const maxObservationMessageChars = 4_096;
 
 const liveStatuses = new Set(['initiated', 'in-progress']);
+const finishedCallSuccessful = new Set(['success', 'failure']);
+
+/** Limite de idade para status aberto: acima disso é zombie preso na ElevenLabs. */
+export const maxLiveConversationAgeSecs = 24 * 60 * 60;
 
 export class MissingElevenLabsApiKeyError extends Error {
   constructor() {
@@ -76,6 +80,48 @@ export function isLiveConversationStatus(
   return liveStatuses.has(status ?? '');
 }
 
+export function isActivelyOpenConversationSummary(
+  conversation: {
+    status?: string;
+    start_time_unix_secs?: number;
+    termination_reason?: string;
+    call_successful?: string;
+  },
+  nowSecs: number
+): boolean {
+  if (!isLiveConversationStatus(conversation.status)) {
+    return false;
+  }
+  const reason = conversation.termination_reason?.trim();
+  if (reason) {
+    return false;
+  }
+  if (
+    typeof conversation.call_successful === 'string' &&
+    finishedCallSuccessful.has(conversation.call_successful)
+  ) {
+    return false;
+  }
+  if (typeof conversation.start_time_unix_secs === 'number') {
+    const ageSecs = nowSecs - conversation.start_time_unix_secs;
+    if (ageSecs > maxLiveConversationAgeSecs) {
+      return false;
+    }
+  }
+  return true;
+}
+
+export function excludeLocallyConcludedConversations<
+  T extends { conversationId: string }
+>(live: T[], concludedConversationIds: ReadonlySet<string>): T[] {
+  if (concludedConversationIds.size === 0) {
+    return live;
+  }
+  return live.filter(
+    (item) => !concludedConversationIds.has(item.conversationId)
+  );
+}
+
 type UpstreamEvent = {
   type?: string;
   user_transcription_event?: { user_transcript?: string };
@@ -124,6 +170,9 @@ type ElevenLabsConversation = {
   agent_id?: string;
   status?: string;
   start_time_unix_secs?: number;
+  termination_reason?: string;
+  call_successful?: string;
+  call_duration_secs?: number;
 };
 
 type ElevenLabsListResponse = {
@@ -177,21 +226,37 @@ export async function requireOpenConversationAtElevenLabs(options: {
     );
   }
 
-  let body: { status?: string };
+  let body: {
+    status?: string;
+    metadata?: { start_time_unix_secs?: number };
+    termination_reason?: string;
+    analysis?: { call_successful?: string } | null;
+  };
   try {
-    body = (await response.json()) as { status?: string };
+    body = (await response.json()) as typeof body;
   } catch {
     throw new ElevenLabsListError(
       'Resposta inválida ao consultar conversa na ElevenLabs'
     );
   }
 
-  if (!isLiveConversationStatus(body.status)) {
+  const nowSecs = Math.floor(Date.now() / 1000);
+  if (
+    !isActivelyOpenConversationSummary(
+      {
+        status: body.status,
+        start_time_unix_secs: body.metadata?.start_time_unix_secs,
+        termination_reason: body.termination_reason,
+        call_successful: body.analysis?.call_successful
+      },
+      nowSecs
+    )
+  ) {
     throw new ConversationNotOpenError(
       'Esta conversa não está mais aberta na ElevenLabs'
     );
   }
-  return body.status;
+  return body.status as 'initiated' | 'in-progress';
 }
 
 export async function listLiveConversationsFromElevenLabs(options: {
@@ -200,8 +265,10 @@ export async function listLiveConversationsFromElevenLabs(options: {
   pageSize?: number;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
+  nowSecs?: number;
 }): Promise<LiveConversation[]> {
   const fetchImpl = options.fetchImpl ?? fetch;
+  const nowSecs = options.nowSecs ?? Math.floor(Date.now() / 1000);
   const url = buildElevenLabsConversationsUrl(
     options.apiBaseUrl,
     options.pageSize ?? 50
@@ -240,21 +307,24 @@ export async function listLiveConversationsFromElevenLabs(options: {
 
   const live: LiveConversation[] = [];
   for (const conversation of body.conversations ?? []) {
+    const conversationId = conversation.conversation_id;
+    const agentId = conversation.agent_id;
+    const status = conversation.status;
     if (
-      typeof conversation.conversation_id !== 'string' ||
-      typeof conversation.agent_id !== 'string' ||
-      !liveStatuses.has(conversation.status ?? '')
+      typeof conversationId !== 'string' ||
+      typeof agentId !== 'string' ||
+      !isLiveConversationStatus(status) ||
+      !isActivelyOpenConversationSummary(conversation, nowSecs)
     ) {
       continue;
     }
-    const status = conversation.status as 'initiated' | 'in-progress';
     const started =
       typeof conversation.start_time_unix_secs === 'number'
         ? new Date(conversation.start_time_unix_secs * 1000).toISOString()
         : null;
     live.push({
-      conversationId: conversation.conversation_id,
-      agentId: conversation.agent_id,
+      conversationId,
+      agentId,
       status,
       iniciadoEm: started
     });
