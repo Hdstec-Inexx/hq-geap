@@ -11,8 +11,8 @@ O HQ GEAP sobe como **dois App services** (API + Web) e conecta a um **PostgreSQ
 ## Serviços no painel
 
 1. **PostgreSQL** já provisionado (Database do Easypanel ou outro host acessível pela rede do Compose)
-2. **hq-api** (App → `Dockerfile`, porta `3000`) — conecta só via `DATABASE_URL`
-3. **hq-web** (App → `Dockerfile.web`, porta `8080`)
+2. **hq-api** (App → `Dockerfile`, porta `3015`) — conecta só via `DATABASE_URL`
+3. **hq-web** (App → `Dockerfile.web`, porta `8025`)
 4. Storage: MinIO com HTTPS público **ou** GCS (`STORAGE_PROVIDER=gcs`)
 5. **n8n** continua separado (Credentials próprias; ver `docs/n8n/credentials.md`)
 
@@ -20,13 +20,13 @@ O HQ GEAP sobe como **dois App services** (API + Web) e conecta a um **PostgreSQ
 
 - Source: repositório Git, branch de deploy, Build Path `/`
 - Build: Dockerfile, path `Dockerfile`
-- Domínio: ex. `https://api.seudominio.com` → porta interna `3000`
+- Domínio: ex. `https://api.seudominio.com` → porta interna `3015`
 - Environment (exemplo):
 
 ```dotenv
 NODE_ENV=production
 HOST=0.0.0.0
-PORT=3000
+PORT=3015
 DATABASE_URL=postgres://USER:PASSWORD@NOME_DO_SERVICO_DB:5432/hq_geap
 CORS_ORIGIN=https://hq.seudominio.com
 JWT_SECRET=troque-por-segredo-com-pelo-menos-32-chars
@@ -52,7 +52,7 @@ Com `STORAGE_PROVIDER=gcs`, o bucket deve existir e a API precisa de credenciais
 
 - Build: Dockerfile path `Dockerfile.web`
 - Environment / build arg: `VITE_API_URL=https://api.seudominio.com` (URL pública da API, sem barra final). O Easypanel injeta envs do serviço como build args.
-- Domínio: ex. `https://hq.seudominio.com` → porta interna `8080`
+- Domínio: ex. `https://hq.seudominio.com` → porta interna `8025`
 
 Rebuild a Web sempre que mudar `VITE_API_URL` (é embutida no bundle Vite).
 
@@ -61,8 +61,8 @@ Rebuild a Web sempre que mudar `VITE_API_URL` (é embutida no bundle Vite).
 1. Serviço **Compose** com arquivo `compose.easypanel.yaml` (só `api` + `web`; sem Postgres no Compose)
 2. Preencha as variáveis exigidas — modelo completo em `compose.easypanel.env.example` (`DATABASE_URL` do DB externo, `CORS_ORIGIN`, secrets, storage, `VITE_API_URL`, …)
 3. Domains do painel:
-   - API → serviço interno `api`, porta `3000`
-   - Web → serviço interno `web`, porta `8080`
+   - API → serviço interno `api`, porta `3015`
+   - Web → serviço interno `web`, porta `8025`
 4. Não publique `ports` no host para HTTP; o proxy do Easypanel resolve isso
 
 ## Checklist pós-deploy
