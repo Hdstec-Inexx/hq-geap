@@ -9,6 +9,7 @@ import {
   buildElevenLabsConversationUrl,
   buildElevenLabsConversationsUrl,
   buildElevenLabsMonitorUrl,
+  excludeLocallyConcludedConversations,
   listLiveConversationsFromElevenLabs,
   mapObservationEvent,
   maxObservationMessageChars,
@@ -123,6 +124,7 @@ test('lista ao vivo usa o endpoint de conversas da ElevenLabs', () => {
 });
 
 test('lista ao vivo filtra apenas conversas iniciadas ou em progresso', async () => {
+  const nowSecs = 1_775_000_000;
   const requestedUrls: string[] = [];
   const fetchImpl: typeof fetch = async (input) => {
     requestedUrls.push(String(input));
@@ -133,31 +135,31 @@ test('lista ao vivo filtra apenas conversas iniciadas ou em progresso', async ()
             conversation_id: 'conv_live',
             agent_id: 'agent_1',
             status: 'in-progress',
-            start_time_unix_secs: 1_700_000_000
+            start_time_unix_secs: nowSecs - 120
           },
           {
             conversation_id: 'conv_initiated',
             agent_id: 'agent_1',
             status: 'initiated',
-            start_time_unix_secs: 1_600_000_000
+            start_time_unix_secs: nowSecs - 30
           },
           {
             conversation_id: 'conv_done',
             agent_id: 'agent_1',
             status: 'done',
-            start_time_unix_secs: 1_700_000_200
+            start_time_unix_secs: nowSecs - 200
           },
           {
             conversation_id: 'conv_failed',
             agent_id: 'agent_1',
             status: 'failed',
-            start_time_unix_secs: 1_700_000_300
+            start_time_unix_secs: nowSecs - 300
           },
           {
             conversation_id: 'conv_processing',
             agent_id: 'agent_1',
             status: 'processing',
-            start_time_unix_secs: 1_700_000_400
+            start_time_unix_secs: nowSecs - 400
           }
         ]
       }),
@@ -168,7 +170,8 @@ test('lista ao vivo filtra apenas conversas iniciadas ou em progresso', async ()
   const live = await listLiveConversationsFromElevenLabs({
     apiBaseUrl: 'https://api.elevenlabs.io',
     apiKey: 'sk_test',
-    fetchImpl
+    fetchImpl,
+    nowSecs
   });
 
   assert.equal(requestedUrls.length, 1);
@@ -184,7 +187,93 @@ test('lista ao vivo filtra apenas conversas iniciadas ou em progresso', async ()
     live.map((item) => item.status),
     ['in-progress', 'initiated']
   );
-  assert.equal(live[1]?.iniciadoEm, '2020-09-13T12:26:40.000Z');
+  assert.equal(
+    live[1]?.iniciadoEm,
+    new Date((nowSecs - 30) * 1000).toISOString()
+  );
+});
+
+test('lista ao vivo ignora conversas zombie ainda marcadas abertas na ElevenLabs', async () => {
+  const nowSecs = 1_775_000_000;
+  const fetchImpl: typeof fetch = async () =>
+    new Response(
+      JSON.stringify({
+        conversations: [
+          {
+            conversation_id: 'conv_zombie_terminated',
+            agent_id: 'agent_1',
+            status: 'in-progress',
+            start_time_unix_secs: nowSecs - 60,
+            termination_reason: 'end_call',
+            call_successful: 'success',
+            call_duration_secs: 45
+          },
+          {
+            conversation_id: 'conv_zombie_old',
+            agent_id: 'agent_1',
+            status: 'in-progress',
+            // Mesmo padrão do bug: dias atrás, status preso em in-progress.
+            start_time_unix_secs: nowSecs - 10 * 24 * 60 * 60,
+            termination_reason: '',
+            call_successful: 'unknown',
+            call_duration_secs: 0
+          },
+          {
+            conversation_id: 'conv_truly_live',
+            agent_id: 'agent_1',
+            status: 'in-progress',
+            start_time_unix_secs: nowSecs - 120,
+            termination_reason: '',
+            call_successful: 'unknown',
+            call_duration_secs: 120
+          },
+          {
+            conversation_id: 'conv_initiated_fresh',
+            agent_id: 'agent_1',
+            status: 'initiated',
+            start_time_unix_secs: nowSecs - 30,
+            call_successful: 'unknown',
+            call_duration_secs: 0
+          }
+        ]
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } }
+    );
+
+  const live = await listLiveConversationsFromElevenLabs({
+    apiBaseUrl: 'https://api.elevenlabs.io',
+    apiKey: 'sk_test',
+    fetchImpl,
+    nowSecs
+  });
+
+  assert.deepEqual(
+    live.map((item) => item.conversationId),
+    ['conv_truly_live', 'conv_initiated_fresh']
+  );
+});
+
+test('lista ao vivo remove Atendimentos já concluídos localmente', () => {
+  assert.deepEqual(
+    excludeLocallyConcludedConversations(
+      [
+        {
+          conversationId: 'conv_open',
+          agentId: 'agent_1',
+          status: 'in-progress',
+          iniciadoEm: null
+        },
+        {
+          conversationId: 'conv_done_local',
+          agentId: 'agent_1',
+          status: 'in-progress',
+          iniciadoEm: null
+        }
+      ],
+      new Set(['conv_done_local'])
+    ).map((item) => item.conversationId),
+    ['conv_open']
+  );
 });
 
 test('URL de monitoramento usa conversation_id sem expor a chave', () => {

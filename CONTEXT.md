@@ -74,5 +74,5 @@ Anotação sobre um Atendimento, usada como insumo para ajustes e melhorias do A
 A lista de Atendimentos concluídos e já avaliados pela IA, da qual o Curador escolhe livremente quais revisar (modelo pull, sem gatilho automático).
 
 **Monitoramento ao Vivo**:
-A observação em tempo real — somente texto, sem áudio — de um Atendimento `Em andamento`, via WebSocket da ElevenLabs. Estritamente observacional: nenhuma intervenção no Atendimento.
+A observação em tempo real — somente texto, sem áudio — de Atendimentos ainda **abertos na ElevenLabs** (`initiated` / `in-progress`, sem sinais de término e com início recente), via WebSocket. A lista não filtra por dia civil; conversas zombie (status aberto preso na fonte) e Atendimentos já `concluido` no HQ ficam de fora. Estritamente observacional: nenhuma intervenção no Atendimento.
 _Avoid_: Supervisão (implica intervenção, que não existe no MVP)
