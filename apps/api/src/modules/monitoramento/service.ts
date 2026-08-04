@@ -57,14 +57,24 @@ export function buildElevenLabsMonitorUrl(
   return base.toString().replace(/\/$/, '');
 }
 
+/** Páginas máximas do catálogo geral ao resolver candidatas open∩all. */
+export const maxLiveCatalogPages = 5;
+
 export function buildElevenLabsConversationsUrl(
   apiBaseUrl: string,
-  pageSize = 50
+  pageSize = 50,
+  mode: 'open' | 'all' = 'open',
+  cursor?: string | null
 ): string {
   const url = new URL('/v1/convai/conversations', apiBaseUrl);
   url.searchParams.set('page_size', String(pageSize));
-  for (const status of ['done', 'failed', 'processing'] as const) {
-    url.searchParams.append('exclude_statuses', status);
+  if (mode === 'open') {
+    for (const status of ['done', 'failed', 'processing'] as const) {
+      url.searchParams.append('exclude_statuses', status);
+    }
+  }
+  if (cursor) {
+    url.searchParams.set('cursor', cursor);
   }
   return url.toString();
 }
@@ -195,6 +205,8 @@ type ElevenLabsConversation = {
 
 type ElevenLabsListResponse = {
   conversations?: ElevenLabsConversation[];
+  next_cursor?: string | null;
+  has_more?: boolean;
 };
 
 export type LiveConversation = {
@@ -204,23 +216,51 @@ export type LiveConversation = {
   iniciadoEm: string | null;
 };
 
-export async function requireOpenConversationAtElevenLabs(options: {
+type ElevenLabsConversationDetail = {
+  status?: string;
+  agent_id?: string;
+  metadata?: {
+    start_time_unix_secs?: number;
+    call_duration_secs?: number;
+    termination_reason?: string;
+  };
+  termination_reason?: string;
+  analysis?: { call_successful?: string } | null;
+};
+
+function openSummaryFromConversationDetail(body: ElevenLabsConversationDetail): {
+  status?: string;
+  start_time_unix_secs?: number;
+  call_duration_secs?: number;
+  termination_reason?: string;
+  call_successful?: string;
+} {
+  return {
+    status: body.status,
+    start_time_unix_secs: body.metadata?.start_time_unix_secs,
+    call_duration_secs: body.metadata?.call_duration_secs,
+    termination_reason:
+      body.termination_reason ?? body.metadata?.termination_reason,
+    call_successful: body.analysis?.call_successful ?? undefined
+  };
+}
+
+async function fetchConversationDetailFromElevenLabs(options: {
   apiBaseUrl: string;
   apiKey: string;
   conversationId: string;
-  fetchImpl?: typeof fetch;
-  timeoutMs?: number;
-}): Promise<'initiated' | 'in-progress'> {
-  const fetchImpl = options.fetchImpl ?? fetch;
+  fetchImpl: typeof fetch;
+  timeoutMs: number;
+}): Promise<ElevenLabsConversationDetail | null> {
   const url = buildElevenLabsConversationUrl(
     options.apiBaseUrl,
     options.conversationId
   );
   let response: Response;
   try {
-    response = await fetchImpl(url, {
+    response = await options.fetchImpl(url, {
       headers: { 'xi-api-key': options.apiKey },
-      signal: AbortSignal.timeout(options.timeoutMs ?? 10_000)
+      signal: AbortSignal.timeout(options.timeoutMs)
     });
   } catch {
     throw new ElevenLabsListError(
@@ -229,9 +269,7 @@ export async function requireOpenConversationAtElevenLabs(options: {
   }
 
   if (response.status === 404) {
-    throw new ConversationNotOpenError(
-      'Conversa não encontrada na ElevenLabs — não é possível observar'
-    );
+    return null;
   }
   if (response.status === 401 || response.status === 403) {
     throw new ElevenLabsListError(
@@ -244,62 +282,74 @@ export async function requireOpenConversationAtElevenLabs(options: {
     );
   }
 
-  let body: {
-    status?: string;
-    metadata?: {
-      start_time_unix_secs?: number;
-      call_duration_secs?: number;
-    };
-    termination_reason?: string;
-    analysis?: { call_successful?: string } | null;
-  };
   try {
-    body = (await response.json()) as typeof body;
+    return (await response.json()) as ElevenLabsConversationDetail;
   } catch {
     throw new ElevenLabsListError(
       'Resposta inválida ao consultar conversa na ElevenLabs'
+    );
+  }
+}
+
+export async function requireOpenConversationAtElevenLabs(options: {
+  apiBaseUrl: string;
+  apiKey: string;
+  conversationId: string;
+  fetchImpl?: typeof fetch;
+  timeoutMs?: number;
+}): Promise<'initiated' | 'in-progress'> {
+  const body = await fetchConversationDetailFromElevenLabs({
+    apiBaseUrl: options.apiBaseUrl,
+    apiKey: options.apiKey,
+    conversationId: options.conversationId,
+    fetchImpl: options.fetchImpl ?? fetch,
+    timeoutMs: options.timeoutMs ?? 10_000
+  });
+  if (!body) {
+    throw new ConversationNotOpenError(
+      'Conversa não encontrada na ElevenLabs — não é possível observar'
     );
   }
 
   const nowSecs = Math.floor(Date.now() / 1000);
   if (
     !isActivelyOpenConversationSummary(
-      {
-        status: body.status,
-        start_time_unix_secs: body.metadata?.start_time_unix_secs,
-        call_duration_secs: body.metadata?.call_duration_secs,
-        termination_reason: body.termination_reason,
-        call_successful: body.analysis?.call_successful
-      },
+      openSummaryFromConversationDetail(body),
       nowSecs
-    )
+    ) ||
+    !isLiveConversationStatus(body.status)
   ) {
     throw new ConversationNotOpenError(
       'Esta conversa não está mais aberta na ElevenLabs'
     );
   }
-  return body.status as 'initiated' | 'in-progress';
+  return body.status;
 }
 
-export async function listLiveConversationsFromElevenLabs(options: {
+async function fetchConversationsPageFromElevenLabs(options: {
   apiBaseUrl: string;
   apiKey: string;
-  pageSize?: number;
-  fetchImpl?: typeof fetch;
-  timeoutMs?: number;
-  nowSecs?: number;
-}): Promise<LiveConversation[]> {
-  const fetchImpl = options.fetchImpl ?? fetch;
-  const nowSecs = options.nowSecs ?? Math.floor(Date.now() / 1000);
+  pageSize: number;
+  mode: 'open' | 'all';
+  cursor?: string | null;
+  fetchImpl: typeof fetch;
+  timeoutMs: number;
+}): Promise<{
+  conversations: ElevenLabsConversation[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}> {
   const url = buildElevenLabsConversationsUrl(
     options.apiBaseUrl,
-    options.pageSize ?? 50
+    options.pageSize,
+    options.mode,
+    options.cursor
   );
   let response: Response;
   try {
-    response = await fetchImpl(url, {
+    response = await options.fetchImpl(url, {
       headers: { 'xi-api-key': options.apiKey },
-      signal: AbortSignal.timeout(options.timeoutMs ?? 10_000)
+      signal: AbortSignal.timeout(options.timeoutMs)
     });
   } catch {
     throw new ElevenLabsListError(
@@ -326,29 +376,106 @@ export async function listLiveConversationsFromElevenLabs(options: {
       'Resposta inválida ao listar conversas na ElevenLabs'
     );
   }
+  const nextCursor =
+    typeof body.next_cursor === 'string' && body.next_cursor.trim()
+      ? body.next_cursor
+      : null;
+  return {
+    conversations: body.conversations ?? [],
+    nextCursor,
+    hasMore: body.has_more === true && nextCursor !== null
+  };
+}
 
-  const live: LiveConversation[] = [];
-  for (const conversation of body.conversations ?? []) {
+function catalogMissingIds(
+  needed: ReadonlySet<string>,
+  catalogIds: ReadonlySet<string>
+): boolean {
+  for (const id of needed) {
+    if (!catalogIds.has(id)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export async function listLiveConversationsFromElevenLabs(options: {
+  apiBaseUrl: string;
+  apiKey: string;
+  pageSize?: number;
+  fetchImpl?: typeof fetch;
+  timeoutMs?: number;
+  nowSecs?: number;
+}): Promise<LiveConversation[]> {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const nowSecs = options.nowSecs ?? Math.floor(Date.now() / 1000);
+  const pageSize = options.pageSize ?? 50;
+  const timeoutMs = options.timeoutMs ?? 10_000;
+
+  const openPage = await fetchConversationsPageFromElevenLabs({
+    apiBaseUrl: options.apiBaseUrl,
+    apiKey: options.apiKey,
+    pageSize,
+    mode: 'open',
+    fetchImpl,
+    timeoutMs
+  });
+
+  const candidates: LiveConversation[] = [];
+  for (const conversation of openPage.conversations) {
     const conversationId = conversation.conversation_id;
     const agentId = conversation.agent_id;
+    const startSecs = conversation.start_time_unix_secs;
     if (
       typeof conversationId !== 'string' ||
       typeof agentId !== 'string' ||
+      typeof startSecs !== 'number' ||
       !isActivelyOpenConversationSummary(conversation, nowSecs) ||
       !isLiveConversationStatus(conversation.status)
     ) {
       continue;
     }
-    const started =
-      typeof conversation.start_time_unix_secs === 'number'
-        ? new Date(conversation.start_time_unix_secs * 1000).toISOString()
-        : null;
-    live.push({
+    candidates.push({
       conversationId,
       agentId,
       status: conversation.status,
-      iniciadoEm: started
+      iniciadoEm: new Date(startSecs * 1000).toISOString()
     });
   }
-  return live;
+
+  if (candidates.length === 0) {
+    return [];
+  }
+
+  // exclude_statuses pode devolver IDs que o monitor ainda aceita
+  // (history_complete) mas que não estão na listagem geral — inclusive
+  // lookalikes de prefixo. Página o catálogo até achar as candidatas ou acabar.
+  const needed = new Set(candidates.map((item) => item.conversationId));
+  const catalogIds = new Set<string>();
+  let cursor: string | null = null;
+  for (let page = 0; page < maxLiveCatalogPages; page += 1) {
+    if (page > 0 && !catalogMissingIds(needed, catalogIds)) {
+      break;
+    }
+    const catalogPage = await fetchConversationsPageFromElevenLabs({
+      apiBaseUrl: options.apiBaseUrl,
+      apiKey: options.apiKey,
+      pageSize,
+      mode: 'all',
+      cursor,
+      fetchImpl,
+      timeoutMs
+    });
+    for (const item of catalogPage.conversations) {
+      if (typeof item.conversation_id === 'string') {
+        catalogIds.add(item.conversation_id);
+      }
+    }
+    if (!catalogMissingIds(needed, catalogIds) || !catalogPage.hasMore) {
+      break;
+    }
+    cursor = catalogPage.nextCursor;
+  }
+
+  return candidates.filter((item) => catalogIds.has(item.conversationId));
 }
