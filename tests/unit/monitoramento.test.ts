@@ -11,6 +11,7 @@ import {
   buildElevenLabsMonitorUrl,
   excludeLocallyConcludedConversations,
   listLiveConversationsFromElevenLabs,
+  liveDurationStaleGraceSecs,
   mapObservationEvent,
   maxObservationMessageChars,
   requireElevenLabsApiKey,
@@ -219,6 +220,26 @@ test('lista ao vivo ignora conversas zombie ainda marcadas abertas na ElevenLabs
             call_duration_secs: 0
           },
           {
+            conversation_id: 'conv_zombie_same_day',
+            agent_id: 'agent_1',
+            status: 'in-progress',
+            // Encerrada há horas, duração congelada, sem termination_reason.
+            start_time_unix_secs: nowSecs - 4 * 60 * 60,
+            termination_reason: '',
+            call_successful: 'unknown',
+            call_duration_secs: 252
+          },
+          {
+            conversation_id: 'conv_zombie_abandoned',
+            agent_id: 'agent_1',
+            status: 'initiated',
+            start_time_unix_secs:
+              nowSecs - (liveDurationStaleGraceSecs + 30),
+            termination_reason: '',
+            call_successful: 'unknown',
+            call_duration_secs: 0
+          },
+          {
             conversation_id: 'conv_truly_live',
             agent_id: 'agent_1',
             status: 'in-progress',
@@ -317,15 +338,25 @@ test('observe exige conversa aberta na ElevenLabs antes do proxy', async () => {
   );
   assert.doesNotMatch(requestedUrls[0]!, /sk_|xi-api-key/i);
 
+  const nowSecs = Math.floor(Date.now() / 1000);
   const open = await requireOpenConversationAtElevenLabs({
     apiBaseUrl: 'https://api.elevenlabs.io',
     apiKey: 'sk_test',
     conversationId: 'conv_live',
     fetchImpl: async () =>
-      new Response(JSON.stringify({ status: 'in-progress' }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' }
-      })
+      new Response(
+        JSON.stringify({
+          status: 'in-progress',
+          metadata: {
+            start_time_unix_secs: nowSecs - 90,
+            call_duration_secs: 90
+          }
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        }
+      )
   });
   assert.equal(open, 'in-progress');
 });

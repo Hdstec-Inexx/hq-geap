@@ -5,10 +5,16 @@ export const maxUpstreamMessageBytes = 64_000;
 export const maxObservationMessageChars = 4_096;
 
 const liveStatuses = new Set(['initiated', 'in-progress']);
-const finishedCallSuccessful = new Set(['success', 'failure']);
+const terminalCallSuccessful = new Set(['success', 'failure']);
 
 /** Limite de idade para status aberto: acima disso é zombie preso na ElevenLabs. */
 export const maxLiveConversationAgeSecs = 24 * 60 * 60;
+
+/**
+ * Folga entre idade (wall clock) e `call_duration_secs`.
+ * Se a duração congela e o relógio segue, a conversa já encerrou na prática.
+ */
+export const liveDurationStaleGraceSecs = 10 * 60;
 
 export class MissingElevenLabsApiKeyError extends Error {
   constructor() {
@@ -86,6 +92,7 @@ export function isActivelyOpenConversationSummary(
     start_time_unix_secs?: number;
     termination_reason?: string;
     call_successful?: string;
+    call_duration_secs?: number;
   },
   nowSecs: number
 ): boolean {
@@ -98,15 +105,26 @@ export function isActivelyOpenConversationSummary(
   }
   if (
     typeof conversation.call_successful === 'string' &&
-    finishedCallSuccessful.has(conversation.call_successful)
+    terminalCallSuccessful.has(conversation.call_successful)
   ) {
     return false;
   }
-  if (typeof conversation.start_time_unix_secs === 'number') {
-    const ageSecs = nowSecs - conversation.start_time_unix_secs;
-    if (ageSecs > maxLiveConversationAgeSecs) {
-      return false;
-    }
+  if (typeof conversation.start_time_unix_secs !== 'number') {
+    return false;
+  }
+  const ageSecs = nowSecs - conversation.start_time_unix_secs;
+  if (ageSecs > maxLiveConversationAgeSecs) {
+    return false;
+  }
+  const durationSecs =
+    typeof conversation.call_duration_secs === 'number' &&
+    Number.isFinite(conversation.call_duration_secs) &&
+    conversation.call_duration_secs >= 0
+      ? conversation.call_duration_secs
+      : 0;
+  // Duração congelada enquanto a idade avança → zombie (inclui mesmo dia).
+  if (ageSecs > durationSecs + liveDurationStaleGraceSecs) {
+    return false;
   }
   return true;
 }
@@ -228,7 +246,10 @@ export async function requireOpenConversationAtElevenLabs(options: {
 
   let body: {
     status?: string;
-    metadata?: { start_time_unix_secs?: number };
+    metadata?: {
+      start_time_unix_secs?: number;
+      call_duration_secs?: number;
+    };
     termination_reason?: string;
     analysis?: { call_successful?: string } | null;
   };
@@ -246,6 +267,7 @@ export async function requireOpenConversationAtElevenLabs(options: {
       {
         status: body.status,
         start_time_unix_secs: body.metadata?.start_time_unix_secs,
+        call_duration_secs: body.metadata?.call_duration_secs,
         termination_reason: body.termination_reason,
         call_successful: body.analysis?.call_successful
       },
@@ -309,12 +331,11 @@ export async function listLiveConversationsFromElevenLabs(options: {
   for (const conversation of body.conversations ?? []) {
     const conversationId = conversation.conversation_id;
     const agentId = conversation.agent_id;
-    const status = conversation.status;
     if (
       typeof conversationId !== 'string' ||
       typeof agentId !== 'string' ||
-      !isLiveConversationStatus(status) ||
-      !isActivelyOpenConversationSummary(conversation, nowSecs)
+      !isActivelyOpenConversationSummary(conversation, nowSecs) ||
+      !isLiveConversationStatus(conversation.status)
     ) {
       continue;
     }
@@ -325,7 +346,7 @@ export async function listLiveConversationsFromElevenLabs(options: {
     live.push({
       conversationId,
       agentId,
-      status,
+      status: conversation.status,
       iniciadoEm: started
     });
   }
