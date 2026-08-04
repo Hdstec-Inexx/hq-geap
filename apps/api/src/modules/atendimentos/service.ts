@@ -4,7 +4,26 @@ import {
   type AtendimentoDetail,
   type AtendimentoSummary
 } from '@hq-geap/contracts/atendimentos';
+import { z } from 'zod';
 import type { AtendimentoRow, AtendimentoSummaryRow } from './repository.js';
+
+function toIsoDateTime(value: Date | string | null | undefined): string | null {
+  if (value == null) {
+    return null;
+  }
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.toISOString();
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function safeAudioUrl(audioUrl: string | null): string | null {
+  if (!audioUrl) {
+    return null;
+  }
+  return z.url().safeParse(audioUrl).success ? audioUrl : null;
+}
 
 function summaryValues(row: AtendimentoSummaryRow) {
   return {
@@ -16,8 +35,8 @@ function summaryValues(row: AtendimentoSummaryRow) {
       agentId: row.agentId
     },
     status: row.status,
-    iniciadoEm: row.iniciadoEm?.toISOString() ?? null,
-    concluidoEm: row.concluidoEm?.toISOString() ?? null,
+    iniciadoEm: toIsoDateTime(row.iniciadoEm),
+    concluidoEm: toIsoDateTime(row.concluidoEm),
     duracaoSegundos: row.duracaoSegundos,
     motivoContato: row.motivoContato,
     houveTransferencia: row.houveTransferencia,
@@ -36,6 +55,6 @@ export function toAtendimentoDetail(
   return atendimentoDetailSchema.parse({
     ...summaryValues(row),
     transcricao: row.transcricao ?? [],
-    audioUrl
+    audioUrl: safeAudioUrl(audioUrl)
   });
 }
