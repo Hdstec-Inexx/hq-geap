@@ -237,7 +237,6 @@ test('detalhe do Atendimento nao quebra com message null na transcricao', () => 
         message: 'Olá, como posso ajudar?',
         time_in_call_secs: 0
       },
-      { role: 'agent', message: '', time_in_call_secs: 12 },
       {
         role: 'user',
         message: 'Preciso da segunda via.',
@@ -300,13 +299,58 @@ test('detalhe tolera raw_transcript gravado direto no Postgres pelo n8n', () => 
     })),
     [
       { role: 'agent', message: 'Olá', time_in_call_secs: 0 },
-      { role: 'agent', message: '', time_in_call_secs: 12 },
-      { role: 'user', message: 'Preciso do boleto', time_in_call_secs: 18 }
+      { role: 'user', message: 'Preciso do boleto', time_in_call_secs: 18 },
+      { role: 'agent', message: 'turno sem timestamp', time_in_call_secs: 3 }
     ]
   );
 
   const fromString = toAtendimentoDetail(
     detailRow({ transcricao: JSON.stringify(rawTranscript) }),
+    null
+  );
+  assert.equal(fromString.transcricao.length, 3);
+});
+
+test('detalhe exibe historico com speaker IA/Cliente gravado pelo n8n', () => {
+  const historico = {
+    historico: [
+      {
+        message: 'Olá sou a Livia da GEAP, Como posso te ajudar hoje?',
+        speaker: 'IA'
+      },
+      {
+        message: 'Oi, Lívia. Eu tô querendo um ortopedista perto de casa.',
+        speaker: 'Cliente'
+      },
+      { message: '', speaker: 'IA' },
+      {
+        message: 'A GEAP agradece o seu contato. Tenha um ótimo dia!',
+        speaker: 'IA'
+      }
+    ]
+  };
+
+  const detail = toAtendimentoDetail(detailRow({ transcricao: historico }), null);
+  assert.deepEqual(
+    detail.transcricao.map(({ role, message }) => ({ role, message })),
+    [
+      {
+        role: 'agent',
+        message: 'Olá sou a Livia da GEAP, Como posso te ajudar hoje?'
+      },
+      {
+        role: 'user',
+        message: 'Oi, Lívia. Eu tô querendo um ortopedista perto de casa.'
+      },
+      {
+        role: 'agent',
+        message: 'A GEAP agradece o seu contato. Tenha um ótimo dia!'
+      }
+    ]
+  );
+
+  const fromString = toAtendimentoDetail(
+    detailRow({ transcricao: JSON.stringify(historico) }),
     null
   );
   assert.equal(fromString.transcricao.length, 3);

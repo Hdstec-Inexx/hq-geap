@@ -25,22 +25,55 @@ function safeAudioUrl(audioUrl: string | null): string | null {
   return z.url().safeParse(audioUrl).success ? audioUrl : null;
 }
 
-function parseTranscriptPayload(raw: unknown): unknown[] {
+function asTranscriptEntries(raw: unknown): unknown[] {
   if (Array.isArray(raw)) {
     return raw;
   }
-  if (typeof raw === 'string') {
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
+  if (raw && typeof raw === 'object') {
+    const historico = (raw as { historico?: unknown }).historico;
+    if (Array.isArray(historico)) {
+      return historico;
     }
   }
   return [];
 }
 
-/** Normaliza transcrição suja (ex.: raw_transcript da ElevenLabs gravado direto no Postgres). */
+function parseTranscriptPayload(raw: unknown): unknown[] {
+  if (typeof raw === 'string') {
+    try {
+      return asTranscriptEntries(JSON.parse(raw));
+    } catch {
+      return [];
+    }
+  }
+  return asTranscriptEntries(raw);
+}
+
+function roleFromSpeaker(speaker: unknown): 'agent' | 'user' | null {
+  if (typeof speaker !== 'string') {
+    return null;
+  }
+  const normalized = speaker.trim().toLowerCase();
+  if (
+    normalized === 'ia' ||
+    normalized === 'agent' ||
+    normalized === 'assistente' ||
+    normalized === 'agente'
+  ) {
+    return 'agent';
+  }
+  if (
+    normalized === 'cliente' ||
+    normalized === 'user' ||
+    normalized === 'usuario' ||
+    normalized === 'usuário'
+  ) {
+    return 'user';
+  }
+  return null;
+}
+
+/** Normaliza transcrição suja (ElevenLabs raw ou historico IA/Cliente do n8n). */
 export function normalizeTranscricao(raw: unknown) {
   const entries: Array<{
     role: 'agent' | 'user';
@@ -48,16 +81,28 @@ export function normalizeTranscricao(raw: unknown) {
     time_in_call_secs: number;
   }> = [];
 
-  for (const entry of parseTranscriptPayload(raw)) {
+  for (const [index, entry] of parseTranscriptPayload(raw).entries()) {
     if (!entry || typeof entry !== 'object') {
       continue;
     }
-    const { role, message, time_in_call_secs } = entry as {
+    const { role, speaker, message, time_in_call_secs } = entry as {
       role?: unknown;
+      speaker?: unknown;
       message?: unknown;
       time_in_call_secs?: unknown;
     };
-    if (role !== 'agent' && role !== 'user') {
+    const resolvedRole =
+      role === 'agent' || role === 'user' ? role : roleFromSpeaker(speaker);
+    if (!resolvedRole) {
+      continue;
+    }
+    if (typeof message !== 'string') {
+      if (message != null) {
+        continue;
+      }
+    }
+    const text = typeof message === 'string' ? message.trim() : '';
+    if (!text) {
       continue;
     }
     const time =
@@ -65,16 +110,13 @@ export function normalizeTranscricao(raw: unknown) {
         ? time_in_call_secs
         : typeof time_in_call_secs === 'string'
           ? Number(time_in_call_secs)
-          : Number.NaN;
+          : index;
     if (!Number.isFinite(time) || time < 0) {
       continue;
     }
-    if (message != null && typeof message !== 'string') {
-      continue;
-    }
     entries.push({
-      role,
-      message: message ?? '',
+      role: resolvedRole,
+      message: text,
       time_in_call_secs: time
     });
   }
