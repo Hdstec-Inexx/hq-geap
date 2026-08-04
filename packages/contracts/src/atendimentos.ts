@@ -11,7 +11,11 @@ const storageReference = z
 
 export const transcriptEntrySchema = z.object({
   role: z.enum(['agent', 'user']),
-  message: z.string(),
+  // ElevenLabs envia null em turnos só de tool_call; normalizamos para string vazia.
+  message: z
+    .string()
+    .nullable()
+    .transform((value) => value ?? ''),
   time_in_call_secs: z.number().nonnegative()
 });
 

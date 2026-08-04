@@ -41,10 +41,16 @@ const routes: FastifyPluginAsync = async (app) => {
     async (request): Promise<CuradoriaDetail> => {
       const row = await repository.findDetail(request.params.atendimentoId);
       if (!row) throw app.httpErrors.notFound('Atendimento avaliado pela IA nao encontrado');
-      return toCuradoriaDetail(
-        row,
-        await app.storage.resolveAudioUrl(row.audioReference)
-      );
+      let audioUrl: string | null = null;
+      try {
+        audioUrl = await app.storage.resolveAudioUrl(row.audioReference);
+      } catch {
+        request.log.warn(
+          { atendimentoId: row.id },
+          'Failed to resolve Atendimento audio URL'
+        );
+      }
+      return toCuradoriaDetail(row, audioUrl);
     }
   );
 
