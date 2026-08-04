@@ -31,10 +31,16 @@ const routes: FastifyPluginAsync = async (app) => {
       try {
         const result = await repository.ingest(parsed.data);
         reply.code(result.created ? 201 : 200);
-        return toAtendimentoDetail(
-          result.row,
-          await app.storage.resolveAudioUrl(result.row.audioReference)
-        );
+        let audioUrl: string | null = null;
+        try {
+          audioUrl = await app.storage.resolveAudioUrl(result.row.audioReference);
+        } catch {
+          request.log.warn(
+            { conversationId: result.row.conversationId },
+            'Failed to resolve Atendimento audio URL'
+          );
+        }
+        return toAtendimentoDetail(result.row, audioUrl);
       } catch (error) {
         if (error instanceof UnknownVoiceAgentError) {
           throw app.httpErrors.unprocessableEntity('Unknown voice agent');
@@ -71,10 +77,16 @@ const routes: FastifyPluginAsync = async (app) => {
       if (!row) {
         throw app.httpErrors.notFound('Atendimento not found');
       }
-      return toAtendimentoDetail(
-        row,
-        await app.storage.resolveAudioUrl(row.audioReference)
-      );
+      let audioUrl: string | null = null;
+      try {
+        audioUrl = await app.storage.resolveAudioUrl(row.audioReference);
+      } catch {
+        request.log.warn(
+          { atendimentoId: row.id },
+          'Failed to resolve Atendimento audio URL'
+        );
+      }
+      return toAtendimentoDetail(row, audioUrl);
     }
   );
 };
