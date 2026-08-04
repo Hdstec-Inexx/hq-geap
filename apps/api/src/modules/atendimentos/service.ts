@@ -25,7 +25,66 @@ function safeAudioUrl(audioUrl: string | null): string | null {
   return z.url().safeParse(audioUrl).success ? audioUrl : null;
 }
 
+function parseTranscriptPayload(raw: unknown): unknown[] {
+  if (Array.isArray(raw)) {
+    return raw;
+  }
+  if (typeof raw === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+/** Normaliza transcrição suja (ex.: raw_transcript da ElevenLabs gravado direto no Postgres). */
+export function normalizeTranscricao(raw: unknown) {
+  const entries: Array<{
+    role: 'agent' | 'user';
+    message: string;
+    time_in_call_secs: number;
+  }> = [];
+
+  for (const entry of parseTranscriptPayload(raw)) {
+    if (!entry || typeof entry !== 'object') {
+      continue;
+    }
+    const { role, message, time_in_call_secs } = entry as {
+      role?: unknown;
+      message?: unknown;
+      time_in_call_secs?: unknown;
+    };
+    if (role !== 'agent' && role !== 'user') {
+      continue;
+    }
+    const time =
+      typeof time_in_call_secs === 'number'
+        ? time_in_call_secs
+        : typeof time_in_call_secs === 'string'
+          ? Number(time_in_call_secs)
+          : Number.NaN;
+    if (!Number.isFinite(time) || time < 0) {
+      continue;
+    }
+    if (message != null && typeof message !== 'string') {
+      continue;
+    }
+    entries.push({
+      role,
+      message: message ?? '',
+      time_in_call_secs: time
+    });
+  }
+
+  return entries;
+}
+
 function summaryValues(row: AtendimentoSummaryRow) {
+  const custo =
+    row.custo === null || row.custo === undefined ? null : Number(row.custo);
   return {
     id: row.id,
     conversationId: row.conversationId,
@@ -37,10 +96,16 @@ function summaryValues(row: AtendimentoSummaryRow) {
     status: row.status,
     iniciadoEm: toIsoDateTime(row.iniciadoEm),
     concluidoEm: toIsoDateTime(row.concluidoEm),
-    duracaoSegundos: row.duracaoSegundos,
+    duracaoSegundos: (() => {
+      if (row.duracaoSegundos === null || row.duracaoSegundos === undefined) {
+        return null;
+      }
+      const value = Math.trunc(Number(row.duracaoSegundos));
+      return Number.isFinite(value) && value >= 0 ? value : null;
+    })(),
     motivoContato: row.motivoContato,
-    houveTransferencia: row.houveTransferencia,
-    custo: row.custo === null ? null : Number(row.custo)
+    houveTransferencia: Boolean(row.houveTransferencia),
+    custo: custo !== null && Number.isFinite(custo) && custo >= 0 ? custo : null
   };
 }
 
@@ -54,7 +119,7 @@ export function toAtendimentoDetail(
 ): AtendimentoDetail {
   return atendimentoDetailSchema.parse({
     ...summaryValues(row),
-    transcricao: row.transcricao ?? [],
+    transcricao: normalizeTranscricao(row.transcricao),
     audioUrl: safeAudioUrl(audioUrl)
   });
 }
