@@ -251,3 +251,63 @@ test('detalhe do Atendimento ignora audioUrl invalida em vez de 500', () => {
   const detail = toAtendimentoDetail(detailRow({ transcricao: [] }), '');
   assert.equal(detail.audioUrl, null);
 });
+
+test('detalhe tolera raw_transcript gravado direto no Postgres pelo n8n', () => {
+  const rawTranscript = [
+    {
+      role: 'agent',
+      message: 'Olá',
+      tool_calls: null,
+      tool_results: null,
+      feedback: null,
+      time_in_call_secs: 0,
+      conversation_turn_metrics: null
+    },
+    {
+      role: 'agent',
+      message: null,
+      tool_calls: [
+        { tool_name: 'transfer_to_number', tool_has_been_called: true }
+      ],
+      tool_results: [],
+      time_in_call_secs: 12
+    },
+    {
+      role: 'user',
+      message: 'Preciso do boleto',
+      time_in_call_secs: '18'
+    },
+    {
+      role: 'agent',
+      message: 'turno sem timestamp'
+    },
+    {
+      role: 'system',
+      message: 'ignorar',
+      time_in_call_secs: 20
+    }
+  ];
+
+  const fromArray = toAtendimentoDetail(
+    detailRow({ transcricao: rawTranscript }),
+    null
+  );
+  assert.deepEqual(
+    fromArray.transcricao.map(({ role, message, time_in_call_secs }) => ({
+      role,
+      message,
+      time_in_call_secs
+    })),
+    [
+      { role: 'agent', message: 'Olá', time_in_call_secs: 0 },
+      { role: 'agent', message: '', time_in_call_secs: 12 },
+      { role: 'user', message: 'Preciso do boleto', time_in_call_secs: 18 }
+    ]
+  );
+
+  const fromString = toAtendimentoDetail(
+    detailRow({ transcricao: JSON.stringify(rawTranscript) }),
+    null
+  );
+  assert.equal(fromString.transcricao.length, 3);
+});
