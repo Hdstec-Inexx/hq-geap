@@ -2045,11 +2045,22 @@ h1 {
   border-left: 1px solid var(--dashboard-line);
 }
 
+.dashboard-kpi-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.dashboard-kpi-link:focus-visible {
+  outline: 3px solid #e5b85c;
+  outline-offset: -2px;
+}
+
 .dashboard-kpis article {
   min-height: 132px;
   padding: 22px;
   border-right: 1px solid var(--dashboard-line);
   border-bottom: 1px solid var(--dashboard-line);
+  height: 100%;
 }
 
 .dashboard-kpis small {
@@ -2061,13 +2072,15 @@ h1 {
   letter-spacing: 0.02em;
 }
 
-.dashboard-kpis article:first-child small {
-  color: #9fc8bc;
-}
-
-.dashboard-kpis article:first-child {
+.dashboard-kpis > :first-child,
+.dashboard-kpis > :first-child article {
   color: #eff9f5;
   background: var(--dashboard-ink);
+}
+
+.dashboard-kpis > :first-child small,
+.dashboard-kpis > :first-child article small {
+  color: #9fc8bc;
 }
 
 .dashboard-kpis span,
@@ -2081,7 +2094,8 @@ h1 {
   text-transform: uppercase;
 }
 
-.dashboard-kpis article:first-child span {
+.dashboard-kpis > :first-child span,
+.dashboard-kpis > :first-child article span {
   color: #9fc8bc;
 }
 
@@ -2092,6 +2106,28 @@ h1 {
   font-size: clamp(1.7rem, 3vw, 2.7rem);
   font-weight: 400;
   letter-spacing: -0.04em;
+}
+
+.dashboard-kpi-nota strong a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.concordancia-summary a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.motivos-legend a,
+.criterio-label a {
+  color: inherit;
+}
+
+.atendimentos-detalhamento-meta {
+  margin: 8px 0 0;
+  color: #52717a;
+  font-size: 0.95rem;
 }
 
 .dashboard-grid {
@@ -2255,11 +2291,15 @@ h1 {
   border: 1px solid rgb(239 249 245 / 19%);
 }
 
+.concordancia-summary > * {
+  min-width: 0;
+}
+
 .concordancia-summary article {
   padding: 20px;
 }
 
-.concordancia-summary article + article {
+.concordancia-summary > * + * {
   border-left: 1px solid rgb(239 249 245 / 19%);
 }
 
@@ -2410,7 +2450,7 @@ h1 {
     grid-template-columns: 1fr;
   }
 
-  .concordancia-summary article + article {
+  .concordancia-summary > * + * {
     border-top: 1px solid rgb(239 249 245 / 19%);
     border-left: 0;
   }

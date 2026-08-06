@@ -5,6 +5,7 @@ import {
   type AtendimentoSummary
 } from '@hq-geap/contracts/atendimentos';
 import type { FastifyPluginAsync } from 'fastify';
+import { isDetalhamentoQuery } from './detalhamentoFilters.js';
 import {
   AtendimentoAgentMismatchError,
   createAtendimentosRepository,
@@ -59,15 +60,15 @@ const routes: FastifyPluginAsync = async (app) => {
   app.get('/atendimentos', async (request): Promise<AtendimentoSummary[]> => {
     const query = atendimentosQuerySchema.safeParse(request.query);
     if (!query.success) {
-      throw app.httpErrors.badRequest('Invalid pagination');
+      throw app.httpErrors.badRequest('Invalid Atendimentos query');
     }
-    return (
-      await repository.list(
-        query.data.limit,
-        query.data.offset,
-        query.data.status
-      )
-    ).map(toAtendimentoSummary);
+    if (isDetalhamentoQuery(query.data)) {
+      const role = request.authUser?.role;
+      if (role !== 'admin' && role !== 'gestao') {
+        throw app.httpErrors.forbidden('Role does not have permission');
+      }
+    }
+    return (await repository.list(query.data)).map(toAtendimentoSummary);
   });
 
   app.get<{ Params: { id: string } }>(

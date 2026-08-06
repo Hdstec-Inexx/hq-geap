@@ -8,6 +8,8 @@ import {
   LinearScale,
   Tooltip,
   type ChartConfiguration,
+  type ChartEvent,
+  type ActiveElement,
   type ChartOptions
 } from 'chart.js';
 import { useEffect, useRef } from 'react';
@@ -35,13 +37,24 @@ function baseOptions(): ChartOptions {
 }
 
 function mergeConfiguration(
-  configuration: ChartConfiguration<any>
+  configuration: ChartConfiguration<any>,
+  onIndexClick?: (index: number) => void
 ): ChartConfiguration<any> {
   return {
     ...configuration,
     options: {
       ...baseOptions(),
-      ...configuration.options
+      ...configuration.options,
+      onClick: (
+        _event: ChartEvent,
+        elements: ActiveElement[],
+        _chart: Chart
+      ) => {
+        const index = elements[0]?.index;
+        if (index !== undefined && onIndexClick) {
+          onIndexClick(index);
+        }
+      }
     }
   };
 }
@@ -49,17 +62,21 @@ function mergeConfiguration(
 export function DashboardChart({
   ariaLabel,
   className,
-  configuration
+  configuration,
+  onIndexClick
 }: {
   ariaLabel: string;
   className?: string;
   // Chart.js generics for typed chart kinds don't assign cleanly across bar/doughnut.
   configuration: ChartConfiguration<any>;
+  onIndexClick?: (index: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
   const configurationRef = useRef(configuration);
+  const onIndexClickRef = useRef(onIndexClick);
   configurationRef.current = configuration;
+  onIndexClickRef.current = onIndexClick;
 
   const labels = configuration.data.labels ?? [];
   const dataset = configuration.data.datasets[0];
@@ -78,7 +95,12 @@ export function DashboardChart({
     }
 
     Chart.getChart(canvas)?.destroy();
-    const chart = new Chart(canvas, mergeConfiguration(configurationRef.current));
+    const chart = new Chart(
+      canvas,
+      mergeConfiguration(configurationRef.current, (index) =>
+        onIndexClickRef.current?.(index)
+      )
+    );
     chartRef.current = chart;
 
     return () => {
@@ -93,7 +115,9 @@ export function DashboardChart({
       return;
     }
 
-    const next = mergeConfiguration(configurationRef.current);
+    const next = mergeConfiguration(configurationRef.current, (index) =>
+      onIndexClickRef.current?.(index)
+    );
     chart.data = next.data;
     chart.options = next.options ?? {};
     chart.update(baseOptions().animation === false ? 'none' : undefined);
@@ -105,6 +129,7 @@ export function DashboardChart({
       className={className}
       ref={canvasRef}
       role="img"
+      style={onIndexClick ? { cursor: 'pointer' } : undefined}
     />
   );
 }

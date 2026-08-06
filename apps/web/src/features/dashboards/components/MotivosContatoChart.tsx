@@ -1,14 +1,21 @@
 import type { Dashboard } from '@hq-geap/contracts/dashboards';
 import type { ChartConfiguration } from 'chart.js';
+import { Link, useNavigate } from 'react-router-dom';
 import { motivosChartSeries } from '../chartSeries';
 import { motivosColors } from '../chartTheme';
+import { detalhamentoListPath } from '../detalhamento';
 import { DashboardChart } from './DashboardChart';
 
 export function MotivosContatoChart({
-  motivos
+  motivos,
+  inicio,
+  fim
 }: {
   motivos: Dashboard['motivosContato'];
+  inicio: string;
+  fim: string;
 }) {
+  const navigate = useNavigate();
   const series = motivosChartSeries(motivos);
   const colors = motivosColors(series.values.length);
   const total = series.values.reduce<number>(
@@ -50,6 +57,20 @@ export function MotivosContatoChart({
             <DashboardChart
               ariaLabel="Gráfico de Motivos de Contato"
               configuration={configuration}
+              onIndexClick={(index) => {
+                const motivo = motivos[index];
+                if (!motivo) {
+                  return;
+                }
+                navigate(
+                  detalhamentoListPath({
+                    inicio,
+                    fim,
+                    indicador: 'motivo',
+                    motivo: motivo.motivo
+                  })
+                );
+              }}
             />
           </div>
           <ul className="motivos-legend">
@@ -61,7 +82,16 @@ export function MotivosContatoChart({
                     className="motivos-swatch"
                     style={{ background: colors[index]! }}
                   />
-                  <span>{item.motivo}</span>
+                  <Link
+                    to={detalhamentoListPath({
+                      inicio,
+                      fim,
+                      indicador: 'motivo',
+                      motivo: item.motivo
+                    })}
+                  >
+                    {item.motivo}
+                  </Link>
                   <strong>
                     {item.total.toLocaleString('pt-BR')} ({share.toFixed(0)}%)
                   </strong>

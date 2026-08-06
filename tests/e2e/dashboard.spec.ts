@@ -302,4 +302,69 @@ test.describe.serial('Dashboard da Gestao', () => {
     await expect(page.locator('.piores-panel canvas')).toHaveCount(0);
     await expect(page.getByRole('button', { name: /salvar|editar|excluir/i })).toHaveCount(0);
   });
+
+  test('clique no KPI navega para lista filtrada preservando o periodo', async ({
+    page,
+    request
+  }) => {
+    const gestao = await loginApi(request, 'gestao');
+    await loginPage(page, 'gestao');
+    await page.goto('/gestao/dashboard?inicio=2025-01-01&fim=2025-01-31');
+
+    await page.getByRole('link', { name: 'Detalhar Taxa de Resolvidas' }).click();
+    await expect(page).toHaveURL(
+      /\/atendimentos\?.*inicio=2025-01-01.*fim=2025-01-31.*indicador=resolvidas/
+    );
+    await expect(page.getByText('Detalhamento do Indicador')).toBeVisible();
+    await expect(page.getByText('Financeiro / Boletos')).toBeVisible();
+    await expect(page.getByText('Rede credenciada')).toHaveCount(0);
+
+    const list = await request.get(
+      `${apiUrl}/atendimentos?inicio=2025-01-01&fim=2025-01-31&indicador=resolvidas`,
+      { headers: { authorization: `Bearer ${gestao.token}` } }
+    );
+    expect(list.status()).toBe(200);
+    const rows = await list.json();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].motivoContato).toBe('Financeiro / Boletos');
+    expect(rows[0].houveTransferencia).toBe(false);
+
+    const curador = await loginApi(request, 'curador');
+    expect(
+      (
+        await request.get(
+          `${apiUrl}/atendimentos?inicio=2025-01-01&fim=2025-01-31&indicador=volume`,
+          { headers: { authorization: `Bearer ${curador.token}` } }
+        )
+      ).status()
+    ).toBe(403);
+  });
+
+  test('clique no Motivo de Contato navega com a populacao correta', async ({
+    page
+  }) => {
+    await loginPage(page, 'gestao');
+    await page.goto('/gestao/dashboard?inicio=2025-01-01&fim=2025-01-31');
+
+    await page.locator('.motivos-legend').getByRole('link', { name: 'Rede credenciada' }).click();
+    await expect(page).toHaveURL(/indicador=motivo/);
+    await expect(page).toHaveURL(/motivo=Rede(\+|%20)credenciada/);
+    await expect(page.getByRole('heading', { name: 'Atendimentos' })).toBeVisible();
+    await expect(page.locator('.atendimento-row').getByText('Rede credenciada')).toBeVisible();
+    await expect(page.locator('.atendimento-row').getByText('Financeiro / Boletos')).toHaveCount(0);
+  });
+
+  test('clique no Critério atendido navega com a populacao correta', async ({
+    page
+  }) => {
+    await loginPage(page, 'gestao');
+    await page.goto('/gestao/dashboard?inicio=2025-01-01&fim=2025-01-31');
+
+    await page.locator('.criterios-list a').first().click();
+    await expect(page).toHaveURL(/indicador=criterio/);
+    await expect(page).toHaveURL(/criterioId=/);
+    await expect(page).toHaveURL(/inicio=2025-01-01/);
+    await expect(page.getByText('Detalhamento do Indicador')).toBeVisible();
+    await expect(page.locator('.atendimento-row')).toHaveCount(1);
+  });
 });

@@ -1,8 +1,10 @@
 import type {
   AtendimentoSummary,
+  AtendimentosQuery,
   IngestAtendimento
 } from '@hq-geap/contracts/atendimentos';
 import type pg from 'pg';
+import { buildDetalhamentoFilters } from './detalhamentoFilters.js';
 
 export type AtendimentoSummaryRow = {
   id: string;
@@ -159,7 +161,7 @@ export function createAtendimentosRepository(db: pg.Pool) {
             ) values (
               $1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14, $15
             )
-          `, values);
+          `, values.slice(0, 15));
         }
 
         const result = await client.query<AtendimentoRow>(
@@ -176,17 +178,23 @@ export function createAtendimentosRepository(db: pg.Pool) {
       }
     },
 
-    async list(
-      limit: number,
-      offset: number,
-      status?: AtendimentoSummary['status']
-    ): Promise<AtendimentoSummaryRow[]> {
+    async list(query: AtendimentosQuery): Promise<AtendimentoSummaryRow[]> {
+      const detalhamento = buildDetalhamentoFilters(query, 4);
+      const clauses = [
+        '($3::status_atendimento is null or a.status = $3::status_atendimento)',
+        ...detalhamento.clauses
+      ];
       const result = await db.query<AtendimentoSummaryRow>(`
         ${selectAtendimentoSummary}
-        where ($3::status_atendimento is null or a.status = $3::status_atendimento)
+        where ${clauses.join(' and ')}
         order by a.criado_em desc, a.id desc
         limit $1 offset $2
-      `, [limit, offset, status ?? null]);
+      `, [
+        query.limit,
+        query.offset,
+        query.status ?? null,
+        ...detalhamento.values
+      ]);
       return result.rows;
     },
 
