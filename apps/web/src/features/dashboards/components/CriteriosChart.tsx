@@ -1,5 +1,7 @@
 import type { Dashboard } from '@hq-geap/contracts/dashboards';
+import { Link, useNavigate } from 'react-router-dom';
 import { criteriosChartSeries } from '../chartSeries';
+import { detalhamentoListPath } from '../detalhamento';
 import { percentageBarConfiguration } from '../percentageBarChart';
 import { DashboardChart } from './DashboardChart';
 
@@ -8,10 +10,15 @@ function formatPercentage(value: number | null) {
 }
 
 export function CriteriosChart({
-  criterios
+  criterios,
+  inicio,
+  fim
 }: {
   criterios: Dashboard['criterios'];
+  inicio: string;
+  fim: string;
 }) {
+  const navigate = useNavigate();
   const series = criteriosChartSeries(criterios);
 
   return (
@@ -34,13 +41,36 @@ export function CriteriosChart({
                 label: '#123b4a',
                 grid: 'rgb(18 59 74 / 12%)'
               })}
+              onIndexClick={(index) => {
+                const criterio = criterios[index];
+                if (!criterio) {
+                  return;
+                }
+                navigate(
+                  detalhamentoListPath({
+                    inicio,
+                    fim,
+                    indicador: 'criterio',
+                    criterioId: criterio.criterioId
+                  })
+                );
+              }}
             />
           </div>
           <ol className="criterios-list">
             {criterios.map((criterio) => (
               <li key={criterio.criterioId}>
                 <div className="criterio-label">
-                  <span>{criterio.nome}</span>
+                  <Link
+                    to={detalhamentoListPath({
+                      inicio,
+                      fim,
+                      indicador: 'criterio',
+                      criterioId: criterio.criterioId
+                    })}
+                  >
+                    {criterio.nome}
+                  </Link>
                   <strong>{formatPercentage(criterio.percentualAcerto)}</strong>
                 </div>
                 <small>

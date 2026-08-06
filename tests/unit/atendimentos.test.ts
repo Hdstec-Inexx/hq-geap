@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import test from 'node:test';
 import {
+  atendimentosQuerySchema,
   ingestAtendimentoSchema,
   transcriptEntrySchema
 } from '../../packages/contracts/src/atendimentos.js';
@@ -462,4 +463,109 @@ test('detalhe exibe historico com speaker IA/Cliente gravado pelo n8n', () => {
     null
   );
   assert.equal(fromString.transcricao.length, 3);
+});
+
+test('query da lista aceita filtros compartilháveis do Detalhamento', () => {
+  const parsed = atendimentosQuerySchema.parse({
+    inicio: '2025-01-01',
+    fim: '2025-01-31',
+    indicador: 'resolvidas',
+    limit: '20',
+    offset: '0'
+  });
+
+  assert.equal(parsed.inicio, '2025-01-01');
+  assert.equal(parsed.fim, '2025-01-31');
+  assert.equal(parsed.indicador, 'resolvidas');
+  assert.equal(parsed.limit, 20);
+});
+
+test('query do Detalhamento exige motivo para indicador motivo', () => {
+  const result = atendimentosQuerySchema.safeParse({
+    inicio: '2025-01-01',
+    fim: '2025-01-31',
+    indicador: 'motivo'
+  });
+  assert.equal(result.success, false);
+});
+
+test('query do Detalhamento exige criterioId para criterio e concordancia_criterio', () => {
+  for (const indicador of ['criterio', 'concordancia_criterio'] as const) {
+    const missing = atendimentosQuerySchema.safeParse({
+      inicio: '2025-01-01',
+      fim: '2025-01-31',
+      indicador
+    });
+    assert.equal(missing.success, false);
+
+    const ok = atendimentosQuerySchema.parse({
+      inicio: '2025-01-01',
+      fim: '2025-01-31',
+      indicador,
+      criterioId: '11111111-1111-4111-8111-111111111111'
+    });
+    assert.equal(ok.criterioId, '11111111-1111-4111-8111-111111111111');
+  }
+});
+
+test('query do Detalhamento exige periodo valido quando ha indicador', () => {
+  assert.equal(
+    atendimentosQuerySchema.safeParse({ indicador: 'volume' }).success,
+    false
+  );
+  assert.equal(
+    atendimentosQuerySchema.safeParse({
+      inicio: '2025-01-01',
+      fim: '2026-01-02',
+      indicador: 'volume'
+    }).success,
+    false
+  );
+});
+
+test('filtros SQL do Detalhamento espelham populacoes positivas do Dashboard', async () => {
+  const { buildDetalhamentoFilters } = await import(
+    '../../apps/api/src/modules/atendimentos/detalhamentoFilters.js'
+  );
+  const { SLA_TME_LIMITE_SEGUNDOS } = await import(
+    '../../packages/contracts/src/dashboards.js'
+  );
+
+  const resolvidas = buildDetalhamentoFilters(
+    atendimentosQuerySchema.parse({
+      inicio: '2025-01-01',
+      fim: '2025-01-31',
+      indicador: 'resolvidas'
+    })
+  );
+  assert.match(resolvidas.clauses.join(' '), /not a\.houve_transferencia/);
+  assert.deepEqual(resolvidas.values, ['2025-01-01', '2025-01-31']);
+
+  const sla = buildDetalhamentoFilters(
+    atendimentosQuerySchema.parse({
+      inicio: '2025-01-01',
+      fim: '2025-01-31',
+      indicador: 'sla'
+    })
+  );
+  assert.match(sla.clauses.join(' '), /tme_segundos <= \$3/);
+  assert.deepEqual(sla.values, [
+    '2025-01-01',
+    '2025-01-31',
+    SLA_TME_LIMITE_SEGUNDOS
+  ]);
+
+  const motivo = buildDetalhamentoFilters(
+    atendimentosQuerySchema.parse({
+      inicio: '2025-01-01',
+      fim: '2025-01-31',
+      indicador: 'motivo',
+      motivo: 'Rede credenciada'
+    })
+  );
+  assert.match(
+    motivo.clauses.join(' '),
+    /coalesce\(a\.motivo_contato, 'Nao informado'\) = \$3/
+  );
+  assert.equal(motivo.values[2], 'Rede credenciada');
 });

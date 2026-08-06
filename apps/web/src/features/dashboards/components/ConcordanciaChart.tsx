@@ -1,5 +1,7 @@
 import type { Dashboard } from '@hq-geap/contracts/dashboards';
+import { Link, useNavigate } from 'react-router-dom';
 import { concordanciaChartSeries } from '../chartSeries';
+import { detalhamentoListPath } from '../detalhamento';
 import { percentageBarConfiguration } from '../percentageBarChart';
 import { DashboardChart } from './DashboardChart';
 
@@ -8,11 +10,21 @@ function percentage(value: number | null) {
 }
 
 export function ConcordanciaChart({
-  concordancia
+  concordancia,
+  inicio,
+  fim
 }: {
   concordancia: Dashboard['concordancia'];
+  inicio: string;
+  fim: string;
 }) {
+  const navigate = useNavigate();
   const series = concordanciaChartSeries(concordancia.porCriterio);
+  const notaHref = detalhamentoListPath({
+    inicio,
+    fim,
+    indicador: 'concordancia_nota'
+  });
 
   return (
     <section className="dashboard-panel concordancia-panel">
@@ -21,13 +33,15 @@ export function ConcordanciaChart({
         <h2>Concordância</h2>
       </header>
       <div className="concordancia-summary">
-        <article>
-          <span>Nota exata</span>
-          <strong>{percentage(concordancia.nota.percentual)}</strong>
-          <small>
-            {concordancia.nota.concordantes} de {concordancia.nota.total}
-          </small>
-        </article>
+        <Link aria-label="Detalhar Concordância por nota" to={notaHref}>
+          <article>
+            <span>Nota exata</span>
+            <strong>{percentage(concordancia.nota.percentual)}</strong>
+            <small>
+              {concordancia.nota.concordantes} de {concordancia.nota.total}
+            </small>
+          </article>
+        </Link>
         <article>
           <span>Estado dos Critérios</span>
           <strong>{percentage(concordancia.criterios.percentual)}</strong>
@@ -48,6 +62,20 @@ export function ConcordanciaChart({
               label: '#eff9f5',
               grid: 'rgb(239 249 245 / 12%)'
             })}
+            onIndexClick={(index) => {
+              const item = concordancia.porCriterio[index];
+              if (!item) {
+                return;
+              }
+              navigate(
+                detalhamentoListPath({
+                  inicio,
+                  fim,
+                  indicador: 'concordancia_criterio',
+                  criterioId: item.criterioId
+                })
+              );
+            }}
           />
         </div>
       )}
