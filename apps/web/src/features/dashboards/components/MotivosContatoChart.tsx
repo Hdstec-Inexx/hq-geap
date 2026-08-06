@@ -1,40 +1,47 @@
 import type { Dashboard } from '@hq-geap/contracts/dashboards';
-
-const palette = [
-  '#1f6f5b',
-  '#c45c26',
-  '#2f5d8c',
-  '#8a4f7d',
-  '#b08900',
-  '#4a6fa5',
-  '#6b8f71',
-  '#9c6644'
-];
+import type { ChartConfiguration } from 'chart.js';
+import { Link, useNavigate } from 'react-router-dom';
+import { motivosChartSeries } from '../chartSeries';
+import { motivosColors } from '../chartTheme';
+import { detalhamentoListPath } from '../detalhamento';
+import { DashboardChart } from './DashboardChart';
 
 export function MotivosContatoChart({
-  motivos
+  motivos,
+  inicio,
+  fim
 }: {
   motivos: Dashboard['motivosContato'];
+  inicio: string;
+  fim: string;
 }) {
-  const total = motivos.reduce((sum, item) => sum + item.total, 0);
-  let cursor = 0;
-  const segments = motivos.map((item, index) => {
-    const start = cursor;
-    const share = total === 0 ? 0 : (item.total / total) * 100;
-    cursor += share;
-    return {
-      ...item,
-      start,
-      share,
-      color: palette[index % palette.length]!
-    };
-  });
-  const gradient =
-    segments.length === 0
-      ? '#d9d5cc'
-      : `conic-gradient(${segments
-          .map(({ color, start, share }) => `${color} ${start}% ${start + share}%`)
-          .join(', ')})`;
+  const navigate = useNavigate();
+  const series = motivosChartSeries(motivos);
+  const colors = motivosColors(series.values.length);
+  const total = series.values.reduce<number>(
+    (sum, value) => sum + (value ?? 0),
+    0
+  );
+  const values = series.values.map((value) => value ?? 0);
+  const configuration: ChartConfiguration<'doughnut'> = {
+    type: 'doughnut',
+    data: {
+      labels: series.labels,
+      datasets: [
+        {
+          data: values,
+          backgroundColor: colors,
+          borderWidth: 0
+        }
+      ]
+    },
+    options: {
+      plugins: {
+        legend: { display: false }
+      },
+      cutout: '58%'
+    }
+  };
 
   return (
     <section className="dashboard-panel motivos-panel">
@@ -45,22 +52,52 @@ export function MotivosContatoChart({
       {motivos.length === 0 ? (
         <p className="dashboard-empty">Nenhum Motivo de Contato no período.</p>
       ) : (
-        <div className="motivos-donut-layout">
-          <div
-            aria-hidden="true"
-            className="motivos-donut"
-            style={{ background: gradient }}
-          />
+        <div className="motivos-chart-layout">
+          <div className="dashboard-chart-frame motivos-chart-frame">
+            <DashboardChart
+              ariaLabel="Gráfico de Motivos de Contato"
+              configuration={configuration}
+              onIndexClick={(index) => {
+                const motivo = motivos[index];
+                if (!motivo) {
+                  return;
+                }
+                navigate(
+                  detalhamentoListPath({
+                    inicio,
+                    fim,
+                    indicador: 'motivo',
+                    motivo: motivo.motivo
+                  })
+                );
+              }}
+            />
+          </div>
           <ul className="motivos-legend">
-            {segments.map(({ motivo, total: count, color, share }) => (
-              <li key={motivo}>
-                <span className="motivos-swatch" style={{ background: color }} />
-                <span>{motivo}</span>
-                <strong>
-                  {count.toLocaleString('pt-BR')} ({share.toFixed(0)}%)
-                </strong>
-              </li>
-            ))}
+            {motivos.map((item, index) => {
+              const share = total === 0 ? 0 : (item.total / total) * 100;
+              return (
+                <li key={item.motivo}>
+                  <span
+                    className="motivos-swatch"
+                    style={{ background: colors[index]! }}
+                  />
+                  <Link
+                    to={detalhamentoListPath({
+                      inicio,
+                      fim,
+                      indicador: 'motivo',
+                      motivo: item.motivo
+                    })}
+                  >
+                    {item.motivo}
+                  </Link>
+                  <strong>
+                    {item.total.toLocaleString('pt-BR')} ({share.toFixed(0)}%)
+                  </strong>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

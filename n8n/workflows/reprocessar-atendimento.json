@@ -27,7 +27,10 @@
       "name": "Buscar Conversa",
       "type": "n8n-nodes-base.formTrigger",
       "typeVersion": 2.2,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "webhookId": "hq-geap-buscar-conversa"
     },
     {
@@ -39,7 +42,10 @@
       "name": "Validar conversation_id",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
@@ -52,7 +58,10 @@
       "name": "Buscar Conversa ElevenLabs",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 0],
+      "position": [
+        440,
+        0
+      ],
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 2000,
@@ -66,13 +75,16 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const data = $json;\nif (data?.status !== 'done') throw new Error('Somente Atendimentos concluídos podem ser ingeridos');\nconst transferToolName = $env.ELEVENLABS_TRANSFER_TOOL_NAME;\nif (!transferToolName) throw new Error('ELEVENLABS_TRANSFER_TOOL_NAME is required');\nconst startedAt = new Date(data.metadata.start_time_unix_secs * 1000);\nconst duration = data.metadata.call_duration_secs;\nconst contactReason = data.analysis?.data_collection_results?.['Classificação']?.value ?? null;\nconst transferred = data.transcript.some(turn => turn.tool_calls?.some(call => call.tool_name === transferToolName && call.tool_has_been_called === true));\nreturn [{ json: {\n  conversation_id: data.conversation_id,\n  agent_id: data.agent_id,\n  event_timestamp: data.metadata.start_time_unix_secs + duration,\n  status: 'concluido',\n  started_at: startedAt.toISOString(),\n  completed_at: new Date(startedAt.getTime() + duration * 1000).toISOString(),\n  duration_seconds: duration,\n  transcript: data.transcript.filter(turn => turn.role === 'agent' || turn.role === 'user').map(({ role, message, time_in_call_secs }) => ({ role, message: message ?? '', time_in_call_secs })),\n  audio_reference: null,\n  contact_reason: contactReason,\n  transferred,\n  cost: data.metadata.cost_fiat ?? null\n} }];"
+        "jsCode": "const data = $json;\nif (data?.status !== 'done') throw new Error('Somente Atendimentos concluídos podem ser ingeridos');\nconst transferToolName = $env.ELEVENLABS_TRANSFER_TOOL_NAME;\nif (!transferToolName) throw new Error('ELEVENLABS_TRANSFER_TOOL_NAME is required');\nconst startedAt = new Date(data.metadata.start_time_unix_secs * 1000);\nconst duration = data.metadata.call_duration_secs;\nconst contactReason = data.analysis?.data_collection_results?.['Classificação']?.value ?? null;\nconst transferred = data.transcript.some(turn => turn.tool_calls?.some(call => call.tool_name === transferToolName && call.tool_has_been_called === true));\n\nconst firstAgentSpeech = data.transcript.find(turn => turn.role === 'agent' && String(turn.message ?? '').trim());\nconst tme_seconds = firstAgentSpeech && Number.isFinite(Number(firstAgentSpeech.time_in_call_secs))\n  ? Number(firstAgentSpeech.time_in_call_secs)\n  : null;\nconst resultsByCallId = new Map();\nfor (const turn of data.transcript) {\n  for (const result of turn.tool_results ?? []) {\n    if (result?.tool_call_id) resultsByCallId.set(result.tool_call_id, result);\n  }\n}\nconst executions = [];\nfor (const turn of data.transcript) {\n  for (const call of turn.tool_calls ?? []) {\n    if (call?.tool_has_been_called !== true) continue;\n    const result = call.tool_call_id ? resultsByCallId.get(call.tool_call_id) : undefined;\n    // Sucesso só com tool_result explícito e sem erro (US12 / Taxa de Promessas Cumpridas).\n    const success = Boolean(result) && result.is_error !== true;\n    executions.push({ success });\n  }\n}\nreturn [{ json: {\n  conversation_id: data.conversation_id,\n  agent_id: data.agent_id,\n  event_timestamp: data.metadata.start_time_unix_secs + duration,\n  status: 'concluido',\n  started_at: startedAt.toISOString(),\n  completed_at: new Date(startedAt.getTime() + duration * 1000).toISOString(),\n  duration_seconds: duration,\n  transcript: data.transcript.filter(turn => turn.role === 'agent' || turn.role === 'user').map(({ role, message, time_in_call_secs }) => ({ role, message: message ?? '', time_in_call_secs })),\n  audio_reference: null,\n  contact_reason: contactReason,\n  transferred,\n  cost: data.metadata.cost_fiat ?? null,\n  tme_seconds,\n  tool_executions: { total: executions.length, successful: executions.filter(item => item.success).length }\n} }];"
       },
       "id": "aec5f1f4-8028-435a-aa3e-0df4dabf05d1",
       "name": "Contrato normalizado",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ]
     },
     {
       "parameters": {
@@ -90,7 +102,10 @@
       "name": "Persistir Atendimento",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [880, 0],
+      "position": [
+        880,
+        0
+      ],
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 2000,
@@ -105,16 +120,48 @@
   "pinData": {},
   "connections": {
     "Buscar Conversa": {
-      "main": [[{ "node": "Validar conversation_id", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Validar conversation_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Validar conversation_id": {
-      "main": [[{ "node": "Buscar Conversa ElevenLabs", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Buscar Conversa ElevenLabs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Buscar Conversa ElevenLabs": {
-      "main": [[{ "node": "Contrato normalizado", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Contrato normalizado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Contrato normalizado": {
-      "main": [[{ "node": "Persistir Atendimento", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Persistir Atendimento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,

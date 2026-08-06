@@ -4,7 +4,7 @@ export const criterioSchema = z.object({
   chave: z.string().trim().min(1),
   nome: z.string().trim().min(1),
   descricao: z.string().trim().min(1).nullable(),
-  valor: z.number().positive().max(10).multipleOf(0.01),
+  valor: z.number().nonnegative().max(10).multipleOf(0.01),
   critico: z.boolean(),
   condicional: z.boolean(),
   ordem: z.number().int().positive()

@@ -99,10 +99,11 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
         atendimento_id, autor, prompt_id, nota,
         saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
         resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
-        encerramento_geap, atendimento_aprovado, nota_qualidade
+        encerramento_geap, uso_correto_ferramentas, atendimento_aprovado,
+        nota_qualidade
       )
       select $1, 'ia', id, 10,
-        true, true, true, true, true, true, true, true, 10
+        true, true, true, true, true, true, true, true, true, 10
       from prompts_ia_avaliadora where ativo
     `, [emAndamentoId]);
 
@@ -281,10 +282,11 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
           atendimento_id, autor, prompt_id, nota,
           saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
           resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
-          encerramento_geap, atendimento_aprovado, nota_qualidade
+          encerramento_geap, uso_correto_ferramentas, atendimento_aprovado,
+          nota_qualidade
         )
         select $1, 'ia', id, 10,
-          true, true, true, true, true, true, true, true, 10
+          true, true, true, true, true, true, true, true, true, 10
         from prompts_ia_avaliadora where ativo
         returning id
       )
@@ -346,6 +348,57 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     });
   });
 
+  test('gate: ferramentas nao atendidas forca resolucao nao atendida na conferencia', async ({
+    request
+  }) => {
+    const atendimentoId = await createAtendimento('conv-curadoria-gate-ferramentas');
+    await persistirAvaliacaoIa(atendimentoId);
+    const curador = await login(request, 'curador');
+    const headers = { authorization: `Bearer ${curador.token}` };
+    const detalhe = await request.get(`${apiUrl}/curadoria/${atendimentoId}`, {
+      headers
+    });
+    const inicial = (await detalhe.json()) as {
+      avaliacaoIa: { checklist: Array<{ chave: string; estado: string }> };
+    };
+
+    const response = await request.post(
+      `${apiUrl}/curadoria/${atendimentoId}/avaliacoes`,
+      {
+        headers,
+        data: {
+          checklist: inicial.avaliacaoIa.checklist.map((criterio) => ({
+            chave: criterio.chave,
+            estado:
+              criterio.chave === 'uso_correto_ferramentas'
+                ? 'nao_atendido'
+                : criterio.chave === 'resolveu_solicitacao'
+                  ? 'atendido'
+                  : criterio.estado
+          })),
+          notaAvaliacaoIa: 9.5,
+          falhasIdentificadas: ['Ferramenta incorreta'],
+          resumoAtendimento: 'Gate de ferramentas aplicado.'
+        }
+      }
+    );
+    expect(response.status()).toBe(201);
+    const avaliacao = await response.json();
+    expect(avaliacao.nota).toBe(6.5);
+    expect(avaliacao.checklist).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          chave: 'uso_correto_ferramentas',
+          estado: 'nao_atendido'
+        }),
+        expect.objectContaining({
+          chave: 'resolveu_solicitacao',
+          estado: 'nao_atendido'
+        })
+      ])
+    );
+  });
+
   test('Gestao consulta a conferencia pela interface sem acao de escrita', async ({
     page
   }) => {
@@ -380,6 +433,7 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.getByRole('heading', { name: 'Fila de Curadoria' })).toBeVisible();
     await page.getByRole('link', { name: /conv-curadoria-interface/ }).click();
     await expect(page.getByRole('heading', { name: 'Conferência humana' })).toBeVisible();
+    await expect(page.getByText('Uso Correto de Ferramentas')).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Avaliação original' }).locator('..').getByText('Atendimento objetivo.')
     ).toBeVisible();

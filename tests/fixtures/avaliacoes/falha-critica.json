@@ -6,8 +6,10 @@
     "resolveu_solicitacao": true,
     "validou_email_por_extenso": true,
     "sem_diminutivos": true,
-    "encerramento_geap": true
+    "encerramento_geap": true,
+    "uso_correto_ferramentas": true
   },
+
   "atendimento_aprovado": false,
   "nota_qualidade": 7.5,
   "falhas_identificadas": ["Nao informou o envio do protocolo por e-mail."],

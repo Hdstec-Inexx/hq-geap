@@ -13,7 +13,8 @@ export const checklistIaBooleanoSchema = z.object({
   resolveu_solicitacao: z.boolean(),
   validou_email_por_extenso: z.boolean(),
   sem_diminutivos: z.boolean(),
-  encerramento_geap: z.boolean()
+  encerramento_geap: z.boolean(),
+  uso_correto_ferramentas: z.boolean()
 });
 
 export const criterioIaSnapshotSchema = z.object({

@@ -43,7 +43,7 @@ export function DashboardPage() {
           <p className="eyebrow">Gestão / leitura gerencial</p>
           <h1>Pulso da operação</h1>
           <p>
-            Qualidade, resolução e custo sob a mesma janela de observação.
+            Volume, espera, resolução e qualidade sob a mesma janela de observação.
           </p>
         </div>
         <Form className="period-filter" method="get">
@@ -75,11 +75,23 @@ export function DashboardPage() {
       ) : null}
       {state.status === 'ready' ? (
         <>
-          <Kpis kpis={state.data.kpis} />
+          <Kpis fim={fim} inicio={inicio} kpis={state.data.kpis} />
           <div className="dashboard-grid">
-            <MotivosContatoChart motivos={state.data.motivosContato} />
-            <CriteriosChart criterios={state.data.criterios} />
-            <ConcordanciaChart concordancia={state.data.concordancia} />
+            <MotivosContatoChart
+              fim={fim}
+              inicio={inicio}
+              motivos={state.data.motivosContato}
+            />
+            <CriteriosChart
+              criterios={state.data.criterios}
+              fim={fim}
+              inicio={inicio}
+            />
+            <ConcordanciaChart
+              concordancia={state.data.concordancia}
+              fim={fim}
+              inicio={inicio}
+            />
             <section className="dashboard-panel piores-panel">
               <header>
                 <p className="dashboard-panel-kicker">Prioridade de análise</p>

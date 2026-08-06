@@ -1,15 +1,21 @@
-import type { DashboardPeriod } from '@hq-geap/contracts/dashboards';
+import {
+  SLA_TME_LIMITE_SEGUNDOS,
+  type DashboardPeriod
+} from '@hq-geap/contracts/dashboards';
 import type pg from 'pg';
 
 export type DashboardKpisRow = {
   volume: string;
   tmaSegundos: string | null;
+  tmeSegundos: string | null;
+  resolvidas: string;
+  dentroSla: string;
+  comTme: string;
   notaMediaIa: string | null;
   notaMediaCurador: string | null;
-  transferencias: string;
-  resolvidosSemTransferencia: string;
-  custoTotal: string | null;
-  custoMedio: string | null;
+  toolsTotal: string;
+  toolsSuccessful: string;
+  tempoMedioAteResolucao: string | null;
 };
 
 export type MotivoContatoRow = {
@@ -62,12 +68,20 @@ export function createDashboardRepository(db: pg.Pool) {
         select
           count(*) as volume,
           avg(a.duracao_segundos) as "tmaSegundos",
+          avg(a.tme_segundos) as "tmeSegundos",
+          count(*) filter (where not a.houve_transferencia) as resolvidas,
+          count(*) filter (
+            where a.tme_segundos is not null
+              and a.tme_segundos <= $3
+          ) as "dentroSla",
+          count(*) filter (where a.tme_segundos is not null) as "comTme",
           avg(ia.nota) as "notaMediaIa",
           avg(curador.nota) as "notaMediaCurador",
-          count(*) filter (where a.houve_transferencia) as transferencias,
-          count(*) filter (where not a.houve_transferencia) as "resolvidosSemTransferencia",
-          sum(a.custo) as "custoTotal",
-          avg(a.custo) as "custoMedio"
+          coalesce(sum(a.tools_executados), 0) as "toolsTotal",
+          coalesce(sum(a.tools_sucesso), 0) as "toolsSuccessful",
+          avg(a.duracao_segundos) filter (
+            where not a.houve_transferencia
+          ) as "tempoMedioAteResolucao"
         from atendimentos a
         left join avaliacoes ia
           on ia.atendimento_id = a.id and ia.autor = 'ia'
@@ -79,7 +93,7 @@ export function createDashboardRepository(db: pg.Pool) {
           limit 1
         ) curador on true
         where ${periodFilter}
-      `, [periodo.inicio, periodo.fim]);
+      `, [periodo.inicio, periodo.fim, SLA_TME_LIMITE_SEGUNDOS]);
       return result.rows[0]!;
     },
 

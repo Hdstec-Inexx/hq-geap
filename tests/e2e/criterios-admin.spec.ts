@@ -40,9 +40,9 @@ test.describe('consulta da Regua de Avaliacao', () => {
       total: 10,
       limiarAprovacao: 7
     });
-    expect(regua.criterios).toHaveLength(7);
+    expect(regua.criterios).toHaveLength(8);
     expect(regua.criterios.map((criterio: { ordem: number }) => criterio.ordem)).toEqual([
-      1, 2, 3, 4, 5, 6, 7
+      1, 2, 3, 4, 5, 6, 7, 8
     ]);
     expect(
       regua.criterios.reduce(
@@ -64,6 +64,16 @@ test.describe('consulta da Regua de Avaliacao', () => {
       expect.objectContaining({
         chave: 'validou_email_por_extenso',
         condicional: true
+      })
+    );
+    expect(regua.criterios).toContainEqual(
+      expect.objectContaining({
+        chave: 'uso_correto_ferramentas',
+        nome: 'Uso Correto de Ferramentas',
+        valor: 0,
+        critico: false,
+        condicional: false,
+        ordem: 8
       })
     );
 
@@ -104,7 +114,9 @@ test.describe('consulta da Regua de Avaliacao', () => {
     await expect(
       criterioNaoCritico.getByText('Não crítico', { exact: true })
     ).toBeVisible();
-    await expect(page.locator('[data-testid="criterio-regua"]')).toHaveCount(7);
+    await expect(page.getByText('Uso Correto de Ferramentas')).toBeVisible();
+    await expect(page.getByText('0,0 pt')).toBeVisible();
+    await expect(page.locator('[data-testid="criterio-regua"]')).toHaveCount(8);
     await expect(page.locator('form')).toHaveCount(0);
     await expect(
       page.getByRole('button', { name: /criar|editar|ativar|desativar|excluir/i })

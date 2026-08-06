@@ -117,10 +117,14 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
       expect(claimedIds).toContain(first.rows[0]?.atendimento_id);
       expect(claimedIds).toContain(second.rows[0]?.atendimento_id);
       expect(first.rows[0]?.criterio_chaves).toContain('solicitou_cpf');
+      expect(first.rows[0]?.criterio_chaves).toContain('uso_correto_ferramentas');
       expect(first.rows[0]?.checklist_schema.validou_email_por_extenso?.type).toBe(
         'boolean'
       );
       expect(first.rows[0]?.checklist_schema.solicitou_cpf?.type).toBe('boolean');
+      expect(first.rows[0]?.checklist_schema.uso_correto_ferramentas?.type).toBe(
+        'boolean'
+      );
     } finally {
       await queryDatabase(
         'delete from atendimentos where id = any($1::uuid[])',
@@ -161,7 +165,7 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
        where a.atendimento_id = $1`,
       [atendimentoId]
     );
-    expect(checks.rows[0]?.count).toBe('7');
+    expect(checks.rows[0]?.count).toBe('8');
 
     const invalidId = await createAtendimento('conv-avaliacao-invalida');
     await expect(
@@ -226,10 +230,11 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
       atendimentoAprovado: false,
       falhasIdentificadas: falhaCritica.falhas_identificadas,
       resumoAtendimento: falhaCritica.resumo_atendimento,
-      promptVersao: 3,
+      promptVersao: 4,
       checklist: {
         informou_protocolo_email: false,
-        resolveu_solicitacao: true
+        resolveu_solicitacao: true,
+        uso_correto_ferramentas: true
       },
       criterios: expect.arrayContaining([
         expect.objectContaining({
@@ -238,6 +243,12 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
           atendido: false,
           critico: true,
           valor: 2.5
+        }),
+        expect.objectContaining({
+          chave: 'uso_correto_ferramentas',
+          nome: 'Uso Correto de Ferramentas',
+          atendido: true,
+          valor: 0
         })
       ])
     });
@@ -288,9 +299,38 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
     await expect(page.getByRole('heading', { name: 'Avaliação da IA' })).toBeVisible();
     await expect(page.getByText('Reprovado', { exact: true })).toBeVisible();
     await expect(page.getByText('7,5').first()).toBeVisible();
-    await expect(page.getByText(/Claim da LLM/i)).toBeVisible();
-    await expect(page.getByText(/Atendimento reprovado/i)).toBeVisible();
+    await expect(page.getByText(/Claims da LLM/i)).toBeVisible();
+    await expect(page.getByText(/Aprovação claim: não/i)).toBeVisible();
     await expect(page.getByText('Informação de Protocolo')).toBeVisible();
-    await expect(page.getByText('Prompt v3')).toBeVisible();
+    await expect(page.getByText('Prompt v4')).toBeVisible();
+    await expect(page.getByText('Uso Correto de Ferramentas')).toBeVisible();
+  });
+
+  test('gate: ferramentas false forca resolucao false e perde 3 pontos', async () => {
+    const atendimentoId = await createAtendimento('conv-avaliacao-gate-ferramentas');
+    const result = await persistirAvaliacao(atendimentoId, {
+      ...aprovada,
+      checklist: {
+        ...aprovada.checklist,
+        uso_correto_ferramentas: false,
+        resolveu_solicitacao: true
+      },
+      atendimento_aprovado: false,
+      nota_qualidade: 6.5
+    });
+
+    expect(Number(result.rows[0]?.nota)).toBe(6.5);
+    const typed = await queryDatabase<{
+      uso_correto_ferramentas: boolean;
+      resolveu_solicitacao: boolean;
+    }>(`
+      select uso_correto_ferramentas, resolveu_solicitacao
+      from avaliacoes
+      where atendimento_id = $1 and autor = 'ia'
+    `, [atendimentoId]);
+    expect(typed.rows[0]).toMatchObject({
+      uso_correto_ferramentas: false,
+      resolveu_solicitacao: false
+    });
   });
 });

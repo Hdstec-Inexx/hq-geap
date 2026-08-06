@@ -46,6 +46,9 @@ async function createDashboardAtendimento(input: {
   conversationId: string;
   concluidoEm: string;
   duracao: number;
+  tme: number | null;
+  toolsTotal: number;
+  toolsSuccessful: number;
   motivo: string;
   transferencia: boolean;
   custo: number;
@@ -57,9 +60,10 @@ async function createDashboardAtendimento(input: {
   const atendimento = await queryDatabase<{ id: string }>(`
     insert into atendimentos (
       agente_voz_id, elevenlabs_conversation_id, status, concluido_em,
-      duracao_segundos, motivo_contato, houve_transferencia, custo
+      duracao_segundos, tme_segundos, tools_executados, tools_sucesso,
+      motivo_contato, houve_transferencia, custo
     )
-    select id, $1, 'concluido', $2, $3, $4, $5, $6
+    select id, $1, 'concluido', $2, $3, $4, $5, $6, $7, $8, $9
     from agentes_voz
     where elevenlabs_agent_id = 'agent-dashboard'
     returning id
@@ -67,6 +71,9 @@ async function createDashboardAtendimento(input: {
     input.conversationId,
     input.concluidoEm,
     input.duracao,
+    input.tme,
+    input.toolsTotal,
+    input.toolsSuccessful,
     input.motivo,
     input.transferencia,
     input.custo
@@ -77,12 +84,12 @@ async function createDashboardAtendimento(input: {
       atendimento_id, autor, prompt_id, nota,
       saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
       resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
-      encerramento_geap, atendimento_aprovado, nota_qualidade
+      encerramento_geap, uso_correto_ferramentas, atendimento_aprovado, nota_qualidade
     )
     select $1::uuid, 'ia', id, $2::numeric,
       true, true, true, true,
       ($3::text in ('atendido', 'nao_se_aplica')),
-      true, true,
+      true, true, true,
       $2::numeric >= 7, $2::numeric
     from prompts_ia_avaliadora where ativo
     returning id
@@ -140,6 +147,9 @@ test.describe.serial('Dashboard da Gestao', () => {
       conversationId: 'conv-dashboard-1',
       concluidoEm: '2025-01-10T12:00:00Z',
       duracao: 120,
+      tme: 180,
+      toolsTotal: 2,
+      toolsSuccessful: 1,
       motivo: 'Rede credenciada',
       transferencia: true,
       custo: 2.5,
@@ -152,6 +162,9 @@ test.describe.serial('Dashboard da Gestao', () => {
       conversationId: 'conv-dashboard-2',
       concluidoEm: '2025-01-20T12:00:00Z',
       duracao: 60,
+      tme: 30,
+      toolsTotal: 1,
+      toolsSuccessful: 1,
       motivo: 'Financeiro / Boletos',
       transferencia: false,
       custo: 1.5,
@@ -164,6 +177,9 @@ test.describe.serial('Dashboard da Gestao', () => {
       conversationId: 'conv-dashboard-fora-periodo',
       concluidoEm: '2025-02-01T12:00:00Z',
       duracao: 900,
+      tme: 10,
+      toolsTotal: 9,
+      toolsSuccessful: 9,
       motivo: 'Fora do periodo',
       transferencia: true,
       custo: 99,
@@ -185,12 +201,14 @@ test.describe.serial('Dashboard da Gestao', () => {
     expect(dashboard.kpis).toEqual({
       volume: 2,
       tmaSegundos: 90,
+      tmeSegundos: 105,
+      taxaResolvidas: 50,
+      sla: 50,
+      slaMeta: 80,
       notaMediaIa: 7,
       notaMediaCurador: 6.5,
-      transferencias: 1,
-      resolvidosSemTransferencia: 1,
-      custoTotal: 4,
-      custoMedio: 2
+      taxaPromessasCumpridas: 66.7,
+      tempoMedioAteResolucao: 60
     });
     expect(dashboard.motivosContato).toEqual([
       { motivo: 'Financeiro / Boletos', total: 1 },
@@ -263,9 +281,104 @@ test.describe.serial('Dashboard da Gestao', () => {
     await page.goto('/gestao/dashboard?inicio=2025-01-01&fim=2025-01-31');
 
     await expect(page.getByRole('heading', { name: 'Pulso da operação' })).toBeVisible();
+    await expect(page.getByText('Total de Atendimentos', { exact: true })).toBeVisible();
+    await expect(page.getByText('TME', { exact: true })).toBeVisible();
+    await expect(page.getByText('Taxa de Resolvidas', { exact: true })).toBeVisible();
+    await expect(page.getByText('SLA', { exact: true })).toBeVisible();
+    await expect(page.getByText('meta 80% · TME ≤ 2:30')).toBeVisible();
+    await expect(page.getByText('Nota média', { exact: true })).toBeVisible();
+    await expect(page.getByText('IA × Curador', { exact: true })).toBeVisible();
+    await expect(page.getByText('Taxa de Promessas Cumpridas', { exact: true })).toBeVisible();
+    await expect(page.getByText('Tempo Médio até Resolução', { exact: true })).toBeVisible();
+    await expect(page.getByText('Transferências')).toHaveCount(0);
+    await expect(page.getByText('Custo total')).toHaveCount(0);
     await expect(page.getByText('2', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Financeiro / Boletos').first()).toBeVisible();
     await expect(page.getByText('Concordância')).toBeVisible();
+    await expect(page.getByLabel('Gráfico de Motivos de Contato')).toBeVisible();
+    await expect(page.getByLabel('Gráfico de acerto por Critério')).toBeVisible();
+    await expect(page.getByLabel('Gráfico de Concordância por Critério')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Piores Atendimentos' })).toBeVisible();
+    await expect(page.locator('.piores-panel canvas')).toHaveCount(0);
     await expect(page.getByRole('button', { name: /salvar|editar|excluir/i })).toHaveCount(0);
+  });
+
+  test('clique no KPI navega para lista filtrada preservando o periodo', async ({
+    page,
+    request
+  }) => {
+    const gestao = await loginApi(request, 'gestao');
+    await loginPage(page, 'gestao');
+    await page.goto('/gestao/dashboard?inicio=2025-01-01&fim=2025-01-31');
+
+    await page.getByRole('link', { name: 'Detalhar Taxa de Resolvidas' }).click();
+    await expect(page).toHaveURL(
+      /\/atendimentos\?.*inicio=2025-01-01.*fim=2025-01-31.*indicador=resolvidas/
+    );
+    await expect(page.getByText('Detalhamento do Indicador')).toBeVisible();
+    await expect(page.getByText('Financeiro / Boletos')).toBeVisible();
+    await expect(page.getByText('Rede credenciada')).toHaveCount(0);
+
+    const list = await request.get(
+      `${apiUrl}/atendimentos?inicio=2025-01-01&fim=2025-01-31&indicador=resolvidas`,
+      { headers: { authorization: `Bearer ${gestao.token}` } }
+    );
+    expect(list.status()).toBe(200);
+    const rows = await list.json();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].motivoContato).toBe('Financeiro / Boletos');
+    expect(rows[0].houveTransferencia).toBe(false);
+
+    const curador = await loginApi(request, 'curador');
+    expect(
+      (
+        await request.get(
+          `${apiUrl}/atendimentos?inicio=2025-01-01&fim=2025-01-31&indicador=volume`,
+          { headers: { authorization: `Bearer ${curador.token}` } }
+        )
+      ).status()
+    ).toBe(403);
+  });
+
+  test('clique no Motivo de Contato navega com a populacao correta', async ({
+    page
+  }) => {
+    await loginPage(page, 'gestao');
+    await page.goto('/gestao/dashboard?inicio=2025-01-01&fim=2025-01-31');
+
+    await page.locator('.motivos-legend').getByRole('link', { name: 'Rede credenciada' }).click();
+    await expect(page).toHaveURL(/indicador=motivo/);
+    await expect(page).toHaveURL(/motivo=Rede(\+|%20)credenciada/);
+    await expect(page.getByRole('heading', { name: 'Atendimentos' })).toBeVisible();
+    await expect(page.locator('.atendimento-row').getByText('Rede credenciada')).toBeVisible();
+    await expect(page.locator('.atendimento-row').getByText('Financeiro / Boletos')).toHaveCount(0);
+  });
+
+  test('clique no Critério atendido navega com a populacao correta', async ({
+    page
+  }) => {
+    await loginPage(page, 'gestao');
+    await page.goto('/gestao/dashboard?inicio=2025-01-01&fim=2025-01-31');
+
+    await page.locator('.criterios-list a').first().click();
+    await expect(page).toHaveURL(/indicador=criterio/);
+    await expect(page).toHaveURL(/criterioId=/);
+    await expect(page).toHaveURL(/inicio=2025-01-01/);
+    await expect(page.getByText('Detalhamento do Indicador')).toBeVisible();
+    await expect(page.locator('.atendimento-row')).toHaveCount(1);
+  });
+
+  test('clique na Concordância por nota navega com a populacao correta', async ({
+    page
+  }) => {
+    await loginPage(page, 'gestao');
+    await page.goto('/gestao/dashboard?inicio=2025-01-01&fim=2025-01-31');
+
+    await page.getByRole('link', { name: 'Detalhar Concordância por nota' }).click();
+    await expect(page).toHaveURL(/indicador=concordancia_nota/);
+    await expect(page).toHaveURL(/inicio=2025-01-01/);
+    await expect(page).toHaveURL(/fim=2025-01-31/);
+    await expect(page.getByText('Detalhamento do Indicador')).toBeVisible();
+    await expect(page.locator('.atendimento-row')).toHaveCount(1);
   });
 });

@@ -3,6 +3,7 @@ import {
 } from '@hq-geap/contracts/atendimentos';
 import { Link, useSearchParams } from 'react-router-dom';
 import { formatDuration, useAuthenticatedResource } from './api';
+import { detalhamentoQueryFromSearch } from '../dashboards/detalhamento';
 
 const pageSize = 50;
 const maximumPage = 201;
@@ -25,25 +26,76 @@ function formatCost(cost: number | null | undefined) {
       }).format(cost);
 }
 
+function paginationHref(
+  searchParams: URLSearchParams,
+  page: number
+): string {
+  const next = new URLSearchParams(searchParams);
+  if (page <= 1) {
+    next.delete('page');
+  } else {
+    next.set('page', String(page));
+  }
+  const query = next.toString();
+  return query ? `?${query}` : '?';
+}
+
 export function AtendimentosPage() {
   const [searchParams] = useSearchParams();
   const page = Math.min(
     maximumPage,
     Math.max(1, Math.floor(Number(searchParams.get('page')) || 1))
   );
+  const detalhamentoQuery = detalhamentoQueryFromSearch(searchParams);
+  const listQuery = new URLSearchParams({
+    limit: String(pageSize),
+    offset: String((page - 1) * pageSize)
+  });
+  if (detalhamentoQuery) {
+    for (const [key, value] of new URLSearchParams(detalhamentoQuery)) {
+      listQuery.set(key, value);
+    }
+  }
   const state = useAuthenticatedResource(
-    `/atendimentos?limit=${pageSize}&offset=${(page - 1) * pageSize}`,
+    `/atendimentos?${listQuery.toString()}`,
     atendimentoListSchema
   );
+  const indicador = searchParams.get('indicador');
+  const inicio = searchParams.get('inicio');
+  const fim = searchParams.get('fim');
+  const isDetalhamento = Boolean(indicador && inicio && fim);
 
   return (
     <main className="atendimentos-page">
       <header className="atendimentos-heading">
         <div>
-          <p className="eyebrow">Operação / histórico</p>
+          <p className="eyebrow">
+            {isDetalhamento
+              ? 'Gestão / Detalhamento do Indicador'
+              : 'Operação / histórico'}
+          </p>
           <h1>Atendimentos</h1>
+          {isDetalhamento ? (
+            <p className="atendimentos-detalhamento-meta">
+              Período {inicio} → {fim}
+              {' · '}
+              {indicador}
+              {searchParams.get('motivo')
+                ? ` · ${searchParams.get('motivo')}`
+                : ''}
+            </p>
+          ) : null}
         </div>
-        <Link className="back-link" to="/">Voltar ao início</Link>
+        {isDetalhamento ? (
+          <Link
+            className="back-link"
+            to={`/gestao/dashboard?inicio=${encodeURIComponent(inicio!)}&fim=${encodeURIComponent(fim!)}`}
+          >
+            Voltar ao Dashboard
+          </Link>
+        ) : (
+          <Link className="back-link" to="/">Voltar ao início</Link>
+        )}
       </header>
 
       {state.status === 'loading' ? (
@@ -82,8 +134,14 @@ export function AtendimentosPage() {
             );
           })}
           <nav className="atendimentos-pagination" aria-label="Paginação">
-            {page > 1 ? <Link to={`?page=${page - 1}`}>Página anterior</Link> : <span />}
-            {state.data.length === pageSize && page < maximumPage ? <Link to={`?page=${page + 1}`}>Próxima página</Link> : null}
+            {page > 1 ? (
+              <Link to={paginationHref(searchParams, page - 1)}>Página anterior</Link>
+            ) : (
+              <span />
+            )}
+            {state.data.length === pageSize && page < maximumPage ? (
+              <Link to={paginationHref(searchParams, page + 1)}>Próxima página</Link>
+            ) : null}
           </nav>
         </div>
       ) : null}

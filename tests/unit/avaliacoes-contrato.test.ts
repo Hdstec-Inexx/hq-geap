@@ -15,7 +15,8 @@ const checklistBooleano = {
   resolveu_solicitacao: true,
   validou_email_por_extenso: true,
   sem_diminutivos: false,
-  encerramento_geap: true
+  encerramento_geap: true,
+  uso_correto_ferramentas: true
 };
 
 const criterios = [
@@ -58,7 +59,29 @@ test('contrato da Avaliacao da IA expoe checklist booleano, claims e snapshot', 
   assert.equal(parsed.notaQualidade, 9.5);
   assert.equal(parsed.atendimentoAprovado, true);
   assert.deepEqual(parsed.checklist, checklistBooleano);
+  assert.equal(parsed.checklist.uso_correto_ferramentas, true);
   assert.equal(parsed.criterios[1]?.atendido, false);
+});
+
+test('contrato rejeita checklist sem uso_correto_ferramentas', () => {
+  const { uso_correto_ferramentas: _omitida, ...semFerramentas } = checklistBooleano;
+  assert.equal(
+    avaliacaoIaSchema.safeParse({
+      id,
+      atendimentoId,
+      nota: 9.5,
+      aprovacao: 'aprovado',
+      notaQualidade: 9.5,
+      atendimentoAprovado: true,
+      falhasIdentificadas: [],
+      resumoAtendimento: null,
+      promptVersao: 3,
+      criadoEm: '2026-07-31T12:00:00.000Z',
+      checklist: semFerramentas,
+      criterios
+    }).success,
+    false
+  );
 });
 
 test('contrato rejeita checklist com estados ternarios da Regua antiga', () => {
