@@ -295,6 +295,11 @@ test.describe.serial('Dashboard da Gestao', () => {
     await expect(page.getByText('2', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Financeiro / Boletos').first()).toBeVisible();
     await expect(page.getByText('Concordância')).toBeVisible();
+    await expect(page.getByLabel('Gráfico de Motivos de Contato')).toBeVisible();
+    await expect(page.getByLabel('Gráfico de acerto por Critério')).toBeVisible();
+    await expect(page.getByLabel('Gráfico de Concordância por Critério')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Piores Atendimentos' })).toBeVisible();
+    await expect(page.locator('.piores-panel canvas')).toHaveCount(0);
     await expect(page.getByRole('button', { name: /salvar|editar|excluir/i })).toHaveCount(0);
   });
 });

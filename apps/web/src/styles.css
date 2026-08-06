@@ -2125,18 +2125,39 @@ h1 {
   font-size: 0.82rem;
 }
 
-.motivos-donut-layout {
+.motivos-chart-layout {
   display: grid;
-  grid-template-columns: 160px minmax(0, 1fr);
+  grid-template-columns: 180px minmax(0, 1fr);
   gap: 28px;
   align-items: center;
 }
 
-.motivos-donut {
-  width: 160px;
-  height: 160px;
-  border-radius: 50%;
-  mask: radial-gradient(circle at center, transparent 48%, #000 49%);
+.dashboard-chart-frame {
+  position: relative;
+  width: 100%;
+  min-height: 180px;
+}
+
+.motivos-chart-frame {
+  width: 180px;
+  height: 180px;
+  min-height: 180px;
+}
+
+.criterios-chart-frame {
+  min-height: clamp(220px, 40vh, 360px);
+  margin-bottom: 22px;
+}
+
+.concordancia-chart-frame {
+  min-height: clamp(200px, 36vh, 320px);
+  margin-top: 26px;
+}
+
+.dashboard-chart-frame canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .motivos-legend {
@@ -2162,7 +2183,7 @@ h1 {
 }
 
 @media (max-width: 720px) {
-  .motivos-donut-layout {
+  .motivos-chart-layout {
     grid-template-columns: 1fr;
     justify-items: center;
   }
@@ -2170,7 +2191,6 @@ h1 {
 
 .dashboard-bars,
 .criterios-list,
-.concordancia-list,
 .piores-panel ol {
   display: grid;
   gap: 20px;
@@ -2196,15 +2216,13 @@ h1 {
   white-space: nowrap;
 }
 
-.dashboard-bar-track,
-.criterio-track {
+.dashboard-bar-track {
   display: block;
   height: 7px;
   background: #d5e3de;
 }
 
-.dashboard-bar-track > span,
-.criterio-track > span {
+.dashboard-bar-track > span {
   display: block;
   min-width: 3px;
   height: 100%;
@@ -2213,10 +2231,6 @@ h1 {
 
 .criterios-panel {
   grid-row: span 2;
-}
-
-.criterio-track > span {
-  background: var(--dashboard-ink);
 }
 
 .criterios-list small {
@@ -2265,37 +2279,9 @@ h1 {
   font-weight: 400;
 }
 
-.concordancia-list {
+.concordancia-panel .dashboard-empty {
   margin-top: 26px;
-  gap: 13px;
-}
-
-.concordancia-list li {
-  display: grid;
-  grid-template-columns: minmax(130px, 1fr) auto 46px;
-  align-items: center;
-  gap: 12px;
-  font-size: 0.76rem;
-}
-
-.concordancia-list strong {
-  text-align: right;
-}
-
-.concordancia-dots {
-  display: flex;
-  gap: 3px;
-}
-
-.concordancia-dots i {
-  width: 7px;
-  height: 7px;
-  background: rgb(239 249 245 / 19%);
-  border-radius: 50%;
-}
-
-.concordancia-dots i.filled {
-  background: var(--dashboard-mint);
+  color: #b9d1ca;
 }
 
 .piores-panel li {
@@ -2427,14 +2413,6 @@ h1 {
   .concordancia-summary article + article {
     border-top: 1px solid rgb(239 249 245 / 19%);
     border-left: 0;
-  }
-
-  .concordancia-dots {
-    display: none;
-  }
-
-  .concordancia-list li {
-    grid-template-columns: 1fr auto;
   }
 }
 
