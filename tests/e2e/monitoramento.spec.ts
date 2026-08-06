@@ -280,10 +280,15 @@ test.describe.serial('Monitoramento ao Vivo — conversas abertas na ElevenLabs'
 
     await scroll.evaluate((el) => {
       el.scrollTop = 0;
+      el.dispatchEvent(new Event('scroll'));
     });
     await expect
       .poll(async () => (await transcriptScrollMetrics(scroll)).scrollTop)
       .toBe(0);
+    // Garante que o onScroll desarmou o follow antes da próxima linha.
+    await expect
+      .poll(async () => (await transcriptScrollMetrics(scroll)).nearBottom)
+      .toBe(false);
 
     stub.sendTranscript('user', 'Mensagem sem follow');
     await expect(page.getByText('Mensagem sem follow')).toBeAttached();
@@ -296,6 +301,7 @@ test.describe.serial('Monitoramento ao Vivo — conversas abertas na ElevenLabs'
 
     await scroll.evaluate((el) => {
       el.scrollTop = el.scrollHeight;
+      el.dispatchEvent(new Event('scroll'));
     });
     await expect
       .poll(async () => (await transcriptScrollMetrics(scroll)).nearBottom)

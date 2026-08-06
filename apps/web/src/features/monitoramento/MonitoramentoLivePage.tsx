@@ -2,7 +2,7 @@ import {
   monitoramentoEventSchema,
   type MonitoramentoEvent
 } from '@hq-geap/contracts/monitoramento';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { monitoramentoAuthPayload, monitoramentoWsUrl } from './api';
 
@@ -21,6 +21,10 @@ type ConnectionState =
   | { status: 'ended' }
   | { status: 'error'; message: string };
 
+function isNearBottom(el: HTMLElement) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= nearBottomPx;
+}
+
 export function MonitoramentoLivePage() {
   const { conversationId = '' } = useParams();
   const [lines, setLines] = useState<LiveLine[]>([]);
@@ -29,13 +33,30 @@ export function MonitoramentoLivePage() {
   });
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
+  const ignoreScrollRef = useRef(false);
+  const prevScrollHeightRef = useRef(0);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = scrollRef.current;
-    if (!el || !stickToBottomRef.current) {
+    if (!el) {
       return;
     }
-    el.scrollTop = el.scrollHeight;
+
+    const prevHeight = prevScrollHeightRef.current;
+    const nextHeight = el.scrollHeight;
+
+    ignoreScrollRef.current = true;
+    if (stickToBottomRef.current) {
+      el.scrollTop = nextHeight;
+    } else if (prevHeight > 0 && nextHeight < prevHeight) {
+      // Trim do topo (maxLiveLines): mantém o trecho visível e evita
+      // rearmar o follow só porque a distância ao fim encolheu.
+      el.scrollTop = Math.max(0, el.scrollTop - (prevHeight - nextHeight));
+    }
+    prevScrollHeightRef.current = el.scrollHeight;
+    requestAnimationFrame(() => {
+      ignoreScrollRef.current = false;
+    });
   }, [lines]);
 
   useEffect(() => {
@@ -67,6 +88,7 @@ export function MonitoramentoLivePage() {
     setConnection({ status: 'connecting' });
     setLines([]);
     stickToBottomRef.current = true;
+    prevScrollHeightRef.current = 0;
 
     socket.addEventListener('open', () => {
       try {
@@ -214,10 +236,10 @@ export function MonitoramentoLivePage() {
           className="transcript-lines monitoramento-transcript-scroll"
           data-testid="monitoramento-transcript-scroll"
           onScroll={(event) => {
-            const el = event.currentTarget;
-            const distance =
-              el.scrollHeight - el.scrollTop - el.clientHeight;
-            stickToBottomRef.current = distance <= nearBottomPx;
+            if (ignoreScrollRef.current) {
+              return;
+            }
+            stickToBottomRef.current = isNearBottom(event.currentTarget);
           }}
           ref={scrollRef}
         >
