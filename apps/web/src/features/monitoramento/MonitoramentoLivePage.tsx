@@ -2,11 +2,12 @@ import {
   monitoramentoEventSchema,
   type MonitoramentoEvent
 } from '@hq-geap/contracts/monitoramento';
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { monitoramentoAuthPayload, monitoramentoWsUrl } from './api';
 
 const maxLiveLines = 200;
+const nearBottomPx = 80;
 
 type LiveLine = {
   id: number;
@@ -20,12 +21,43 @@ type ConnectionState =
   | { status: 'ended' }
   | { status: 'error'; message: string };
 
+function isNearBottom(el: HTMLElement) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= nearBottomPx;
+}
+
 export function MonitoramentoLivePage() {
   const { conversationId = '' } = useParams();
   const [lines, setLines] = useState<LiveLine[]>([]);
   const [connection, setConnection] = useState<ConnectionState>({
     status: 'connecting'
   });
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
+  const ignoreScrollRef = useRef(false);
+  const prevScrollHeightRef = useRef(0);
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) {
+      return;
+    }
+
+    const prevHeight = prevScrollHeightRef.current;
+    const nextHeight = el.scrollHeight;
+
+    ignoreScrollRef.current = true;
+    if (stickToBottomRef.current) {
+      el.scrollTop = nextHeight;
+    } else if (prevHeight > 0 && nextHeight < prevHeight) {
+      // Trim do topo (maxLiveLines): mantém o trecho visível e evita
+      // rearmar o follow só porque a distância ao fim encolheu.
+      el.scrollTop = Math.max(0, el.scrollTop - (prevHeight - nextHeight));
+    }
+    prevScrollHeightRef.current = el.scrollHeight;
+    requestAnimationFrame(() => {
+      ignoreScrollRef.current = false;
+    });
+  }, [lines]);
 
   useEffect(() => {
     if (!conversationId) {
@@ -55,6 +87,8 @@ export function MonitoramentoLivePage() {
 
     setConnection({ status: 'connecting' });
     setLines([]);
+    stickToBottomRef.current = true;
+    prevScrollHeightRef.current = 0;
 
     socket.addEventListener('open', () => {
       try {
@@ -198,7 +232,17 @@ export function MonitoramentoLivePage() {
 
       <section className="transcript-panel monitoramento-live-panel">
         <p className="panel-label">Transcrição ao vivo</p>
-        <div className="transcript-lines">
+        <div
+          className="transcript-lines monitoramento-transcript-scroll"
+          data-testid="monitoramento-transcript-scroll"
+          onScroll={(event) => {
+            if (ignoreScrollRef.current) {
+              return;
+            }
+            stickToBottomRef.current = isNearBottom(event.currentTarget);
+          }}
+          ref={scrollRef}
+        >
           {lines.length === 0 ? (
             <p>Aguardando falas do Atendimento...</p>
           ) : (
