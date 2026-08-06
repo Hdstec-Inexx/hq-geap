@@ -1,5 +1,6 @@
 import {
   dashboardSchema,
+  SLA_META_PERCENTUAL,
   type Dashboard,
   type DashboardPeriod
 } from '@hq-geap/contracts/dashboards';
@@ -10,8 +11,8 @@ function numberOrNull(value: string | null, decimals = 2) {
   return Number(Number(value).toFixed(decimals));
 }
 
-function percentage(concordantes: number, total: number) {
-  return total === 0 ? null : Number(((concordantes / total) * 100).toFixed(1));
+function percentage(part: number, total: number) {
+  return total === 0 ? null : Number(((part / total) * 100).toFixed(1));
 }
 
 export async function getDashboard(
@@ -25,6 +26,12 @@ export async function getDashboard(
   const porCriterio = await repository.listConcordanciaPorCriterio(periodo);
   const piores = await repository.listPiores(periodo);
 
+  const volume = Number(kpis.volume);
+  const resolvidas = Number(kpis.resolvidas);
+  const dentroSla = Number(kpis.dentroSla);
+  const comTme = Number(kpis.comTme);
+  const toolsTotal = Number(kpis.toolsTotal);
+  const toolsSuccessful = Number(kpis.toolsSuccessful);
   const notasConcordantes = Number(concordancia.notasConcordantes);
   const totalNotas = Number(concordancia.totalNotas);
   const criteriosConcordantes = Number(concordancia.criteriosConcordantes);
@@ -33,14 +40,16 @@ export async function getDashboard(
   return dashboardSchema.parse({
     periodo,
     kpis: {
-      volume: Number(kpis.volume),
+      volume,
       tmaSegundos: numberOrNull(kpis.tmaSegundos, 0),
+      tmeSegundos: numberOrNull(kpis.tmeSegundos, 0),
+      taxaResolvidas: percentage(resolvidas, volume),
+      sla: percentage(dentroSla, comTme),
+      slaMeta: SLA_META_PERCENTUAL,
       notaMediaIa: numberOrNull(kpis.notaMediaIa),
       notaMediaCurador: numberOrNull(kpis.notaMediaCurador),
-      transferencias: Number(kpis.transferencias),
-      resolvidosSemTransferencia: Number(kpis.resolvidosSemTransferencia),
-      custoTotal: numberOrNull(kpis.custoTotal, 4),
-      custoMedio: numberOrNull(kpis.custoMedio, 4)
+      taxaPromessasCumpridas: percentage(toolsSuccessful, toolsTotal),
+      tempoMedioAteResolucao: numberOrNull(kpis.tempoMedioAteResolucao, 0)
     },
     motivosContato: motivos.map((row) => ({
       motivo: row.motivo,

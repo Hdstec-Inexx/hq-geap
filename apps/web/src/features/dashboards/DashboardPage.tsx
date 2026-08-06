@@ -43,7 +43,7 @@ export function DashboardPage() {
           <p className="eyebrow">Gestão / leitura gerencial</p>
           <h1>Pulso da operação</h1>
           <p>
-            Qualidade, resolução e custo sob a mesma janela de observação.
+            Volume, espera, resolução e qualidade sob a mesma janela de observação.
           </p>
         </div>
         <Form className="period-filter" method="get">

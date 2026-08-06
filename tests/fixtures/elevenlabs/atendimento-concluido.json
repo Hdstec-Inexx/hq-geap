@@ -67,6 +67,11 @@
     "audio_reference": "atendimentos/conv-fixture-concluido-001.mp3",
     "contact_reason": "Financeiro/Boletos",
     "transferred": false,
-    "cost": 0.1842
+    "cost": 0.1842,
+    "tme_seconds": 0,
+    "tool_executions": {
+      "total": 1,
+      "successful": 1
+    }
   }
 }

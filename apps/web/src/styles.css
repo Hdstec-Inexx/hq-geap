@@ -2052,6 +2052,19 @@ h1 {
   border-bottom: 1px solid var(--dashboard-line);
 }
 
+.dashboard-kpis small {
+  display: block;
+  margin-top: 10px;
+  color: var(--dashboard-muted);
+  font-family: Consolas, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+
+.dashboard-kpis article:first-child small {
+  color: #9fc8bc;
+}
+
 .dashboard-kpis article:first-child {
   color: #eff9f5;
   background: var(--dashboard-ink);

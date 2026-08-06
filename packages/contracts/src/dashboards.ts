@@ -3,6 +3,11 @@ import { z } from 'zod';
 const isoDateSchema = z.iso.date();
 const percentageSchema = z.number().min(0).max(100).nullable();
 
+/** Limite operacional de TME para o SLA (2:30). */
+export const SLA_TME_LIMITE_SEGUNDOS = 150;
+/** Meta de referência do SLA (%). */
+export const SLA_META_PERCENTUAL = 80;
+
 export const dashboardPeriodSchema = z
   .object({
     inicio: isoDateSchema,
@@ -25,12 +30,14 @@ export const dashboardPeriodSchema = z
 export const dashboardKpisSchema = z.object({
   volume: z.number().int().nonnegative(),
   tmaSegundos: z.number().nonnegative().nullable(),
+  tmeSegundos: z.number().nonnegative().nullable(),
+  taxaResolvidas: percentageSchema,
+  sla: percentageSchema,
+  slaMeta: z.literal(SLA_META_PERCENTUAL),
   notaMediaIa: z.number().min(0).max(10).nullable(),
   notaMediaCurador: z.number().min(0).max(10).nullable(),
-  transferencias: z.number().int().nonnegative(),
-  resolvidosSemTransferencia: z.number().int().nonnegative(),
-  custoTotal: z.number().nonnegative().nullable(),
-  custoMedio: z.number().nonnegative().nullable()
+  taxaPromessasCumpridas: percentageSchema,
+  tempoMedioAteResolucao: z.number().nonnegative().nullable()
 });
 
 export const dashboardSchema = z.object({
