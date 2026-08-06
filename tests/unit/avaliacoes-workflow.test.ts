@@ -65,3 +65,12 @@ test('workflow persiste o contrato tipado com claims da LLM', async () => {
   );
   assert.match(workflow, /chaves booleanas/i);
 });
+
+test('workflow usa schema dinamico da Regua (inclui 8a chave via criterio_chaves)', async () => {
+  const workflow = await readFile(workflowPath, 'utf8');
+
+  assert.match(workflow, /criterio_chaves/);
+  assert.match(workflow, /checklist_schema/);
+  assert.match(workflow, /required:\s*\$json\.criterio_chaves/);
+  assert.match(workflow, /properties:\s*\$json\.checklist_schema/);
+});

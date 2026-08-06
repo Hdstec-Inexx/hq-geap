@@ -25,6 +25,39 @@ const checklistIa = [
   }
 ];
 
+const checklistComFerramentas = [
+  {
+    criterioId: '33333333-3333-4333-8333-333333333333',
+    chave: 'resolveu_solicitacao',
+    nome: 'Resolucao da Solicitacao',
+    estado: 'atendido' as const,
+    valor: '3.00',
+    critico: false,
+    condicional: false,
+    ordem: 1
+  },
+  {
+    criterioId: '44444444-4444-4444-8444-444444444444',
+    chave: 'uso_correto_ferramentas',
+    nome: 'Uso Correto de Ferramentas',
+    estado: 'atendido' as const,
+    valor: '0.00',
+    critico: false,
+    condicional: false,
+    ordem: 2
+  },
+  {
+    criterioId: '55555555-5555-4555-8555-555555555555',
+    chave: 'saudacao_e_intencao',
+    nome: 'Saudacao',
+    estado: 'atendido' as const,
+    valor: '7.00',
+    critico: false,
+    condicional: false,
+    ordem: 3
+  }
+];
+
 test('conferencia recalcula nota e aprovacao com os valores do snapshot da IA', () => {
   const result = calcularConferencia(checklistIa, [
     { chave: 'saudacao', estado: 'nao_atendido' },
@@ -66,5 +99,23 @@ test('conferencia aceita nao se aplica apenas em Criterio condicional', () => {
       { chave: 'protocolo', estado: 'atendido' }
     ]),
     /condicional/i
+  );
+});
+
+test('gate: ferramentas nao atendidas forca resolucao nao atendida e perde 3 pontos', () => {
+  const result = calcularConferencia(checklistComFerramentas, [
+    { chave: 'resolveu_solicitacao', estado: 'atendido' },
+    { chave: 'uso_correto_ferramentas', estado: 'nao_atendido' },
+    { chave: 'saudacao_e_intencao', estado: 'atendido' }
+  ]);
+
+  assert.equal(result.nota, 7);
+  assert.deepEqual(
+    result.checklist.map(({ chave, estado }) => ({ chave, estado })),
+    [
+      { chave: 'resolveu_solicitacao', estado: 'nao_atendido' },
+      { chave: 'uso_correto_ferramentas', estado: 'nao_atendido' },
+      { chave: 'saudacao_e_intencao', estado: 'atendido' }
+    ]
   );
 });

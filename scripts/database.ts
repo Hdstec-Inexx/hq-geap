@@ -132,11 +132,11 @@ async function validate() {
     const row = result.rows[0];
 
     if (
-      row?.active_criteria !== '7' ||
+      row?.active_criteria !== '8' ||
       Number(row.total) !== 10 ||
       row.active_prompts !== '1'
     ) {
-      throw new Error('Initial seed must contain seven active criteria totaling 10 and one active prompt');
+      throw new Error('Initial seed must contain eight active criteria totaling 10 and one active prompt');
     }
   } finally {
     await client.query('rollback');

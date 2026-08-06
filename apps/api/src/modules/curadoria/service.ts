@@ -47,8 +47,18 @@ export function calcularConferencia(
     throw new Error('A conferencia deve conter todos os Criterios da IA');
   }
 
+  const ferramentasNaoAtendidas =
+    estados.get('uso_correto_ferramentas') === 'nao_atendido';
+
   const checklist = checklistIa.map((criterio) => {
-    const estado = estados.get(criterio.chave)!;
+    let estado = estados.get(criterio.chave)!;
+    if (
+      ferramentasNaoAtendidas &&
+      criterio.chave === 'resolveu_solicitacao' &&
+      estado !== 'nao_atendido'
+    ) {
+      estado = 'nao_atendido';
+    }
     if (estado === 'nao_se_aplica' && !criterio.condicional) {
       throw new Error('Nao se aplica exige um Criterio condicional');
     }

@@ -77,12 +77,13 @@ async function createDashboardAtendimento(input: {
       atendimento_id, autor, prompt_id, nota,
       saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
       resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
-      encerramento_geap, atendimento_aprovado, nota_qualidade
+      encerramento_geap, uso_correto_ferramentas, atendimento_aprovado,
+      nota_qualidade
     )
     select $1::uuid, 'ia', id, $2::numeric,
       true, true, true, true,
       ($3::text in ('atendido', 'nao_se_aplica')),
-      true, true,
+      true, true, true,
       $2::numeric >= 7, $2::numeric
     from prompts_ia_avaliadora where ativo
     returning id
