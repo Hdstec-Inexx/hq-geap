@@ -35,6 +35,26 @@ test('aceita uma Regua vigente ordenada que soma exatamente 10', () => {
   assert.equal(reguaAvaliacaoSchema.safeParse(reguaValida).success, true);
 });
 
+test('criterioSchema aceita valor 0', () => {
+  assert.equal(
+    criterioSchema.safeParse({
+      ...reguaValida.criterios[0]!,
+      valor: 0
+    }).success,
+    true
+  );
+});
+
+test('criterioSchema rejeita valor negativo', () => {
+  assert.equal(
+    criterioSchema.safeParse({
+      ...reguaValida.criterios[0]!,
+      valor: -0.01
+    }).success,
+    false
+  );
+});
+
 test('aceita Critério com valor 0 quando a Regua continua somando 10', () => {
   assert.equal(
     reguaAvaliacaoSchema.safeParse({
@@ -45,16 +65,6 @@ test('aceita Critério com valor 0 quando a Regua continua somando 10', () => {
       ]
     }).success,
     true
-  );
-});
-
-test('rejeita Critério com valor negativo', () => {
-  assert.equal(
-    criterioSchema.safeParse({
-      ...reguaValida.criterios[0]!,
-      valor: -0.01
-    }).success,
-    false
   );
 });
 
