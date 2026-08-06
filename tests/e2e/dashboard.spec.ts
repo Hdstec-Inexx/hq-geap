@@ -367,4 +367,18 @@ test.describe.serial('Dashboard da Gestao', () => {
     await expect(page.getByText('Detalhamento do Indicador')).toBeVisible();
     await expect(page.locator('.atendimento-row')).toHaveCount(1);
   });
+
+  test('clique na Concordância por nota navega com a populacao correta', async ({
+    page
+  }) => {
+    await loginPage(page, 'gestao');
+    await page.goto('/gestao/dashboard?inicio=2025-01-01&fim=2025-01-31');
+
+    await page.getByRole('link', { name: 'Detalhar Concordância por nota' }).click();
+    await expect(page).toHaveURL(/indicador=concordancia_nota/);
+    await expect(page).toHaveURL(/inicio=2025-01-01/);
+    await expect(page).toHaveURL(/fim=2025-01-31/);
+    await expect(page.getByText('Detalhamento do Indicador')).toBeVisible();
+    await expect(page.locator('.atendimento-row')).toHaveCount(1);
+  });
 });
