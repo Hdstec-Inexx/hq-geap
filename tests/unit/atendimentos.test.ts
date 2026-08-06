@@ -105,6 +105,44 @@ test('a fixture permite Motivo de Contato ausente', async () => {
   );
 });
 
+test('contrato de ingestao aceita TME e contadores de tools', () => {
+  const parsed = ingestAtendimentoSchema.parse({
+    conversation_id: 'conv-tme-tools',
+    agent_id: 'agent-1',
+    event_timestamp: 1,
+    status: 'concluido',
+    started_at: '2026-08-03T10:00:00.000Z',
+    completed_at: '2026-08-03T10:05:00.000Z',
+    duration_seconds: 300,
+    transferred: false,
+    transcript: [
+      { role: 'agent', message: 'Olá', time_in_call_secs: 12 }
+    ],
+    tme_seconds: 12,
+    tool_executions: { total: 2, successful: 1 }
+  });
+
+  assert.equal(parsed.tme_seconds, 12);
+  assert.deepEqual(parsed.tool_executions, { total: 2, successful: 1 });
+});
+
+test('contrato de ingestao rejeita tools bem-sucedidas acima do total', () => {
+  const result = ingestAtendimentoSchema.safeParse({
+    conversation_id: 'conv-tools-invalid',
+    agent_id: 'agent-1',
+    event_timestamp: 1,
+    status: 'concluido',
+    started_at: '2026-08-03T10:00:00.000Z',
+    completed_at: '2026-08-03T10:05:00.000Z',
+    duration_seconds: 300,
+    transferred: false,
+    transcript: [],
+    tool_executions: { total: 1, successful: 2 }
+  });
+
+  assert.equal(result.success, false);
+});
+
 test('o workflow valida HMAC sobre o corpo bruto antes da ingestao', async () => {
   const workflow = await loadWorkflow();
   const webhook = workflow.nodes.find((node) => node.name === 'Webhook ElevenLabs');
@@ -188,6 +226,70 @@ test('o workflow transforma a fixture real no contrato esperado', async () => {
   assert.equal(has_audio, true);
   assert.equal(audio_object_key, audio_reference);
   assert.deepEqual(payload, expected);
+});
+
+test('workflow conta falha de tool_results.is_error na Taxa de Promessas', async () => {
+  const workflow = await loadWorkflow();
+  const code = workflowCode(workflow, 'Contrato normalizado');
+  const execute = new Function('$json', '$env', code) as (
+    json: unknown,
+    environment: unknown
+  ) => Array<{ json: Record<string, unknown> }>;
+  const generated = execute(
+    {
+      event: {
+        type: 'post_call_transcription',
+        event_timestamp: 1785330252,
+        data: {
+          conversation_id: 'conv-tool-error',
+          agent_id: 'agent-livia-test',
+          status: 'done',
+          has_audio: false,
+          transcript: [
+            {
+              role: 'agent',
+              message: 'Olá',
+              time_in_call_secs: 5,
+              tool_calls: [
+                {
+                  tool_name: 'enviar_segunda_via_boleto',
+                  tool_call_id: 'tool-ok',
+                  tool_has_been_called: true
+                },
+                {
+                  tool_name: 'enviar_segunda_via_boleto',
+                  tool_call_id: 'tool-fail',
+                  tool_has_been_called: true
+                }
+              ],
+              tool_results: [
+                {
+                  tool_call_id: 'tool-ok',
+                  tool_name: 'enviar_segunda_via_boleto',
+                  is_error: false
+                },
+                {
+                  tool_call_id: 'tool-fail',
+                  tool_name: 'enviar_segunda_via_boleto',
+                  is_error: true
+                }
+              ]
+            }
+          ],
+          metadata: {
+            start_time_unix_secs: 1785330000,
+            call_duration_secs: 60,
+            cost_fiat: 0.1
+          },
+          analysis: { data_collection_results: {} }
+        }
+      }
+    },
+    { ELEVENLABS_TRANSFER_TOOL_NAME: 'transfer_to_number' }
+  )[0]!.json;
+
+  assert.equal(generated.tme_seconds, 5);
+  assert.deepEqual(generated.tool_executions, { total: 2, successful: 1 });
 });
 
 test('contrato aceita message null de tool call da ElevenLabs', () => {

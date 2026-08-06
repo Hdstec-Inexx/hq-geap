@@ -16,7 +16,10 @@
       "name": "Polling de reconciliação",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
@@ -27,7 +30,10 @@
       "name": "Configurar janela",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
@@ -40,7 +46,10 @@
       "name": "Listar Atendimentos ElevenLabs",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 0],
+      "position": [
+        440,
+        0
+      ],
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 2000,
@@ -60,7 +69,10 @@
       "name": "Extrair Atendimentos concluídos",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, -120]
+      "position": [
+        660,
+        -120
+      ]
     },
     {
       "parameters": {
@@ -71,7 +83,10 @@
       "name": "Agregar candidatos",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, -120]
+      "position": [
+        880,
+        -120
+      ]
     },
     {
       "parameters": {
@@ -85,7 +100,10 @@
       "name": "Manter somente ausentes",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
-      "position": [1100, -120],
+      "position": [
+        1100,
+        -120
+      ],
       "credentials": {
         "postgres": {
           "id": "CONFIGURE_NO_N8N",
@@ -104,7 +122,10 @@
       "name": "Buscar Conversa ElevenLabs",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1320, -120],
+      "position": [
+        1320,
+        -120
+      ],
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 2000,
@@ -119,13 +140,16 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const data = $json;\nif (data?.error || !data?.conversation_id) return [];\nif (data.status !== 'done') return [];\nconst transferToolName = $env.ELEVENLABS_TRANSFER_TOOL_NAME;\nif (!transferToolName) throw new Error('ELEVENLABS_TRANSFER_TOOL_NAME is required');\nconst startedAt = new Date(data.metadata.start_time_unix_secs * 1000);\nconst duration = data.metadata.call_duration_secs;\nconst contactReason = data.analysis?.data_collection_results?.['Classificação']?.value ?? null;\nconst transferred = data.transcript.some(turn => turn.tool_calls?.some(call => call.tool_name === transferToolName && call.tool_has_been_called === true));\nreturn [{ json: {\n  conversation_id: data.conversation_id,\n  agent_id: data.agent_id,\n  event_timestamp: data.metadata.start_time_unix_secs + duration,\n  status: 'concluido',\n  started_at: startedAt.toISOString(),\n  completed_at: new Date(startedAt.getTime() + duration * 1000).toISOString(),\n  duration_seconds: duration,\n  transcript: data.transcript.filter(turn => turn.role === 'agent' || turn.role === 'user').map(({ role, message, time_in_call_secs }) => ({ role, message: message ?? '', time_in_call_secs })),\n  audio_reference: null,\n  contact_reason: contactReason,\n  transferred,\n  cost: data.metadata.cost_fiat ?? null\n} }];"
+        "jsCode": "const data = $json;\nif (data?.error || !data?.conversation_id) return [];\nif (data.status !== 'done') return [];\nconst transferToolName = $env.ELEVENLABS_TRANSFER_TOOL_NAME;\nif (!transferToolName) throw new Error('ELEVENLABS_TRANSFER_TOOL_NAME is required');\nconst startedAt = new Date(data.metadata.start_time_unix_secs * 1000);\nconst duration = data.metadata.call_duration_secs;\nconst contactReason = data.analysis?.data_collection_results?.['Classificação']?.value ?? null;\nconst transferred = data.transcript.some(turn => turn.tool_calls?.some(call => call.tool_name === transferToolName && call.tool_has_been_called === true));\n\nconst firstAgentSpeech = data.transcript.find(turn => turn.role === 'agent' && String(turn.message ?? '').trim());\nconst tme_seconds = firstAgentSpeech && Number.isFinite(Number(firstAgentSpeech.time_in_call_secs))\n  ? Number(firstAgentSpeech.time_in_call_secs)\n  : null;\nconst resultsByCallId = new Map();\nlet hasToolResults = false;\nfor (const turn of data.transcript) {\n  for (const result of turn.tool_results ?? []) {\n    hasToolResults = true;\n    if (result?.tool_call_id) resultsByCallId.set(result.tool_call_id, result);\n  }\n}\nconst calledTools = [];\nfor (const turn of data.transcript) {\n  for (const call of turn.tool_calls ?? []) {\n    if (call?.tool_has_been_called !== true) continue;\n    calledTools.push(call);\n  }\n}\nconst executions = hasToolResults\n  ? [...resultsByCallId.values()].map(result => ({ success: result.is_error !== true }))\n  : calledTools.map(() => ({ success: true }));\nreturn [{ json: {\n  conversation_id: data.conversation_id,\n  agent_id: data.agent_id,\n  event_timestamp: data.metadata.start_time_unix_secs + duration,\n  status: 'concluido',\n  started_at: startedAt.toISOString(),\n  completed_at: new Date(startedAt.getTime() + duration * 1000).toISOString(),\n  duration_seconds: duration,\n  transcript: data.transcript.filter(turn => turn.role === 'agent' || turn.role === 'user').map(({ role, message, time_in_call_secs }) => ({ role, message: message ?? '', time_in_call_secs })),\n  audio_reference: null,\n  contact_reason: contactReason,\n  transferred,\n  cost: data.metadata.cost_fiat ?? null,\n  tme_seconds,\n  tool_executions: { total: executions.length, successful: executions.filter(item => item.success).length }\n} }];"
       },
       "id": "9b8f626b-00f1-4bb4-8440-9d250c0ccf10",
       "name": "Contrato normalizado",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1540, -120],
+      "position": [
+        1540,
+        -120
+      ],
       "continueOnFail": true
     },
     {
@@ -144,7 +168,10 @@
       "name": "Persistir Atendimento",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1760, -120],
+      "position": [
+        1760,
+        -120
+      ],
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 2000,
@@ -184,7 +211,10 @@
       "name": "Há próxima página?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [660, 120]
+      "position": [
+        660,
+        120
+      ]
     },
     {
       "parameters": {
@@ -195,43 +225,129 @@
       "name": "Preparar próxima página",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, 120]
+      "position": [
+        880,
+        120
+      ]
     }
   ],
   "pinData": {},
   "connections": {
     "Polling de reconciliação": {
-      "main": [[{ "node": "Configurar janela", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Configurar janela",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Configurar janela": {
-      "main": [[{ "node": "Listar Atendimentos ElevenLabs", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Listar Atendimentos ElevenLabs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Listar Atendimentos ElevenLabs": {
-      "main": [[
-        { "node": "Extrair Atendimentos concluídos", "type": "main", "index": 0 },
-        { "node": "Há próxima página?", "type": "main", "index": 0 }
-      ]]
+      "main": [
+        [
+          {
+            "node": "Extrair Atendimentos concluídos",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Há próxima página?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Extrair Atendimentos concluídos": {
-      "main": [[{ "node": "Agregar candidatos", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Agregar candidatos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Agregar candidatos": {
-      "main": [[{ "node": "Manter somente ausentes", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Manter somente ausentes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Manter somente ausentes": {
-      "main": [[{ "node": "Buscar Conversa ElevenLabs", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Buscar Conversa ElevenLabs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Buscar Conversa ElevenLabs": {
-      "main": [[{ "node": "Contrato normalizado", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Contrato normalizado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Contrato normalizado": {
-      "main": [[{ "node": "Persistir Atendimento", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Persistir Atendimento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Há próxima página?": {
-      "main": [[{ "node": "Preparar próxima página", "type": "main", "index": 0 }], []]
+      "main": [
+        [
+          {
+            "node": "Preparar próxima página",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
     },
     "Preparar próxima página": {
-      "main": [[{ "node": "Listar Atendimentos ElevenLabs", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Listar Atendimentos ElevenLabs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,

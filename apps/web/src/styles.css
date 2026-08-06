@@ -2039,7 +2039,7 @@ h1 {
 
 .dashboard-kpis {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   margin: 38px 0;
   border-top: 1px solid var(--dashboard-line);
   border-left: 1px solid var(--dashboard-line);
@@ -2050,6 +2050,19 @@ h1 {
   padding: 22px;
   border-right: 1px solid var(--dashboard-line);
   border-bottom: 1px solid var(--dashboard-line);
+}
+
+.dashboard-kpis small {
+  display: block;
+  margin-top: 10px;
+  color: var(--dashboard-muted);
+  font-family: Consolas, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+
+.dashboard-kpis article:first-child small {
+  color: #9fc8bc;
 }
 
 .dashboard-kpis article:first-child {

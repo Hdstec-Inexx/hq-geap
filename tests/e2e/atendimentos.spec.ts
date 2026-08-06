@@ -91,6 +91,21 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     });
     expect(first.status()).toBe(201);
     const created = await first.json();
+    const persistedMetrics = await queryDatabase<{
+      tme_segundos: number | null;
+      tools_executados: number;
+      tools_sucesso: number;
+    }>(
+      `select tme_segundos, tools_executados, tools_sucesso
+       from atendimentos
+       where elevenlabs_conversation_id = $1`,
+      [atendimento.conversation_id]
+    );
+    expect(persistedMetrics.rows[0]).toEqual({
+      tme_segundos: atendimento.tme_seconds,
+      tools_executados: atendimento.tool_executions.total,
+      tools_sucesso: atendimento.tool_executions.successful
+    });
 
     const replay = await request.post(`${apiUrl}/atendimentos/ingestao`, {
       data: { ...atendimento, contact_reason: 'Segunda via de boleto' },

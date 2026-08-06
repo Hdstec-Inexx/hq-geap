@@ -19,6 +19,15 @@ export const transcriptEntrySchema = z.object({
   time_in_call_secs: z.number().nonnegative()
 });
 
+const toolExecutionsSchema = z
+  .object({
+    total: z.number().int().nonnegative(),
+    successful: z.number().int().nonnegative()
+  })
+  .refine(({ total, successful }) => successful <= total, {
+    message: 'tools bem-sucedidas nao podem exceder o total'
+  });
+
 const ingestBaseSchema = z.object({
   conversation_id: z.string().trim().min(1),
   agent_id: z.string().trim().min(1),
@@ -28,7 +37,9 @@ const ingestBaseSchema = z.object({
   audio_reference: storageReference.nullable().optional(),
   contact_reason: optionalNullableText,
   transferred: z.boolean(),
-  cost: optionalNullableNonnegativeNumber
+  cost: optionalNullableNonnegativeNumber,
+  tme_seconds: z.number().int().nonnegative().nullable().optional(),
+  tool_executions: toolExecutionsSchema.optional()
 });
 
 export const ingestAtendimentoSchema = z.discriminatedUnion('status', [

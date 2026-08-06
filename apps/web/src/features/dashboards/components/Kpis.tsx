@@ -1,49 +1,65 @@
-import type { Dashboard } from '@hq-geap/contracts/dashboards';
+import {
+  SLA_TME_LIMITE_SEGUNDOS,
+  type Dashboard
+} from '@hq-geap/contracts/dashboards';
 import { formatDuration } from '../../atendimentos/api';
-
-const currency = new Intl.NumberFormat('pt-BR', {
-  style: 'currency',
-  currency: 'USD'
-});
 
 function valueOrDash(value: number | null, format: (value: number) => string) {
   return value === null ? '—' : format(value);
 }
 
+function formatPercentage(value: number) {
+  return `${value.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`;
+}
+
+function formatNota(value: number) {
+  return value.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+}
+
+function formatSlaLimit(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${minutes}:${String(remainder).padStart(2, '0')}`;
+}
+
 export function Kpis({ kpis }: { kpis: Dashboard['kpis'] }) {
   const items = [
-    { label: 'Volume', value: kpis.volume.toLocaleString('pt-BR') },
+    {
+      label: 'Total de Atendimentos',
+      value: kpis.volume.toLocaleString('pt-BR')
+    },
     {
       label: 'TMA',
       value: valueOrDash(kpis.tmaSegundos, formatDuration)
     },
     {
-      label: 'Nota IA',
-      value: valueOrDash(kpis.notaMediaIa, (value) =>
-        value.toLocaleString('pt-BR', { maximumFractionDigits: 2 })
-      )
+      label: 'TME',
+      value: valueOrDash(kpis.tmeSegundos, formatDuration)
     },
     {
-      label: 'Nota Curador',
-      value: valueOrDash(kpis.notaMediaCurador, (value) =>
-        value.toLocaleString('pt-BR', { maximumFractionDigits: 2 })
-      )
+      label: 'Taxa de Resolvidas',
+      value: valueOrDash(kpis.taxaResolvidas, formatPercentage)
     },
     {
-      label: 'Transferências',
-      value: kpis.transferencias.toLocaleString('pt-BR')
+      label: 'SLA',
+      value: valueOrDash(kpis.sla, formatPercentage),
+      hint: `meta ${kpis.slaMeta}% · TME ≤ ${formatSlaLimit(SLA_TME_LIMITE_SEGUNDOS)}`
     },
     {
-      label: 'Resolvidos sem transferência',
-      value: kpis.resolvidosSemTransferencia.toLocaleString('pt-BR')
+      label: 'Nota média IA',
+      value: valueOrDash(kpis.notaMediaIa, formatNota)
     },
     {
-      label: 'Custo total',
-      value: valueOrDash(kpis.custoTotal, currency.format)
+      label: 'Nota média Curador',
+      value: valueOrDash(kpis.notaMediaCurador, formatNota)
     },
     {
-      label: 'Custo médio',
-      value: valueOrDash(kpis.custoMedio, currency.format)
+      label: 'Taxa de Promessas Cumpridas',
+      value: valueOrDash(kpis.taxaPromessasCumpridas, formatPercentage)
+    },
+    {
+      label: 'Tempo Médio até Resolução',
+      value: valueOrDash(kpis.tempoMedioAteResolucao, formatDuration)
     }
   ];
 
@@ -53,6 +69,7 @@ export function Kpis({ kpis }: { kpis: Dashboard['kpis'] }) {
         <article key={item.label}>
           <span>{item.label}</span>
           <strong>{item.value}</strong>
+          {'hint' in item && item.hint ? <small>{item.hint}</small> : null}
         </article>
       ))}
     </section>
