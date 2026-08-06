@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { reguaAvaliacaoSchema } from '../../packages/contracts/src/criterios.js';
+import {
+  criterioSchema,
+  reguaAvaliacaoSchema
+} from '../../packages/contracts/src/criterios.js';
 
 const reguaValida = {
   vigente: true,
@@ -30,6 +33,39 @@ const reguaValida = {
 
 test('aceita uma Regua vigente ordenada que soma exatamente 10', () => {
   assert.equal(reguaAvaliacaoSchema.safeParse(reguaValida).success, true);
+});
+
+test('criterioSchema aceita valor 0', () => {
+  assert.equal(
+    criterioSchema.safeParse({
+      ...reguaValida.criterios[0]!,
+      valor: 0
+    }).success,
+    true
+  );
+});
+
+test('criterioSchema rejeita valor negativo', () => {
+  assert.equal(
+    criterioSchema.safeParse({
+      ...reguaValida.criterios[0]!,
+      valor: -0.01
+    }).success,
+    false
+  );
+});
+
+test('aceita Critério com valor 0 quando a Regua continua somando 10', () => {
+  assert.equal(
+    reguaAvaliacaoSchema.safeParse({
+      ...reguaValida,
+      criterios: [
+        { ...reguaValida.criterios[0]!, valor: 0 },
+        { ...reguaValida.criterios[1]!, valor: 10 }
+      ]
+    }).success,
+    true
+  );
 });
 
 test('rejeita uma Regua cuja soma nao seja exatamente 10', () => {
