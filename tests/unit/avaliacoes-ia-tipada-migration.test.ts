@@ -124,6 +124,12 @@ test('migration inclui uso_correto_ferramentas, Criterio valor 0 e gate na persi
     /add constraint avaliacoes_ia_contrato_tipado_check/i
   );
   assert.ok(backfillAt >= 0 && newCheckAt >= 0 && backfillAt < newCheckAt);
+  // Deploy migration-only precisa alinhar o prompt ativo às 8 chaves.
+  assert.match(
+    migration,
+    /prompt not like '%uso_correto_ferramentas%'[\s\S]*insert into prompts_ia_avaliadora/i
+  );
+  assert.match(migration, /oito chaves booleanas/i);
 });
 
 test('seed alinha prompt e Regua ao contrato de 8 chaves booleanas', async () => {
@@ -138,4 +144,5 @@ test('seed alinha prompt e Regua ao contrato de 8 chaves booleanas', async () =>
     seed,
     /uso_correto_ferramentas[\s\S]*resolveu_solicitacao|ferramentas[\s\S]*resolu/i
   );
+  assert.match(seed, /prompt not like '%uso_correto_ferramentas%'/i);
 });

@@ -21,10 +21,13 @@ set
   ativo = excluded.ativo,
   ordem = excluded.ordem;
 
+-- Só publica nova versão se a migration 0013 ainda não alinhou o prompt
+-- (instalação fresca ou ambientes que aplicam seeds sem ter rodado o bump).
 with configuracao_atual as materialized (
   select id, prompt, provedor, modelo, temperatura, criado_por
   from prompts_ia_avaliadora
   where ativo
+    and prompt not like '%uso_correto_ferramentas%'
   for update
 ),
 configuracao_desativada as (
