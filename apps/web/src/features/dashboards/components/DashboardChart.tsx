@@ -5,7 +5,6 @@ import {
   CategoryScale,
   Chart,
   DoughnutController,
-  Legend,
   LinearScale,
   Tooltip,
   type ChartConfiguration,
@@ -19,15 +18,33 @@ Chart.register(
   BarElement,
   CategoryScale,
   DoughnutController,
-  Legend,
   LinearScale,
   Tooltip
 );
 
-const defaultOptions: ChartOptions = {
-  responsive: true,
-  maintainAspectRatio: false
-};
+function baseOptions(): ChartOptions {
+  const reduceMotion =
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: reduceMotion ? false : undefined
+  };
+}
+
+function mergeConfiguration(
+  configuration: ChartConfiguration<any>
+): ChartConfiguration<any> {
+  return {
+    ...configuration,
+    options: {
+      ...baseOptions(),
+      ...configuration.options
+    }
+  };
+}
 
 export function DashboardChart({
   ariaLabel,
@@ -40,13 +57,14 @@ export function DashboardChart({
   configuration: ChartConfiguration<any>;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<Chart | null>(null);
   const configurationRef = useRef(configuration);
   configurationRef.current = configuration;
 
   const labels = configuration.data.labels ?? [];
   const dataset = configuration.data.datasets[0];
   const values = Array.isArray(dataset?.data) ? dataset.data : [];
-  const syncKey = [
+  const dataFingerprint = [
     configuration.type,
     labels.join('\u0001'),
     values.join('\u0001'),
@@ -60,19 +78,26 @@ export function DashboardChart({
     }
 
     Chart.getChart(canvas)?.destroy();
-
-    const chart = new Chart(canvas, {
-      ...configurationRef.current,
-      options: {
-        ...defaultOptions,
-        ...configurationRef.current.options
-      }
-    } as never);
+    const chart = new Chart(canvas, mergeConfiguration(configurationRef.current));
+    chartRef.current = chart;
 
     return () => {
       chart.destroy();
+      chartRef.current = null;
     };
-  }, [syncKey]);
+  }, []);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) {
+      return;
+    }
+
+    const next = mergeConfiguration(configurationRef.current);
+    chart.data = next.data;
+    chart.options = next.options ?? {};
+    chart.update(baseOptions().animation === false ? 'none' : undefined);
+  }, [dataFingerprint]);
 
   return (
     <canvas
