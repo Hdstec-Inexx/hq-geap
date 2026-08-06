@@ -108,6 +108,7 @@ export function createAtendimentosRepository(db: pg.Pool) {
           return { created: false, row: result.rows[0]! };
         }
         const toolExecutions = atendimento.tool_executions;
+        const hasToolExecutions = toolExecutions !== undefined;
         const values = [
           agentId,
           atendimento.conversation_id,
@@ -123,7 +124,8 @@ export function createAtendimentosRepository(db: pg.Pool) {
           atendimento.event_timestamp,
           atendimento.tme_seconds ?? null,
           toolExecutions?.total ?? 0,
-          toolExecutions?.successful ?? 0
+          toolExecutions?.successful ?? 0,
+          hasToolExecutions
         ];
 
         if (current) {
@@ -140,14 +142,8 @@ export function createAtendimentosRepository(db: pg.Pool) {
                 custo = coalesce($11, custo),
                 elevenlabs_event_timestamp = $12,
                 tme_segundos = coalesce($13, tme_segundos),
-                tools_executados = case
-                  when $14::integer > 0 or $15::integer > 0 then $14
-                  else tools_executados
-                end,
-                tools_sucesso = case
-                  when $14::integer > 0 or $15::integer > 0 then $15
-                  else tools_sucesso
-                end,
+                tools_executados = case when $16 then $14 else tools_executados end,
+                tools_sucesso = case when $16 then $15 else tools_sucesso end,
                 atualizado_em = now()
             where elevenlabs_conversation_id = $2
               and agente_voz_id = $1

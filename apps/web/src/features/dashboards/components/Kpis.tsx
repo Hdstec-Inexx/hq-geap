@@ -16,6 +16,13 @@ function formatNota(value: number) {
   return value.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
 }
 
+function formatNotaPar(ia: number | null, curador: number | null) {
+  if (ia === null && curador === null) {
+    return '—';
+  }
+  return `${valueOrDash(ia, formatNota)} × ${valueOrDash(curador, formatNota)}`;
+}
+
 function formatSlaLimit(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
@@ -46,12 +53,9 @@ export function Kpis({ kpis }: { kpis: Dashboard['kpis'] }) {
       hint: `meta ${kpis.slaMeta}% · TME ≤ ${formatSlaLimit(SLA_TME_LIMITE_SEGUNDOS)}`
     },
     {
-      label: 'Nota média IA',
-      value: valueOrDash(kpis.notaMediaIa, formatNota)
-    },
-    {
-      label: 'Nota média Curador',
-      value: valueOrDash(kpis.notaMediaCurador, formatNota)
+      label: 'Nota média',
+      value: formatNotaPar(kpis.notaMediaIa, kpis.notaMediaCurador),
+      hint: 'IA × Curador'
     },
     {
       label: 'Taxa de Promessas Cumpridas',

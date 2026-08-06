@@ -2039,7 +2039,7 @@ h1 {
 
 .dashboard-kpis {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin: 38px 0;
   border-top: 1px solid var(--dashboard-line);
   border-left: 1px solid var(--dashboard-line);

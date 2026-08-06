@@ -260,6 +260,11 @@ test('workflow conta falha de tool_results.is_error na Taxa de Promessas', async
                   tool_name: 'enviar_segunda_via_boleto',
                   tool_call_id: 'tool-fail',
                   tool_has_been_called: true
+                },
+                {
+                  tool_name: 'enviar_segunda_via_boleto',
+                  tool_call_id: 'tool-sem-result',
+                  tool_has_been_called: true
                 }
               ],
               tool_results: [
@@ -289,7 +294,8 @@ test('workflow conta falha de tool_results.is_error na Taxa de Promessas', async
   )[0]!.json;
 
   assert.equal(generated.tme_seconds, 5);
-  assert.deepEqual(generated.tool_executions, { total: 2, successful: 1 });
+  // total inclui chamada sem result; sucesso só tool-ok
+  assert.deepEqual(generated.tool_executions, { total: 3, successful: 1 });
 });
 
 test('contrato aceita message null de tool call da ElevenLabs', () => {

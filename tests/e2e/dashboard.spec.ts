@@ -286,6 +286,8 @@ test.describe.serial('Dashboard da Gestao', () => {
     await expect(page.getByText('Taxa de Resolvidas', { exact: true })).toBeVisible();
     await expect(page.getByText('SLA', { exact: true })).toBeVisible();
     await expect(page.getByText('meta 80% · TME ≤ 2:30')).toBeVisible();
+    await expect(page.getByText('Nota média', { exact: true })).toBeVisible();
+    await expect(page.getByText('IA × Curador', { exact: true })).toBeVisible();
     await expect(page.getByText('Taxa de Promessas Cumpridas', { exact: true })).toBeVisible();
     await expect(page.getByText('Tempo Médio até Resolução', { exact: true })).toBeVisible();
     await expect(page.getByText('Transferências')).toHaveCount(0);
