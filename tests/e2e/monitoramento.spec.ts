@@ -133,4 +133,58 @@ test.describe.serial('Monitoramento ao Vivo — conversas abertas na ElevenLabs'
     await expect(page.getByRole('link', { name: /Voltar/i })).toBeVisible();
     await expect(page.getByText(/end_call|takeover|transfer/i)).toHaveCount(0);
   });
+
+  test('lista refetch ~10s enquanto a página está montada', async ({ page }) => {
+    test.setTimeout(45_000);
+    await loginPage(page, 'curador');
+
+    const listCallAt: number[] = [];
+    await page.route('**/monitoramento/conversas', async (route) => {
+      listCallAt.push(Date.now());
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            conversationId: 'conv_el_refresh',
+            agentId: 'agent-livia-live',
+            agenteVozNome: 'Lívia Live',
+            status: 'in-progress',
+            iniciadoEm: '2020-09-13T12:26:40.000Z'
+          }
+        ])
+      });
+    });
+
+    await page.goto('/monitoramento');
+    await expect(
+      page.getByRole('heading', { name: 'Monitoramento ao Vivo' })
+    ).toBeVisible();
+    await expect(page.getByText('conv_el_refresh')).toBeVisible();
+    await expect(
+      page.getByText(/Somente leitura|somente observação/i).first()
+    ).toBeVisible();
+    await expect(page.getByText(/end_call|takeover|transfer/i)).toHaveCount(0);
+
+    const afterMount = listCallAt.length;
+    expect(afterMount).toBeGreaterThan(0);
+
+    // Initial + ~2 polls at 10s. StrictMode may double the mount fetch.
+    await expect
+      .poll(() => listCallAt.length, { timeout: 28_000 })
+      .toBeGreaterThanOrEqual(afterMount + 2);
+
+    const refreshGaps = listCallAt.slice(afterMount).map((at, index, rest) => {
+      const previous = index === 0 ? listCallAt[afterMount - 1]! : rest[index - 1]!;
+      return at - previous;
+    });
+    expect(refreshGaps.length).toBeGreaterThanOrEqual(2);
+    const medianGap = [...refreshGaps].sort((a, b) => a - b)[
+      Math.floor(refreshGaps.length / 2)
+    ]!;
+    expect(medianGap).toBeGreaterThanOrEqual(8_000);
+    expect(medianGap).toBeLessThanOrEqual(15_000);
+
+    await expect(page.getByText(/end_call|takeover|transfer/i)).toHaveCount(0);
+  });
 });
