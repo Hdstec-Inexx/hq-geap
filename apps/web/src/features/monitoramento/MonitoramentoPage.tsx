@@ -37,15 +37,40 @@ export function MonitoramentoPage() {
   useEffect(() => {
     let cancelled = false;
     let refreshTimer: number | undefined;
+    let releaseVisibilityWait: (() => void) | undefined;
     const abortController = new AbortController();
 
-    async function load(showLoading: boolean) {
+    function delay(ms: number) {
+      return new Promise<void>((resolve) => {
+        refreshTimer = window.setTimeout(resolve, ms);
+      });
+    }
+
+    function whenVisible() {
+      if (document.visibilityState === 'visible') return Promise.resolve();
+      return new Promise<void>((resolve) => {
+        function onVisibility() {
+          if (document.visibilityState !== 'visible') return;
+          document.removeEventListener('visibilitychange', onVisibility);
+          releaseVisibilityWait = undefined;
+          resolve();
+        }
+        releaseVisibilityWait = () => {
+          document.removeEventListener('visibilitychange', onVisibility);
+          releaseVisibilityWait = undefined;
+          resolve();
+        };
+        document.addEventListener('visibilitychange', onVisibility);
+      });
+    }
+
+    async function load(isInitial: boolean) {
       const session = getSession();
       if (!session) {
         if (!cancelled) setState({ status: 'error' });
-        return;
+        return 'auth' as const;
       }
-      if (showLoading) setState({ status: 'loading' });
+      if (isInitial) setState({ status: 'loading' });
 
       try {
         const response = await fetch(`${apiUrl}/monitoramento/conversas`, {
@@ -57,23 +82,28 @@ export function MonitoramentoPage() {
         }
         const data = monitoramentoConversasSchema.parse(await response.json());
         if (!cancelled) setState({ status: 'ready', data });
+        return 'ok' as const;
       } catch (error: unknown) {
         if (error instanceof DOMException && error.name === 'AbortError') {
-          return;
+          return 'aborted' as const;
         }
         // Soft-fail on refresh: keep the last good snapshot for the Curador.
-        if (!cancelled && showLoading) setState({ status: 'error' });
+        if (!cancelled && isInitial) setState({ status: 'error' });
+        return 'error' as const;
       }
     }
 
     async function poll() {
-      await load(true);
+      const first = await load(true);
+      if (cancelled || first === 'auth') return;
       while (!cancelled) {
-        await new Promise<void>((resolve) => {
-          refreshTimer = window.setTimeout(resolve, LIST_REFRESH_MS);
-        });
+        await delay(LIST_REFRESH_MS);
         if (cancelled) return;
-        await load(false);
+        // Skip ElevenLabs-backed refreshes while the Curador is on another tab.
+        await whenVisible();
+        if (cancelled) return;
+        const result = await load(false);
+        if (result === 'auth') return;
       }
     }
 
@@ -82,6 +112,7 @@ export function MonitoramentoPage() {
     return () => {
       cancelled = true;
       if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
+      releaseVisibilityWait?.();
       abortController.abort();
     };
   }, []);
