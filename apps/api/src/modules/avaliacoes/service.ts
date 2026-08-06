@@ -23,7 +23,8 @@ function checklistBooleano(row: AvaliacaoIaRow): ChecklistIaBooleano {
     resolveu_solicitacao: row.resolveuSolicitacao,
     validou_email_por_extenso: row.validouEmailPorExtenso,
     sem_diminutivos: row.semDiminutivos,
-    encerramento_geap: row.encerramentoGeap
+    encerramento_geap: row.encerramentoGeap,
+    uso_correto_ferramentas: row.usoCorretoFerramentas
   };
 }
 

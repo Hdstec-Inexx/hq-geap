@@ -138,11 +138,12 @@ test.describe.serial('configuracao versionada da IA Avaliadora', () => {
              atendimento_id, autor, nota,
              saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
              resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
-             encerramento_geap, atendimento_aprovado, nota_qualidade
+             encerramento_geap, uso_correto_ferramentas, atendimento_aprovado,
+             nota_qualidade
            )
            values (
              $1, 'ia', 0,
-             true, true, true, true, true, true, true, false, 0
+             true, true, true, true, true, true, true, true, false, 0
            )`,
           [atendimento.rows[0]!.id]
         )

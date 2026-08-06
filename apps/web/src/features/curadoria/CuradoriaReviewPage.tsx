@@ -42,10 +42,18 @@ function ReviewForm({
   );
   const [comentario, setComentario] = useState('');
   const [submitState, setSubmitState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const checklist = detail.avaliacaoIa.checklist.map((criterio) => ({
-    ...criterio,
-    estado: estados[criterio.chave] ?? criterio.estado
-  }));
+  const ferramentasNaoAtendidas = estados.uso_correto_ferramentas === 'nao_atendido';
+  const checklist = detail.avaliacaoIa.checklist.map((criterio) => {
+    let estado = estados[criterio.chave] ?? criterio.estado;
+    if (
+      ferramentasNaoAtendidas &&
+      criterio.chave === 'resolveu_solicitacao' &&
+      estado !== 'nao_atendido'
+    ) {
+      estado = 'nao_atendido';
+    }
+    return { ...criterio, estado };
+  });
   const nota = checklist.reduce(
     (total, criterio) => total + (criterio.estado === 'nao_atendido' ? 0 : criterio.valor),
     0
@@ -122,8 +130,24 @@ function ReviewForm({
                   <label key={estado}>
                     <input
                       checked={criterio.estado === estado}
+                      disabled={
+                        criterio.chave === 'resolveu_solicitacao' &&
+                        ferramentasNaoAtendidas &&
+                        estado !== 'nao_atendido'
+                      }
                       name={criterio.chave}
-                      onChange={() => setEstados((current) => ({ ...current, [criterio.chave]: estado }))}
+                      onChange={() =>
+                        setEstados((current) => {
+                          const next = { ...current, [criterio.chave]: estado };
+                          if (
+                            criterio.chave === 'uso_correto_ferramentas' &&
+                            estado === 'nao_atendido'
+                          ) {
+                            next.resolveu_solicitacao = 'nao_atendido';
+                          }
+                          return next;
+                        })
+                      }
                       type="radio"
                       value={estado}
                     />

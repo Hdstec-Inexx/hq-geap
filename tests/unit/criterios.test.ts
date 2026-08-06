@@ -63,3 +63,38 @@ test('rejeita criterios fora de ordem ou com ordem repetida', () => {
     false
   );
 });
+
+test('aceita Criterio com valor 0 e Regua que ainda soma 10', () => {
+  const reguaComValorZero = {
+    ...reguaValida,
+    criterios: [
+      ...reguaValida.criterios.map((criterio, index) =>
+        index === 0 ? { ...criterio, valor: 4 } : criterio
+      ),
+      {
+        chave: 'uso_correto_ferramentas',
+        nome: 'Uso Correto de Ferramentas',
+        descricao: 'Acionou as ferramentas corretas sem uso indevido?',
+        valor: 0,
+        critico: false,
+        condicional: false,
+        ordem: 3
+      }
+    ]
+  };
+
+  assert.equal(reguaAvaliacaoSchema.safeParse(reguaComValorZero).success, true);
+});
+
+test('rejeita Criterio com valor negativo', () => {
+  assert.equal(
+    reguaAvaliacaoSchema.safeParse({
+      ...reguaValida,
+      criterios: [
+        { ...reguaValida.criterios[0]!, valor: -0.01 },
+        { ...reguaValida.criterios[1]!, valor: 10.01 }
+      ]
+    }).success,
+    false
+  );
+});

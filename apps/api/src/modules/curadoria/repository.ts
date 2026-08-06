@@ -182,7 +182,8 @@ export function createCuradoriaRepository(db: pg.Pool) {
           a.resolveu_solicitacao as "resolveuSolicitacao",
           a.validou_email_por_extenso as "validouEmailPorExtenso",
           a.sem_diminutivos as "semDiminutivos",
-          a.encerramento_geap as "encerramentoGeap"
+          a.encerramento_geap as "encerramentoGeap",
+          a.uso_correto_ferramentas as "usoCorretoFerramentas"
         from avaliacoes a
         join prompts_ia_avaliadora p on p.id = a.prompt_id
         where a.atendimento_id = $1 and a.autor = 'ia'
