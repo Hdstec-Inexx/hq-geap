@@ -2,11 +2,12 @@ import {
   monitoramentoEventSchema,
   type MonitoramentoEvent
 } from '@hq-geap/contracts/monitoramento';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { monitoramentoAuthPayload, monitoramentoWsUrl } from './api';
 
 const maxLiveLines = 200;
+const nearBottomPx = 80;
 
 type LiveLine = {
   id: number;
@@ -26,6 +27,16 @@ export function MonitoramentoLivePage() {
   const [connection, setConnection] = useState<ConnectionState>({
     status: 'connecting'
   });
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !stickToBottomRef.current) {
+      return;
+    }
+    el.scrollTop = el.scrollHeight;
+  }, [lines]);
 
   useEffect(() => {
     if (!conversationId) {
@@ -55,6 +66,7 @@ export function MonitoramentoLivePage() {
 
     setConnection({ status: 'connecting' });
     setLines([]);
+    stickToBottomRef.current = true;
 
     socket.addEventListener('open', () => {
       try {
@@ -198,7 +210,17 @@ export function MonitoramentoLivePage() {
 
       <section className="transcript-panel monitoramento-live-panel">
         <p className="panel-label">Transcrição ao vivo</p>
-        <div className="transcript-lines">
+        <div
+          className="transcript-lines monitoramento-transcript-scroll"
+          data-testid="monitoramento-transcript-scroll"
+          onScroll={(event) => {
+            const el = event.currentTarget;
+            const distance =
+              el.scrollHeight - el.scrollTop - el.clientHeight;
+            stickToBottomRef.current = distance <= nearBottomPx;
+          }}
+          ref={scrollRef}
+        >
           {lines.length === 0 ? (
             <p>Aguardando falas do Atendimento...</p>
           ) : (
