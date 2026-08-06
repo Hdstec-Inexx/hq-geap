@@ -68,6 +68,8 @@ export function buildDetalhamentoFilters(
       )`);
       break;
     case 'promessas':
+      // Lado positivo da Taxa (execuções com sucesso) na lista de Atendimentos:
+      // Atendimentos que contribuíram com ao menos um sucesso no período.
       clauses.push('a.tools_sucesso > 0');
       break;
     case 'motivo': {
