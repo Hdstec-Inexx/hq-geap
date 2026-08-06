@@ -299,6 +299,52 @@ test('workflow conta falha de tool_results.is_error na Taxa de Promessas', async
   assert.deepEqual(generated.tool_executions, { total: 3, successful: 1 });
 });
 
+test('workflow sem tool_results nao conta sucesso na Taxa de Promessas', async () => {
+  const workflow = await loadWorkflow();
+  const code = workflowCode(workflow, 'Contrato normalizado');
+  const execute = new Function('$json', '$env', code) as (
+    json: unknown,
+    environment: unknown
+  ) => Array<{ json: Record<string, unknown> }>;
+  const generated = execute(
+    {
+      event: {
+        type: 'post_call_transcription',
+        event_timestamp: 1785330252,
+        data: {
+          conversation_id: 'conv-tool-no-results',
+          agent_id: 'agent-livia-test',
+          status: 'done',
+          has_audio: false,
+          transcript: [
+            {
+              role: 'agent',
+              message: 'Olá',
+              time_in_call_secs: 2,
+              tool_calls: [
+                {
+                  tool_name: 'enviar_segunda_via_boleto',
+                  tool_call_id: 'tool-orphan',
+                  tool_has_been_called: true
+                }
+              ]
+            }
+          ],
+          metadata: {
+            start_time_unix_secs: 1785330000,
+            call_duration_secs: 40,
+            cost_fiat: 0.1
+          },
+          analysis: { data_collection_results: {} }
+        }
+      }
+    },
+    { ELEVENLABS_TRANSFER_TOOL_NAME: 'transfer_to_number' }
+  )[0]!.json;
+
+  assert.deepEqual(generated.tool_executions, { total: 1, successful: 0 });
+});
+
 test('contrato aceita message null de tool call da ElevenLabs', () => {
   assert.deepEqual(
     transcriptEntrySchema.parse({
