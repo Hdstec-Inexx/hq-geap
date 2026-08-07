@@ -114,7 +114,7 @@ export function Kpis({
       <KpiLink
         ariaLabel="Detalhar SLA"
         fim={fim}
-        hint={`meta ${kpis.slaMeta}% · TME ≤ ${formatSlaLimit(SLA_TME_LIMITE_SEGUNDOS)}`}
+        hint={`meta ${kpis.slaMeta}% · Tempo de Espera ≤ ${formatSlaLimit(SLA_TME_LIMITE_SEGUNDOS)}`}
         indicador="sla"
         inicio={inicio}
         label="SLA"

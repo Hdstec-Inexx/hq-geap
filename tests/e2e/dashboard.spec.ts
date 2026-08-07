@@ -147,7 +147,7 @@ test.describe.serial('Dashboard da Gestao', () => {
       conversationId: 'conv-dashboard-1',
       concluidoEm: '2025-01-10T12:00:00Z',
       duracao: 120,
-      tme: 180,
+      tme: null,
       toolsTotal: 2,
       toolsSuccessful: 1,
       motivo: 'Rede credenciada',
@@ -201,7 +201,7 @@ test.describe.serial('Dashboard da Gestao', () => {
     expect(dashboard.kpis).toEqual({
       volume: 2,
       tmaSegundos: 90,
-      tmeSegundos: 105,
+      tmeSegundos: 30,
       taxaResolvidas: 50,
       sla: 50,
       slaMeta: 80,
@@ -285,7 +285,7 @@ test.describe.serial('Dashboard da Gestao', () => {
     await expect(page.getByText('TME', { exact: true })).toBeVisible();
     await expect(page.getByText('Taxa de Resolvidas', { exact: true })).toBeVisible();
     await expect(page.getByText('SLA', { exact: true })).toBeVisible();
-    await expect(page.getByText('meta 80% · TME ≤ 2:30')).toBeVisible();
+    await expect(page.getByText('meta 80% · Tempo de Espera ≤ 2:30')).toBeVisible();
     await expect(page.getByText('Nota média', { exact: true })).toBeVisible();
     await expect(page.getByText('IA × Curador', { exact: true })).toBeVisible();
     await expect(page.getByText('Taxa de Promessas Cumpridas', { exact: true })).toBeVisible();
@@ -338,6 +338,43 @@ test.describe.serial('Dashboard da Gestao', () => {
         )
       ).status()
     ).toBe(403);
+  });
+
+  test('detalhamento de TME lista com medida e SLA lista dentro do prazo', async ({
+    page,
+    request
+  }) => {
+    const gestao = await loginApi(request, 'gestao');
+    await loginPage(page, 'gestao');
+    await page.goto('/gestao/dashboard?inicio=2025-01-01&fim=2025-01-31');
+
+    await page.getByRole('link', { name: 'Detalhar TME' }).click();
+    await expect(page).toHaveURL(/indicador=tme/);
+    await expect(page.getByText('Detalhamento do Indicador')).toBeVisible();
+    await expect(page.locator('.atendimento-row')).toHaveCount(1);
+    await expect(page.locator('.atendimento-row').getByText('Financeiro / Boletos')).toBeVisible();
+    await expect(page.locator('.atendimento-row').getByText('Rede credenciada')).toHaveCount(0);
+
+    await page.goto('/gestao/dashboard?inicio=2025-01-01&fim=2025-01-31');
+    await page.getByRole('link', { name: 'Detalhar SLA' }).click();
+    await expect(page).toHaveURL(/indicador=sla/);
+    await expect(page.getByText('Detalhamento do Indicador')).toBeVisible();
+    await expect(page.locator('.atendimento-row')).toHaveCount(1);
+    await expect(page.locator('.atendimento-row').getByText('Financeiro / Boletos')).toBeVisible();
+    await expect(page.locator('.atendimento-row').getByText('Rede credenciada')).toHaveCount(0);
+
+    const tmeList = await request.get(
+      `${apiUrl}/atendimentos?inicio=2025-01-01&fim=2025-01-31&indicador=tme`,
+      { headers: { authorization: `Bearer ${gestao.token}` } }
+    );
+    const slaList = await request.get(
+      `${apiUrl}/atendimentos?inicio=2025-01-01&fim=2025-01-31&indicador=sla`,
+      { headers: { authorization: `Bearer ${gestao.token}` } }
+    );
+    expect(tmeList.status()).toBe(200);
+    expect(slaList.status()).toBe(200);
+    expect(await tmeList.json()).toHaveLength(1);
+    expect(await slaList.json()).toHaveLength(1);
   });
 
   test('clique no Motivo de Contato navega com a populacao correta', async ({
