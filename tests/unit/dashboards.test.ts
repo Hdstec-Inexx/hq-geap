@@ -71,7 +71,6 @@ test('consulta as partes do dashboard sem ocupar varias conexoes simultaneamente
         tmeSegundos: '40',
         resolvidas: '1',
         dentroSla: '1',
-        comTme: '2',
         notaMediaIa: '7',
         notaMediaCurador: '6.5',
         toolsTotal: '3',
@@ -119,7 +118,6 @@ test('KPIs nulos quando nao ha amostra para media ou taxa', async () => {
       tmeSegundos: null,
       resolvidas: '0',
       dentroSla: '0',
-      comTme: '0',
       notaMediaIa: null,
       notaMediaCurador: null,
       toolsTotal: '0',
@@ -155,4 +153,43 @@ test('KPIs nulos quando nao ha amostra para media ou taxa', async () => {
     taxaPromessasCumpridas: null,
     tempoMedioAteResolucao: null
   });
+});
+
+test('SLA usa volume do periodo como denominador (volume 2, dentroSla 1 → 50%)', async () => {
+  const repository = {
+    getKpis: async () => ({
+      volume: '2',
+      tmaSegundos: '90',
+      tmeSegundos: '30',
+      resolvidas: '1',
+      dentroSla: '1',
+      notaMediaIa: '7',
+      notaMediaCurador: '6.5',
+      toolsTotal: '3',
+      toolsSuccessful: '2',
+      tempoMedioAteResolucao: '60'
+    }),
+    listMotivos: async () => [],
+    listCriterios: async () => [],
+    getConcordancia: async () => ({
+      notasConcordantes: '0',
+      totalNotas: '0',
+      criteriosConcordantes: '0',
+      totalCriterios: '0'
+    }),
+    listConcordanciaPorCriterio: async () => [],
+    listPiores: async () => []
+  } as unknown as DashboardRepository;
+
+  const dashboard = await getDashboard(repository, {
+    inicio: '2025-01-01',
+    fim: '2025-01-31'
+  });
+
+  // TME media stays on the single measurable sample; SLA divides by volume
+  // so a missing Tempo de Espera still counts against the rate (50%, not 100%).
+  assert.equal(dashboard.kpis.volume, 2);
+  assert.equal(dashboard.kpis.tmeSegundos, 30);
+  assert.equal(dashboard.kpis.sla, 50);
+  assert.equal(dashboard.kpis.slaMeta, 80);
 });
