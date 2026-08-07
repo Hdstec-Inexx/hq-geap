@@ -318,14 +318,15 @@ test('Contrato normalizado grava null com timestamps inválidos', async () => {
   assert.equal(generated.tme_seconds, null);
 });
 
-test('Contrato normalizado grava null com timestamps não-inteiros', async () => {
+test('Contrato normalizado arredonda Tempo de Espera com timestamps fracionários', async () => {
   const generated = await runContratoNormalizado([
     { role: 'agent', message: 'Olá, eu sou a Lívia.', time_in_call_secs: 0 },
     { role: 'user', message: 'Preciso de ajuda.', time_in_call_secs: 5.5 },
     { role: 'agent', message: 'Claro.', time_in_call_secs: 9 }
   ]);
 
-  assert.equal(generated.tme_seconds, null);
+  // Persist integer seconds: 9 − 5.5 = 3.5 → 4
+  assert.equal(generated.tme_seconds, 4);
 });
 
 test('Contrato normalizado grava null quando o intervalo seria negativo', async () => {
