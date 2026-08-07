@@ -68,7 +68,7 @@
     "contact_reason": "Financeiro/Boletos",
     "transferred": false,
     "cost": 0.1842,
-    "tme_seconds": 0,
+    "tme_seconds": 11,
     "tool_executions": {
       "total": 1,
       "successful": 0

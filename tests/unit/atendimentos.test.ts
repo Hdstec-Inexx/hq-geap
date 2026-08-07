@@ -79,6 +79,49 @@ function workflowCode(workflow: Workflow, nodeName: string) {
   return workflow.nodes.find((node) => node.name === nodeName)?.parameters.jsCode ?? '';
 }
 
+type TranscriptTurn = {
+  role: string;
+  message?: string | null;
+  time_in_call_secs?: number | null;
+  tool_calls?: unknown[];
+  tool_results?: unknown[];
+};
+
+async function runContratoNormalizado(
+  transcript: TranscriptTurn[],
+  overrides: Record<string, unknown> = {}
+) {
+  const workflow = await loadWorkflow();
+  const code = workflowCode(workflow, 'Contrato normalizado');
+  const execute = new Function('$json', '$env', code) as (
+    json: unknown,
+    environment: unknown
+  ) => Array<{ json: Record<string, unknown> }>;
+  return execute(
+    {
+      event: {
+        type: 'post_call_transcription',
+        event_timestamp: 1785330252,
+        data: {
+          conversation_id: 'conv-tempo-espera',
+          agent_id: 'agent-livia-test',
+          status: 'done',
+          has_audio: false,
+          transcript,
+          metadata: {
+            start_time_unix_secs: 1785330000,
+            call_duration_secs: 60,
+            cost_fiat: 0.1
+          },
+          analysis: { data_collection_results: {} },
+          ...overrides
+        }
+      }
+    },
+    { ELEVENLABS_TRANSFER_TOOL_NAME: 'transfer_to_number' }
+  )[0]!.json;
+}
+
 test('o contrato preserva a referencia de storage normalizada pelo n8n', async () => {
   const fixture = JSON.parse(await readFile(fixturePath, 'utf8')) as {
     data: { audio_url?: string; has_audio: boolean };
@@ -229,6 +272,72 @@ test('o workflow transforma a fixture real no contrato esperado', async () => {
   assert.deepEqual(payload, expected);
 });
 
+test('Contrato normalizado deriva Tempo de Espera como intervalo cliente → 2ª fala do agente', async () => {
+  const generated = await runContratoNormalizado([
+    { role: 'agent', message: 'Olá, eu sou a Lívia.', time_in_call_secs: 0 },
+    { role: 'user', message: 'Preciso de ajuda.', time_in_call_secs: 5 },
+    { role: 'agent', message: 'Claro, como posso ajudar?', time_in_call_secs: 9 }
+  ]);
+
+  assert.equal(generated.tme_seconds, 4);
+});
+
+test('Contrato normalizado grava null quando só há apresentação do agente', async () => {
+  const generated = await runContratoNormalizado([
+    { role: 'agent', message: 'Olá, eu sou a Lívia.', time_in_call_secs: 0 }
+  ]);
+
+  assert.equal(generated.tme_seconds, null);
+});
+
+test('Contrato normalizado grava null sem fala do cliente', async () => {
+  const generated = await runContratoNormalizado([
+    { role: 'agent', message: 'Olá, eu sou a Lívia.', time_in_call_secs: 0 },
+    { role: 'agent', message: 'Posso ajudar?', time_in_call_secs: 4 }
+  ]);
+
+  assert.equal(generated.tme_seconds, null);
+});
+
+test('Contrato normalizado grava null sem segunda fala do agente', async () => {
+  const generated = await runContratoNormalizado([
+    { role: 'agent', message: 'Olá, eu sou a Lívia.', time_in_call_secs: 0 },
+    { role: 'user', message: 'Preciso de ajuda.', time_in_call_secs: 5 }
+  ]);
+
+  assert.equal(generated.tme_seconds, null);
+});
+
+test('Contrato normalizado grava null com timestamps inválidos', async () => {
+  const generated = await runContratoNormalizado([
+    { role: 'agent', message: 'Olá, eu sou a Lívia.', time_in_call_secs: 0 },
+    { role: 'user', message: 'Preciso de ajuda.', time_in_call_secs: Number.NaN },
+    { role: 'agent', message: 'Claro.', time_in_call_secs: 9 }
+  ]);
+
+  assert.equal(generated.tme_seconds, null);
+});
+
+test('Contrato normalizado grava null com timestamps não-inteiros', async () => {
+  const generated = await runContratoNormalizado([
+    { role: 'agent', message: 'Olá, eu sou a Lívia.', time_in_call_secs: 0 },
+    { role: 'user', message: 'Preciso de ajuda.', time_in_call_secs: 5.5 },
+    { role: 'agent', message: 'Claro.', time_in_call_secs: 9 }
+  ]);
+
+  assert.equal(generated.tme_seconds, null);
+});
+
+test('Contrato normalizado grava null quando o intervalo seria negativo', async () => {
+  const generated = await runContratoNormalizado([
+    { role: 'agent', message: 'Olá, eu sou a Lívia.', time_in_call_secs: 0 },
+    { role: 'user', message: 'Preciso de ajuda.', time_in_call_secs: 12 },
+    { role: 'agent', message: 'Claro.', time_in_call_secs: 9 }
+  ]);
+
+  assert.equal(generated.tme_seconds, null);
+});
+
 test('workflow conta falha de tool_results.is_error na Taxa de Promessas', async () => {
   const workflow = await loadWorkflow();
   const code = workflowCode(workflow, 'Contrato normalizado');
@@ -294,7 +403,7 @@ test('workflow conta falha de tool_results.is_error na Taxa de Promessas', async
     { ELEVENLABS_TRANSFER_TOOL_NAME: 'transfer_to_number' }
   )[0]!.json;
 
-  assert.equal(generated.tme_seconds, 5);
+  assert.equal(generated.tme_seconds, null);
   // total inclui chamada sem result; sucesso só tool-ok
   assert.deepEqual(generated.tool_executions, { total: 3, successful: 1 });
 });
