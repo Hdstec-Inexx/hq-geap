@@ -140,15 +140,11 @@ test('webhook, reconciliacao e Buscar Conversa convergem para a ingestao idempot
     assert.match(JSON.stringify(buscar?.parameters), /\/v1\/convai\/conversations\//);
     assert.match(JSON.stringify(persistir?.parameters), /\/atendimentos\/ingestao/);
     assert.equal(persistir?.parameters.body, '={{ JSON.stringify($json) }}');
-    // #78 updated fixture Tempo de Espera (cliente → 2ª fala do agente).
-    // Reconciliação/reprocessar still use first-agent-speech until #80 restores parity.
-    const { tme_seconds: _expectedTme, ...expectedWithoutTme } = fixture.normalized;
-    const { tme_seconds: generatedTme, ...generatedWithoutTme } = generated;
-    assert.deepEqual(generatedWithoutTme, {
-      ...expectedWithoutTme,
+    assert.equal(generated.tme_seconds, 11);
+    assert.deepEqual(generated, {
+      ...fixture.normalized,
       audio_reference: null
     });
-    assert.equal(generatedTme, 0);
     assert.doesNotMatch(serialized, /xi-api-key["']?\s*[:=]\s*["'][^={]/i);
     assert.doesNotMatch(serialized, /postgres(?:ql)?:\/\//i);
   }
@@ -178,4 +174,101 @@ test('webhook, reconciliacao e Buscar Conversa convergem para a ingestao idempot
     skipNormalizar({ error: 'provider down' }, { ELEVENLABS_TRANSFER_TOOL_NAME: 'x' }),
     []
   );
+});
+
+function contratoNormalizado(workflow: Workflow) {
+  const code = node(workflow, 'Contrato normalizado')?.parameters.jsCode ?? '';
+  return new Function('$json', '$env', code) as (
+    input: unknown,
+    environment: unknown
+  ) => Array<{ json: Record<string, unknown> }> | unknown[];
+}
+
+function detalheComTranscript(
+  transcript: Array<Record<string, unknown>>
+): Record<string, unknown> {
+  return {
+    conversation_id: 'conv-tme-parity',
+    agent_id: 'agent-livia-test',
+    status: 'done',
+    transcript,
+    metadata: {
+      start_time_unix_secs: 1785330000,
+      call_duration_secs: 60,
+      cost_fiat: 0.1
+    },
+    analysis: { data_collection_results: {} }
+  };
+}
+
+test('reconciliacao e reprocessar derivam Tempo de Espera como cliente → 2ª fala do agente', async () => {
+  const [reconciliacao, reprocessamento] = await Promise.all([
+    loadWorkflow(reconciliacaoPath),
+    loadWorkflow(reprocessamentoPath)
+  ]);
+
+  for (const workflow of [reconciliacao, reprocessamento]) {
+    const normalizar = contratoNormalizado(workflow);
+    const generated = (
+      normalizar(
+        detalheComTranscript([
+          { role: 'agent', message: 'Olá, eu sou a Lívia.', time_in_call_secs: 0 },
+          { role: 'user', message: 'Preciso de ajuda.', time_in_call_secs: 5 },
+          { role: 'agent', message: 'Claro, como posso ajudar?', time_in_call_secs: 9 }
+        ]),
+        { ELEVENLABS_TRANSFER_TOOL_NAME: 'transfer_to_number' }
+      ) as Array<{ json: Record<string, unknown> }>
+    )[0]!.json;
+
+    assert.equal(generated.tme_seconds, 4);
+    assert.equal(Object.hasOwn(generated, 'tme'), false);
+    assert.equal(Object.hasOwn(generated, 'sla'), false);
+    assert.equal(Object.hasOwn(generated, 'sla_percent'), false);
+  }
+});
+
+test('reconciliacao e reprocessar gravam null sem regressão à primeira fala do agente', async () => {
+  const [reconciliacao, reprocessamento] = await Promise.all([
+    loadWorkflow(reconciliacaoPath),
+    loadWorkflow(reprocessamentoPath)
+  ]);
+
+  for (const workflow of [reconciliacao, reprocessamento]) {
+    const normalizar = contratoNormalizado(workflow);
+    const onlyPresentation = (
+      normalizar(
+        detalheComTranscript([
+          { role: 'agent', message: 'Olá, eu sou a Lívia.', time_in_call_secs: 0 }
+        ]),
+        { ELEVENLABS_TRANSFER_TOOL_NAME: 'transfer_to_number' }
+      ) as Array<{ json: Record<string, unknown> }>
+    )[0]!.json;
+    const withoutSecondAgent = (
+      normalizar(
+        detalheComTranscript([
+          { role: 'agent', message: 'Olá, eu sou a Lívia.', time_in_call_secs: 0 },
+          { role: 'user', message: 'Preciso de ajuda.', time_in_call_secs: 5 }
+        ]),
+        { ELEVENLABS_TRANSFER_TOOL_NAME: 'transfer_to_number' }
+      ) as Array<{ json: Record<string, unknown> }>
+    )[0]!.json;
+
+    assert.equal(onlyPresentation.tme_seconds, null);
+    assert.equal(withoutSecondAgent.tme_seconds, null);
+  }
+});
+
+test('reconciliacao e reprocessar não materializam TME nem SLA no contrato', async () => {
+  const [reconciliacao, reprocessamento] = await Promise.all([
+    loadWorkflow(reconciliacaoPath),
+    loadWorkflow(reprocessamentoPath)
+  ]);
+
+  for (const workflow of [reconciliacao, reprocessamento]) {
+    const code = node(workflow, 'Contrato normalizado')?.parameters.jsCode ?? '';
+    assert.doesNotMatch(code, /\bSLA\b/);
+    assert.doesNotMatch(code, /\btme_medio\b/i);
+    assert.doesNotMatch(code, /\bsla_/i);
+    assert.match(code, /tme_seconds/);
+  }
 });
