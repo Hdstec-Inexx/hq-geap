@@ -10,7 +10,6 @@ export type DashboardKpisRow = {
   tmeSegundos: string | null;
   resolvidas: string;
   dentroSla: string;
-  comTme: string;
   notaMediaIa: string | null;
   notaMediaCurador: string | null;
   toolsTotal: string;
@@ -74,7 +73,6 @@ export function createDashboardRepository(db: pg.Pool) {
             where a.tme_segundos is not null
               and a.tme_segundos <= $3
           ) as "dentroSla",
-          count(*) filter (where a.tme_segundos is not null) as "comTme",
           avg(ia.nota) as "notaMediaIa",
           avg(curador.nota) as "notaMediaCurador",
           coalesce(sum(a.tools_executados), 0) as "toolsTotal",
