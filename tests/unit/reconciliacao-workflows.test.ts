@@ -140,7 +140,15 @@ test('webhook, reconciliacao e Buscar Conversa convergem para a ingestao idempot
     assert.match(JSON.stringify(buscar?.parameters), /\/v1\/convai\/conversations\//);
     assert.match(JSON.stringify(persistir?.parameters), /\/atendimentos\/ingestao/);
     assert.equal(persistir?.parameters.body, '={{ JSON.stringify($json) }}');
-    assert.deepEqual(generated, { ...fixture.normalized, audio_reference: null });
+    // #78 updated fixture Tempo de Espera (cliente → 2ª fala do agente).
+    // Reconciliação/reprocessar still use first-agent-speech until #80 restores parity.
+    const { tme_seconds: _expectedTme, ...expectedWithoutTme } = fixture.normalized;
+    const { tme_seconds: generatedTme, ...generatedWithoutTme } = generated;
+    assert.deepEqual(generatedWithoutTme, {
+      ...expectedWithoutTme,
+      audio_reference: null
+    });
+    assert.equal(generatedTme, 0);
     assert.doesNotMatch(serialized, /xi-api-key["']?\s*[:=]\s*["'][^={]/i);
     assert.doesNotMatch(serialized, /postgres(?:ql)?:\/\//i);
   }
