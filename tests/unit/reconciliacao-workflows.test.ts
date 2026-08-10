@@ -255,6 +255,30 @@ test('reconciliacao e reprocessar gravam null sem regressão à primeira fala do
 
     assert.equal(onlyPresentation.tme_seconds, null);
     assert.equal(withoutSecondAgent.tme_seconds, null);
+
+    const negativeInterval = (
+      normalizar(
+        detalheComTranscript([
+          { role: 'agent', message: 'Olá, eu sou a Lívia.', time_in_call_secs: 0 },
+          { role: 'user', message: 'Preciso de ajuda.', time_in_call_secs: 12 },
+          { role: 'agent', message: 'Claro.', time_in_call_secs: 9 }
+        ]),
+        { ELEVENLABS_TRANSFER_TOOL_NAME: 'transfer_to_number' }
+      ) as Array<{ json: Record<string, unknown> }>
+    )[0]!.json;
+    const nonFinite = (
+      normalizar(
+        detalheComTranscript([
+          { role: 'agent', message: 'Olá, eu sou a Lívia.', time_in_call_secs: 0 },
+          { role: 'user', message: 'Preciso de ajuda.', time_in_call_secs: Number.NaN },
+          { role: 'agent', message: 'Claro.', time_in_call_secs: 9 }
+        ]),
+        { ELEVENLABS_TRANSFER_TOOL_NAME: 'transfer_to_number' }
+      ) as Array<{ json: Record<string, unknown> }>
+    )[0]!.json;
+
+    assert.equal(negativeInterval.tme_seconds, null);
+    assert.equal(nonFinite.tme_seconds, null);
   }
 });
 

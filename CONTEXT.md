@@ -79,3 +79,14 @@ A lista de Atendimentos concluídos e já avaliados pela IA, da qual o Curador e
 **Monitoramento ao Vivo**:
 A observação em tempo real — somente texto, sem áudio — de Atendimentos ainda **abertos na ElevenLabs** (`initiated` / `in-progress`, sem sinais de término, com duração ainda acompanhando o relógio e início recente), via WebSocket. A lista não filtra por dia civil; conversas zombie (status aberto preso na fonte, inclusive no mesmo dia), IDs que só aparecem no filtro aberto (ausentes na listagem geral, mesmo que o monitor ainda responda `history_complete`) e Atendimentos já `concluido` no HQ ficam de fora. Estritamente observacional: nenhuma intervenção no Atendimento.
 _Avoid_: Supervisão (implica intervenção, que não existe no MVP)
+
+**Tempo de Espera**:
+O intervalo, em segundos, entre a **primeira fala do cliente** e a **segunda fala do agente** (a primeira fala do agente é a apresentação). É fato do Atendimento; não é o TME. Fica `null` quando faltam a primeira fala do cliente, a segunda do agente, ou tempos válidos para calcular a diferença.
+_Avoid_: Fila (colide com Fila de Curadoria), instante absoluto desde o início do Atendimento, TME (TME é a média no período)
+
+**TME**:
+Tempo Médio de Espera: no dashboard, a soma dos Tempos de Espera dos Atendimentos do período filtrado que **têm** Tempo de Espera, dividida pela quantidade desses Atendimentos. Não é gravado na finalização do Atendimento — só o Tempo de Espera individual alimenta o cálculo.
+
+**SLA**:
+Percentual, no dashboard e no período filtrado, dos Atendimentos cujo Tempo de Espera está dentro do prazo (Tempo de Espera ≤ **150 segundos**), sobre o **total** de Atendimentos do período. Atendimento sem Tempo de Espera mensurável não conta como dentro do prazo. O limite define “dentro do prazo”; não é um segundo indicador nem medida de inatividade. A meta de referência é **80%**.
+_Avoid_: Inatividade, solicitação (use Atendimento)
