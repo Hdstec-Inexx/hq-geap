@@ -1,11 +1,5 @@
 import type { Perfil, UserRole } from '@hq-geap/contracts/auth';
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode
-} from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   AuthExpiredError,
@@ -29,18 +23,16 @@ const focusRefreshDebounceMs = 2000;
 const PerfilContext = createContext<Perfil | null>(null);
 
 function usePerfil(): Perfil | null {
-  return useContext(PerfilContext);
+  return useContext(PerfilContext) ?? getPerfil();
 }
 
-function PerfilProvider({
-  value,
-  children
-}: {
-  value: Perfil | null;
-  children: ReactNode;
-}) {
+function samePerfil(left: Perfil | null, right: Perfil): boolean {
   return (
-    <PerfilContext.Provider value={value}>{children}</PerfilContext.Provider>
+    left !== null &&
+    left.id === right.id &&
+    left.name === right.name &&
+    left.email === right.email &&
+    left.role === right.role
   );
 }
 
@@ -72,7 +64,9 @@ export function RequireSession() {
         const nextPerfil = await fetchPerfil(activeSession.token, controller.signal);
         if (controller.signal.aborted || revoked) return;
         savePerfil(nextPerfil);
-        setPerfil(nextPerfil);
+        setPerfil((current) =>
+          samePerfil(current, nextPerfil) ? current : nextPerfil
+        );
         setState('authenticated');
       } catch (error) {
         if (controller.signal.aborted || revoked) return;
@@ -124,14 +118,14 @@ export function RequireSession() {
     return <p className="session-check">Validando acesso...</p>;
   }
   return (
-    <PerfilProvider value={perfil}>
+    <PerfilContext.Provider value={perfil}>
       <Outlet />
-    </PerfilProvider>
+    </PerfilContext.Provider>
   );
 }
 
 export function RequireRole({ roles }: { roles: UserRole[] }) {
-  const perfil = usePerfil() ?? getPerfil();
+  const perfil = usePerfil();
   if (!perfil) {
     return <Navigate replace to="/login" />;
   }
@@ -153,7 +147,7 @@ export function RequireRole({ roles }: { roles: UserRole[] }) {
 
 export function HomePage() {
   const navigate = useNavigate();
-  const perfil = usePerfil() ?? getPerfil();
+  const perfil = usePerfil();
   if (!perfil) {
     return <Navigate replace to="/login" />;
   }
