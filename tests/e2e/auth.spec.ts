@@ -257,3 +257,39 @@ test('login pela interface orienta sobre credenciais invalidas', async ({
     'E-mail ou senha inválidos. Verifique os dados e tente novamente.'
   );
 });
+
+test('refresh de Perfil no foco nao remonta a pagina nem reseta o scroll', async ({
+  page
+}) => {
+  await page.goto('/login');
+  await page.getByLabel('E-mail').fill('admin@hq.test');
+  await page.getByLabel('Senha').fill('senha-admin');
+  await page.getByRole('button', { name: 'Entrar' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Olá, Ana Admin' })
+  ).toBeVisible();
+
+  const heading = page.getByRole('heading', { name: 'Olá, Ana Admin' });
+  await heading.evaluate((el) => {
+    el.setAttribute('data-mount-probe', 'alive');
+  });
+  await page.evaluate(() => {
+    document.documentElement.style.minHeight = '4000px';
+    window.scrollTo(0, 900);
+  });
+  await expect
+    .poll(async () => page.evaluate(() => window.scrollY))
+    .toBeGreaterThanOrEqual(800);
+
+  const meAfterFocus = page.waitForResponse(
+    (response) =>
+      response.url().includes('/me') && response.request().method() === 'GET'
+  );
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  expect((await meAfterFocus).ok()).toBe(true);
+
+  await expect(heading).toHaveAttribute('data-mount-probe', 'alive');
+  await expect
+    .poll(async () => page.evaluate(() => window.scrollY))
+    .toBeGreaterThanOrEqual(800);
+});
