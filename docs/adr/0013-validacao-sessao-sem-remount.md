@@ -1,0 +1,7 @@
+# Validação de sessão não remonta a árvore autenticada
+
+O `RequireSession` valida o token e atualiza o Perfil via `GET /me` (mount, intervalo enquanto a aba está visível e foco da janela com debounce). Essa validação **não** remonta a árvore autenticada: o Perfil atualizado propaga por contexto React aos gates de papel (`RequireRole` / Home), e a página em uso permanece montada. A alternativa rejeitada — forçar remount do `Outlet` autenticado via `key` após cada `/me` bem-sucedido — “releia” o papel desmontando tudo, o que piscava a tela, zerava o scroll e descartava estado de UI em qualquer rota autenticada. Preferimos contexto porque mudança de papel só precisa re-renderizar o gate; expiração ou desativação seguem limpando a sessão e indo ao login.
+
+## Consequences
+
+Não reintroduzir remount forçado do `Outlet` autenticado (`key` ou equivalente) para “forçar” releitura de papel — isso é regressão deste ADR. Consumidores de papel na árvore autenticada (gates e UI de escrita) devem usar `usePerfil`, não só `getPerfil()` no mount, senão deixam de reagir ao refresh. Testes de foco que exercitam refresh de Perfil (preservar mount/scroll) e de rebaixamento/desativação ao retomar o foco continuam válidos e devem permanecer verdes. O poll ~10s da lista do Monitoramento ao Vivo (ADR-0005, ADR-0010) é escopo da página da lista, não mecanismo da casca de sessão: não misturar “atualização automática” da lista ao vivo com validação periódica de Perfil.
