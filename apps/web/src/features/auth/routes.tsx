@@ -1,5 +1,11 @@
-import type { UserRole } from '@hq-geap/contracts/auth';
-import { useEffect, useState } from 'react';
+import type { Perfil, UserRole } from '@hq-geap/contracts/auth';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode
+} from 'react';
 import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   AuthExpiredError,
@@ -20,15 +26,32 @@ const roleNames = {
 
 const focusRefreshDebounceMs = 2000;
 
+const PerfilContext = createContext<Perfil | null>(null);
+
+function usePerfil(): Perfil | null {
+  return useContext(PerfilContext);
+}
+
+function PerfilProvider({
+  value,
+  children
+}: {
+  value: Perfil | null;
+  children: ReactNode;
+}) {
+  return (
+    <PerfilContext.Provider value={value}>{children}</PerfilContext.Provider>
+  );
+}
+
 export function RequireSession() {
   const location = useLocation();
   const [session] = useState(getSession);
+  const [perfil, setPerfil] = useState<Perfil | null>(() => getPerfil());
   const [state, setState] = useState<AccessState>(() => {
     if (!session) return 'anonymous';
     return getPerfil() ? 'authenticated' : 'checking';
   });
-  // Bump when Perfil changes so RequireRole re-reads role gates after refresh.
-  const [perfilEpoch, setPerfilEpoch] = useState(0);
 
   useEffect(() => {
     if (!session) {
@@ -46,16 +69,17 @@ export function RequireSession() {
       validating = true;
       try {
         // /me validates the token and refreshes Perfil in one round-trip.
-        const perfil = await fetchPerfil(activeSession.token, controller.signal);
+        const nextPerfil = await fetchPerfil(activeSession.token, controller.signal);
         if (controller.signal.aborted || revoked) return;
-        savePerfil(perfil);
-        setPerfilEpoch((epoch) => epoch + 1);
+        savePerfil(nextPerfil);
+        setPerfil(nextPerfil);
         setState('authenticated');
       } catch (error) {
         if (controller.signal.aborted || revoked) return;
         if (error instanceof AuthExpiredError) {
           revoked = true;
           clearSession();
+          setPerfil(null);
           setState('anonymous');
           return;
         }
@@ -65,6 +89,7 @@ export function RequireSession() {
         }
         revoked = true;
         clearSession();
+        setPerfil(null);
         setState('anonymous');
       } finally {
         validating = false;
@@ -98,11 +123,15 @@ export function RequireSession() {
   if (state === 'checking') {
     return <p className="session-check">Validando acesso...</p>;
   }
-  return <Outlet key={perfilEpoch} />;
+  return (
+    <PerfilProvider value={perfil}>
+      <Outlet />
+    </PerfilProvider>
+  );
 }
 
 export function RequireRole({ roles }: { roles: UserRole[] }) {
-  const perfil = getPerfil();
+  const perfil = usePerfil() ?? getPerfil();
   if (!perfil) {
     return <Navigate replace to="/login" />;
   }
@@ -124,7 +153,7 @@ export function RequireRole({ roles }: { roles: UserRole[] }) {
 
 export function HomePage() {
   const navigate = useNavigate();
-  const perfil = getPerfil();
+  const perfil = usePerfil() ?? getPerfil();
   if (!perfil) {
     return <Navigate replace to="/login" />;
   }
