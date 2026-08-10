@@ -36,10 +36,7 @@ class RequestError extends Error {
 }
 
 function isRevokedSession(error: unknown) {
-  return (
-    error instanceof RequestError &&
-    (error.status === 401 || error.status === 403)
-  );
+  return error instanceof RequestError && error.status === 401;
 }
 
 function PasswordField({
@@ -99,10 +96,15 @@ export function UsuariosPage() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   async function requireSuccessfulResponse(response: Response) {
-    if (response.status === 401 || response.status === 403) {
+    // 401 = sessão inválida/expirada. 403 = papel insuficiente — o gate de
+    // RequireRole reage ao refresh de Perfil; não tratar como logout.
+    if (response.status === 401) {
       clearSession();
       navigate('/login', { replace: true });
       throw new RequestError(response.status, 'Session revoked');
+    }
+    if (response.status === 403) {
+      throw new RequestError(response.status, 'Forbidden');
     }
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as {

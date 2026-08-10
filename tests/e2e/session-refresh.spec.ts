@@ -38,7 +38,7 @@ test('refresh de Perfil no foco preserva mount e scroll', async ({ page }) => {
 
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await perfilGet;
-  // Commit pós-/me (remount via perfilEpoch ou update in-place) antes de assertar.
+  // Commit pós-/me (re-render in-place via contexto) antes de assertar.
   await page.evaluate(
     () =>
       new Promise<void>((resolve) => {
