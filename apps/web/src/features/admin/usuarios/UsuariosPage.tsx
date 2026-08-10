@@ -6,8 +6,9 @@ import {
   type Usuario
 } from '@hq-geap/contracts/usuarios';
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { apiUrl, clearSession, getPerfil, getSession } from '../../auth/session';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { apiUrl, clearSession, getSession } from '../../auth/session';
+import { usePerfil } from '../../auth/perfil-context';
 
 const roleNames = {
   admin: 'Admin',
@@ -93,7 +94,7 @@ export function UsuariosPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [session] = useState(() => getSession()!);
-  const [perfil] = useState(() => getPerfil()!);
+  const perfil = usePerfil();
   const token = session.token;
   const navigate = useNavigate();
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -277,6 +278,10 @@ export function UsuariosPage() {
       : editor?.mode === 'password'
         ? 'Redefinição de senha'
         : 'Editar acesso';
+
+  if (!perfil) {
+    return <Navigate replace to="/login" />;
+  }
 
   return (
     <section className="users-page">

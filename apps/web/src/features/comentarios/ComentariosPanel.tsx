@@ -3,7 +3,8 @@ import {
   comentariosSchema
 } from '@hq-geap/contracts/comentarios';
 import { useState } from 'react';
-import { apiUrl, getPerfil, getSession } from '../auth/session';
+import { apiUrl, getSession } from '../auth/session';
+import { canWriteAsCurador, usePerfil } from '../auth/perfil-context';
 import { useAuthenticatedResource } from '../atendimentos/api';
 import { ComentarioCard } from './ComentarioCard';
 
@@ -11,8 +12,7 @@ export function ComentariosPanel({ atendimentoId }: { atendimentoId: string }) {
   const [revision, setRevision] = useState(0);
   const [texto, setTexto] = useState('');
   const [submitState, setSubmitState] = useState<'idle' | 'saving' | 'error'>('idle');
-  const role = getPerfil()?.role;
-  const canWrite = role === 'admin' || role === 'curador';
+  const canWrite = canWriteAsCurador(usePerfil()?.role);
   const state = useAuthenticatedResource(
     `/atendimentos/${atendimentoId}/comentarios?revision=${revision}`,
     comentariosSchema

@@ -281,14 +281,17 @@ test('refresh de Perfil no foco nao remonta a pagina nem reseta o scroll', async
     .poll(async () => page.evaluate(() => window.scrollY))
     .toBeGreaterThanOrEqual(800);
 
+  // focusRefreshDebounceMs is 2000 — wait for the debounced /me after focus.
   const meAfterFocus = page.waitForResponse(
     (response) =>
-      response.url().includes('/me') && response.request().method() === 'GET'
+      response.url().includes('/me') && response.request().method() === 'GET',
+    { timeout: 10_000 }
   );
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   expect((await meAfterFocus).ok()).toBe(true);
 
   await expect(heading).toHaveAttribute('data-mount-probe', 'alive');
+  await expect(heading).toBeVisible();
   await expect
     .poll(async () => page.evaluate(() => window.scrollY))
     .toBeGreaterThanOrEqual(800);

@@ -363,27 +363,48 @@ test.describe.serial('administracao de usuarios', () => {
     page,
     request
   }) => {
+    const admin = await login(request, 'admin');
+    const headers = { authorization: `Bearer ${admin.token}` };
+    const targetEmail = `revoked-focus-${Date.now()}@hq.test`;
+    const created = await request.post(`${apiUrl}/admin/usuarios`, {
+      data: {
+        email: targetEmail,
+        name: 'Admin foco revoke',
+        password: 'senha-segura',
+        role: 'admin'
+      },
+      headers
+    });
+    expect(created.status()).toBe(201);
+    const revoked = (await created.json()) as { id: string };
+
     await page.goto('/login');
-    await page.getByLabel('E-mail').fill('novo-admin@hq.test');
+    await page.getByLabel('E-mail').fill(targetEmail);
     await page.getByLabel('Senha').fill('senha-segura');
     await page.getByRole('button', { name: 'Entrar' }).click();
     await expect(page).toHaveURL('/');
     await page.getByRole('link', { name: 'Administrar usuários' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Administração de usuários' })
+    ).toBeVisible();
 
-    const admin = await login(request, 'admin');
-    const headers = { authorization: `Bearer ${admin.token}` };
-    const list = await request.get(`${apiUrl}/admin/usuarios`, { headers });
-    const users = (await list.json()) as {
-      users: Array<{ id: string; email: string; name: string }>;
-    };
-    const revoked = users.users.find((user) => user.email === 'novo-admin@hq.test')!;
     const demotion = await request.patch(`${apiUrl}/admin/usuarios/${revoked.id}`, {
-      data: { email: revoked.email, name: revoked.name, role: 'gestao' },
+      data: {
+        email: targetEmail,
+        name: 'Admin foco revoke',
+        role: 'gestao'
+      },
       headers
     });
     expect(demotion.status()).toBe(200);
 
+    const meAfterDemotion = page.waitForResponse(
+      (response) =>
+        response.url().includes('/me') && response.request().method() === 'GET',
+      { timeout: 10_000 }
+    );
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    expect((await meAfterDemotion).ok()).toBe(true);
     await expect
       .poll(
         async () =>
@@ -404,7 +425,15 @@ test.describe.serial('administracao de usuarios', () => {
     );
     expect(deactivation.status()).toBe(200);
 
+    const meAfterDeactivation = page.waitForResponse(
+      (response) =>
+        response.url().includes('/me') &&
+        response.request().method() === 'GET' &&
+        [401, 403].includes(response.status()),
+      { timeout: 10_000 }
+    );
     await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await meAfterDeactivation;
     await expect(page).toHaveURL('/login', { timeout: 10_000 });
   });
 });
