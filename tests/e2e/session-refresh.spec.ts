@@ -13,8 +13,8 @@ test('refresh de Perfil no foco preserva mount e scroll', async ({ page }) => {
     return token;
   });
 
-  await page.evaluate(() => {
-    const pageRoot = document.querySelector('section.session-page');
+  await heading.evaluate((el) => {
+    const pageRoot = el.closest('section') ?? el.parentElement;
     if (!pageRoot) {
       throw new Error('página autenticada não encontrada');
     }
@@ -38,7 +38,18 @@ test('refresh de Perfil no foco preserva mount e scroll', async ({ page }) => {
 
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await perfilGet;
+  // Commit pós-/me (remount via perfilEpoch ou update in-place) antes de assertar.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => resolve());
+        });
+      })
+  );
 
   await expect.soft(heading).toHaveAttribute('data-mount-probe', probe);
-  expect.soft(await page.evaluate(() => window.scrollY)).toBeGreaterThan(500);
+  await expect
+    .soft.poll(async () => page.evaluate(() => window.scrollY))
+    .toBeGreaterThan(500);
 });
