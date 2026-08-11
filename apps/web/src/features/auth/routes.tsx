@@ -21,10 +21,6 @@ const roleNames = {
 
 const focusRefreshDebounceMs = 2000;
 
-function keepAuthenticated(current: AccessState): AccessState {
-  return current === 'authenticated' ? current : 'authenticated';
-}
-
 export function RequireSession() {
   const location = useLocation();
   const [session] = useState(getSession);
@@ -58,7 +54,7 @@ export function RequireSession() {
         setPerfil((current) =>
           samePerfil(current, nextPerfil) ? current : nextPerfil
         );
-        setState(keepAuthenticated);
+        setState('authenticated');
       } catch (error) {
         if (controller.signal.aborted || revoked) return;
         if (error instanceof AuthExpiredError) {
@@ -71,7 +67,7 @@ export function RequireSession() {
         const stored = getPerfil();
         if (stored) {
           setPerfil((current) => (samePerfil(current, stored) ? current : stored));
-          setState(keepAuthenticated);
+          setState('authenticated');
           return;
         }
         revoked = true;
