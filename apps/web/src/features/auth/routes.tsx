@@ -48,12 +48,14 @@ export function RequireSession() {
         // /me validates the token and refreshes Perfil in one round-trip.
         const nextPerfil = await fetchPerfil(activeSession.token, controller.signal);
         if (controller.signal.aborted || revoked) return;
-        savePerfil(nextPerfil);
         // Equal Perfil is UX no-op: keep object identity so the authenticated
         // route tree does not remount, refetch, or reopen live sockets.
         setPerfil((current) =>
           samePerfil(current, nextPerfil) ? current : nextPerfil
         );
+        if (!samePerfil(getPerfil(), nextPerfil)) {
+          savePerfil(nextPerfil);
+        }
         setState('authenticated');
       } catch (error) {
         if (controller.signal.aborted || revoked) return;
