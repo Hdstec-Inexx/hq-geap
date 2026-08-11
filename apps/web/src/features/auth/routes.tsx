@@ -49,7 +49,8 @@ export function RequireSession() {
         const nextPerfil = await fetchPerfil(activeSession.token, controller.signal);
         if (controller.signal.aborted || revoked) return;
         savePerfil(nextPerfil);
-        // Skip identical updates so role consumers do not re-render every poll.
+        // Equal Perfil is UX no-op: keep object identity so the authenticated
+        // route tree does not remount, refetch, or reopen live sockets.
         setPerfil((current) =>
           samePerfil(current, nextPerfil) ? current : nextPerfil
         );
