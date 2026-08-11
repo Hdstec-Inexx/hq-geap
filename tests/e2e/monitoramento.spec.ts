@@ -1,11 +1,17 @@
-import { expect, test, type Locator, type Page, type WebSocketRoute } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import pg from 'pg';
 import { fetchPerfil, loginApi, loginPage } from '../support/e2e-auth.js';
+import { stubMonitoramentoLiveWs } from '../support/monitoramento-live-ws.js';
 
 const apiUrl = 'http://127.0.0.1:3000';
 const { Client } = pg;
 
 const nearBottomPx = 80;
+
+const liveScrollSeed = Array.from({ length: 40 }, (_, i) => ({
+  role: (i % 2 === 0 ? 'agent' : 'user') as 'agent' | 'user',
+  message: `Linha inicial ${i}`
+}));
 
 async function transcriptScrollMetrics(scroll: Locator) {
   return scroll.evaluate(
@@ -21,48 +27,6 @@ async function transcriptScrollMetrics(scroll: Locator) {
     },
     nearBottomPx
   );
-}
-
-async function stubMonitoramentoLiveWs(page: Page) {
-  let route: WebSocketRoute | undefined;
-  await page.routeWebSocket(/\/monitoramento\/conversas\//, (ws) => {
-    route = ws;
-    ws.onMessage((message) => {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(String(message));
-      } catch {
-        return;
-      }
-      if (
-        typeof parsed !== 'object' ||
-        parsed === null ||
-        !('type' in parsed) ||
-        parsed.type !== 'auth'
-      ) {
-        return;
-      }
-      ws.send(JSON.stringify({ type: 'ready' }));
-      for (let i = 0; i < 40; i += 1) {
-        ws.send(
-          JSON.stringify({
-            type: 'transcript',
-            role: i % 2 === 0 ? 'agent' : 'user',
-            message: `Linha inicial ${i}`
-          })
-        );
-      }
-    });
-  });
-
-  return {
-    sendTranscript(role: 'agent' | 'user', message: string) {
-      if (!route) {
-        throw new Error('WebSocket stub ainda não conectou');
-      }
-      route.send(JSON.stringify({ type: 'transcript', role, message }));
-    }
-  };
 }
 
 async function queryDatabase<T extends pg.QueryResultRow>(
@@ -250,7 +214,9 @@ test.describe.serial('Monitoramento ao Vivo — conversas abertas na ElevenLabs'
 
   test('transcrição acompanha novas linhas só perto do fim', async ({ page }) => {
     await loginPage(page, 'curador');
-    const stub = await stubMonitoramentoLiveWs(page);
+    const stub = await stubMonitoramentoLiveWs(page, {
+      initialTranscripts: liveScrollSeed
+    });
 
     await page.goto('/monitoramento/conv_scroll_follow');
     await expect(page.getByText('Observando em tempo real.')).toBeVisible();
