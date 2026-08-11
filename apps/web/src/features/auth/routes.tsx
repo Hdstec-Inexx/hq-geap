@@ -21,6 +21,10 @@ const roleNames = {
 
 const focusRefreshDebounceMs = 2000;
 
+function keepAuthenticated(current: AccessState): AccessState {
+  return current === 'authenticated' ? current : 'authenticated';
+}
+
 export function RequireSession() {
   const location = useLocation();
   const [session] = useState(getSession);
@@ -49,11 +53,12 @@ export function RequireSession() {
         const nextPerfil = await fetchPerfil(activeSession.token, controller.signal);
         if (controller.signal.aborted || revoked) return;
         savePerfil(nextPerfil);
-        // Skip identical updates so role consumers do not re-render every poll.
+        // Equal Perfil is UX no-op: keep object identity so the authenticated
+        // route tree does not remount, refetch, or reopen live sockets.
         setPerfil((current) =>
           samePerfil(current, nextPerfil) ? current : nextPerfil
         );
-        setState('authenticated');
+        setState(keepAuthenticated);
       } catch (error) {
         if (controller.signal.aborted || revoked) return;
         if (error instanceof AuthExpiredError) {
@@ -66,7 +71,7 @@ export function RequireSession() {
         const stored = getPerfil();
         if (stored) {
           setPerfil((current) => (samePerfil(current, stored) ? current : stored));
-          setState('authenticated');
+          setState(keepAuthenticated);
           return;
         }
         revoked = true;
