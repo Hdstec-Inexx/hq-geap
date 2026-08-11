@@ -5,3 +5,5 @@ O `RequireSession` valida o token e atualiza o Perfil via `GET /me` (mount, inte
 ## Consequences
 
 Não reintroduzir remount forçado do `Outlet` autenticado (`key` ou equivalente) para “forçar” releitura de papel — isso é regressão deste ADR. Consumidores de papel na árvore autenticada (gates e UI de escrita) devem usar `usePerfil`, não só `getPerfil()` no mount, senão deixam de reagir ao refresh. Testes de foco que exercitam refresh de Perfil (preservar mount/scroll) e de rebaixamento/desativação ao retomar o foco continuam válidos e devem permanecer verdes. O poll ~10s da lista do Monitoramento ao Vivo (ADR-0005, ADR-0010) é escopo da página da lista, não mecanismo da casca de sessão: não misturar “atualização automática” da lista ao vivo com validação periódica de Perfil.
+
+Revalidar o Perfil (`GET /me` periódico ou no foco) com resposta **igual** à atual é no-op de UX: não remonta a página da rota, não refaz fetch de dados da página (ex.: dashboard), não reabre o WebSocket do Monitoramento ao Vivo, não zera scroll nem reexibe loading. Só mudança real de papel, ou perda de Perfil/sessão (desativação, 401/403), deve alterar gates ou levar ao login.

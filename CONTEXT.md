@@ -19,6 +19,10 @@ _Avoid_: Operacional (nome antigo no desenho original)
 **Cliente**:
 Papel futuro, fora do escopo do MVP. Teria acesso apenas a dashboards.
 
+**Perfil**:
+A identidade autenticada no HQ GEAP: quem é a pessoa (nome, e-mail) e qual **papel** exerce (Admin, Gestão ou Curador). É o que a casca autenticada consulta para liberar ou bloquear áreas; mudança de papel ou perda do Perfil (conta desativada / sessão inválida) é o que deve alterar a UI — não o mero fato de o Perfil ter sido revalidado.
+_Avoid_: Usuário (ambíguo com conta genérica), sessão (mecanismo de auth, não o conceito de identidade/papel)
+
 ### Objeto central
 
 **Atendimento**:
