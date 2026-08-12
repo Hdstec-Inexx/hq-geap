@@ -1,5 +1,5 @@
 import { Navigate, createBrowserRouter } from 'react-router-dom';
-import { Shell } from './shell';
+import { AuthenticatedShell, Shell } from './shell';
 import { LoginPage } from '../features/auth/LoginPage';
 import { HomePage, RequireRole, RequireSession } from '../features/auth/routes';
 import { HealthPage } from '../features/health/routes';
@@ -28,49 +28,54 @@ export const router = createBrowserRouter([
       {
         element: <RequireSession />,
         children: [
-          { index: true, element: <HomePage /> },
-          { path: '/app', element: <Navigate replace to="/" /> },
-          { path: '/atendimentos', element: <AtendimentosPage /> },
           {
-            path: '/atendimentos/:atendimentoId',
-            element: <AtendimentoPage />
-          },
-          { path: '/monitoramento', element: MonitoramentoRoute },
-          {
-            path: '/monitoramento/:conversationId',
-            element: MonitoramentoLiveRoute
-          },
-          {
-            element: <RequireRole roles={['admin']} />,
+            element: <AuthenticatedShell />,
             children: [
-              { path: '/admin', element: <HomePage /> },
+              { index: true, element: <HomePage /> },
+              { path: '/app', element: <Navigate replace to="/" /> },
+              { path: '/atendimentos', element: <AtendimentosPage /> },
               {
-                path: '/admin/comentarios',
-                element: <ComentariosPendentesRoute />
+                path: '/atendimentos/:atendimentoId',
+                element: <AtendimentoPage />
               },
-              { path: '/admin/criterios', element: <CriteriosRoute /> },
-              { path: '/admin/usuarios', element: <UsuariosRoute /> },
+              { path: '/monitoramento', element: MonitoramentoRoute },
               {
-                path: '/admin/configuracao-ia',
-                element: <ConfiguracaoIaRoute />
-              }
-            ]
-          },
-          {
-            element: <RequireRole roles={['gestao']} />,
-            children: [
-              { path: '/dashboard', element: DashboardRoute },
-              { path: '/gestao', element: <HomePage /> },
-              { path: '/gestao/dashboard', element: DashboardRoute }
-            ]
-          },
-          {
-            element: <RequireRole roles={['curador', 'gestao']} />,
-            children: [
-              { path: '/curadoria', element: FilaCuradoriaRoute },
+                path: '/monitoramento/:conversationId',
+                element: MonitoramentoLiveRoute
+              },
               {
-                path: '/curadoria/:atendimentoId',
-                element: CuradoriaReviewRoute
+                element: <RequireRole roles={['admin']} />,
+                children: [
+                  { path: '/admin', element: <HomePage /> },
+                  {
+                    path: '/admin/comentarios',
+                    element: <ComentariosPendentesRoute />
+                  },
+                  { path: '/admin/criterios', element: <CriteriosRoute /> },
+                  { path: '/admin/usuarios', element: <UsuariosRoute /> },
+                  {
+                    path: '/admin/configuracao-ia',
+                    element: <ConfiguracaoIaRoute />
+                  }
+                ]
+              },
+              {
+                element: <RequireRole roles={['gestao']} />,
+                children: [
+                  { path: '/dashboard', element: DashboardRoute },
+                  { path: '/gestao', element: <HomePage /> },
+                  { path: '/gestao/dashboard', element: DashboardRoute }
+                ]
+              },
+              {
+                element: <RequireRole roles={['curador', 'gestao']} />,
+                children: [
+                  { path: '/curadoria', element: FilaCuradoriaRoute },
+                  {
+                    path: '/curadoria/:atendimentoId',
+                    element: CuradoriaReviewRoute
+                  }
+                ]
               }
             ]
           }

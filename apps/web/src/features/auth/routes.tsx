@@ -1,6 +1,6 @@
 import type { Perfil, UserRole } from '@hq-geap/contracts/auth';
 import { useEffect, useRef, useState } from 'react';
-import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { PerfilProvider, samePerfil, usePerfil } from './perfil-context';
 import {
   AuthExpiredError,
@@ -174,15 +174,9 @@ export function RequireRole({ roles }: { roles: UserRole[] }) {
 }
 
 export function HomePage() {
-  const navigate = useNavigate();
   const perfil = usePerfil();
   if (!perfil) {
     return <Navigate replace to="/login" />;
-  }
-
-  function logout() {
-    clearSession();
-    navigate('/login', { replace: true });
   }
 
   return (
@@ -191,49 +185,14 @@ export function HomePage() {
         <p className="eyebrow">Sessão ativa / {roleNames[perfil.role]}</p>
         <h1>Olá, {perfil.name}</h1>
         <p className="summary">
-          Seu acesso está pronto. As áreas do HQ GEAP serão liberadas conforme
-          as permissões de {roleNames[perfil.role]}.
+          Seu acesso está pronto. Use a navegação para abrir as áreas liberadas
+          ao papel de {roleNames[perfil.role]}.
         </p>
-        {perfil.role !== 'curador' ? (
-          <Link className="admin-feature-link" to="/dashboard">
-            Abrir Dashboard da Gestão
-          </Link>
-        ) : null}
-        <Link className="admin-feature-link" to="/atendimentos">
-          Consultar Atendimentos
-        </Link>
-        <Link className="admin-feature-link" to="/monitoramento">
-          Monitoramento ao Vivo
-        </Link>
-        <Link className="admin-feature-link" to="/curadoria">
-          {perfil.role === 'gestao'
-            ? 'Consultar Fila de Curadoria'
-            : 'Abrir Fila de Curadoria'}
-        </Link>
-        {perfil.role === 'admin' ? (
-          <div className="admin-feature-links">
-            <Link className="admin-feature-link" to="/admin/comentarios">
-              Trabalhar fila de manutenção
-            </Link>
-            <Link className="admin-feature-link" to="/admin/usuarios">
-              Administrar usuários
-            </Link>
-            <Link className="admin-feature-link" to="/admin/configuracao-ia">
-              Configurar IA Avaliadora
-            </Link>
-            <Link className="admin-feature-link" to="/admin/criterios">
-              Consultar Régua de Avaliação
-            </Link>
-          </div>
-        ) : null}
       </div>
       <aside className="identity-card">
         <span className="identity-role">{roleNames[perfil.role]}</span>
         <strong>{perfil.name}</strong>
         <span>{perfil.email}</span>
-        <button className="secondary-button" onClick={logout} type="button">
-          Sair
-        </button>
       </aside>
     </section>
   );
