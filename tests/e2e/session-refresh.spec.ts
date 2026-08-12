@@ -135,3 +135,50 @@ test('Perfil igual no foco não reabre WebSocket do Monitoramento ao Vivo', asyn
   await expect(page.getByText('Linha estável antes do foco')).toBeVisible();
   await expect.soft(heading).toHaveAttribute('data-mount-probe', probe);
 });
+
+test('poll periódico /me igual não refaz fetch do Dashboard', async ({ page }) => {
+  let dashboardGets = 0;
+  let meGets = 0;
+  await page.route('**/dashboards/gestao**', async (route) => {
+    if (route.request().method() === 'GET') {
+      dashboardGets += 1;
+    }
+    await route.continue();
+  });
+  await page.route('**/me', async (route) => {
+    if (route.request().method() === 'GET') {
+      meGets += 1;
+    }
+    await route.continue();
+  });
+
+  await loginPage(page, 'gestao');
+  await page.goto('/dashboard');
+
+  const heading = page.getByRole('heading', { name: 'Pulso da operação' });
+  await expect(heading).toBeVisible();
+  await expect(page.getByLabel('Carregando dashboard')).toHaveCount(0);
+  await expect.poll(() => dashboardGets).toBeGreaterThan(0);
+  await expect.poll(() => meGets).toBeGreaterThan(0);
+
+  const dashboardBefore = dashboardGets;
+  const meBefore = meGets;
+  const probe = await markMountProbe(heading);
+
+  const forced = await page.evaluate(() => {
+    const w = window as unknown as { __hqGeapRefreshPerfil?: () => void };
+    if (typeof w.__hqGeapRefreshPerfil !== 'function') {
+      return false;
+    }
+    w.__hqGeapRefreshPerfil();
+    return true;
+  });
+  expect(forced).toBe(true);
+
+  await expect.poll(() => meGets).toBeGreaterThan(meBefore);
+  await expect
+    .poll(() => dashboardGets, { timeout: 500 })
+    .toBe(dashboardBefore);
+  await expect(heading).toHaveAttribute('data-mount-probe', probe);
+  await expect(page.getByLabel('Carregando dashboard')).toHaveCount(0);
+});
