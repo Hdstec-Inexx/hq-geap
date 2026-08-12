@@ -118,12 +118,24 @@ export function RequireSession() {
       }, focusRefreshDebounceMs);
     }
     window.addEventListener('focus', onFocus);
+    if (import.meta.env.DEV) {
+      // Test-only seam: force the same path as the 60s poll without waiting.
+      (
+        window as unknown as { __hqGeapRefreshPerfil?: () => void }
+      ).__hqGeapRefreshPerfil = () => {
+        void refreshSession('interval');
+      };
+    }
 
     return () => {
       controller.abort();
       window.clearInterval(interval);
       window.clearTimeout(focusTimer);
       window.removeEventListener('focus', onFocus);
+      if (import.meta.env.DEV) {
+        delete (window as unknown as { __hqGeapRefreshPerfil?: () => void })
+          .__hqGeapRefreshPerfil;
+      }
     };
   }, [session]);
 
