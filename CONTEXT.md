@@ -24,8 +24,8 @@ A identidade autenticada no HQ GEAP: quem é a pessoa (nome, e-mail) e qual **pa
 _Avoid_: Usuário (ambíguo com conta genérica), sessão (mecanismo de auth, não o conceito de identidade/papel)
 
 **Casca autenticada**:
-A casca da UI com Perfil válido: expõe as áreas liberadas ao papel, identifica a pessoa pelo nome, permite encerrar a sessão e leva à Home pela marca GEAP. Login e health ficam fora dela. A Home permanece após o login e continua mostrando o Perfil completo (nome, e-mail, papel); a casca mostra só o nome além das áreas e do encerramento de sessão.
-_Avoid_: Shell, layout, sidebar (detalhe de implementação)
+O enquadramento da UI presente só com Perfil válido: expõe as áreas liberadas ao **papel**, identifica a pessoa pelo nome, permite encerrar a sessão e leva à Home pela marca GEAP. Login e health ficam fora dela. A Home mantém o Perfil completo (nome, e-mail, papel); a casca mostra nome, áreas do papel e encerramento de sessão.
+_Avoid_: shell, sidebar (vocabulário de implementação, não de domínio)
 
 ### Objeto central
 
