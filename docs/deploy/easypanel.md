@@ -56,6 +56,12 @@ Com `STORAGE_PROVIDER=gcs`, o bucket deve existir e a API precisa de credenciais
 
 Rebuild a Web sempre que mudar `VITE_API_URL` (é embutida no bundle Vite).
 
+O `index.html` da Web é deliberadamente servido com `Cache-Control: no-store`;
+ele aponta para assets JS/CSS com hash e não pode ficar persistido entre
+deploys. Depois de publicar uma nova imagem, confirme que a resposta de `/`
+tem `Cache-Control: no-store` e que referencia o novo asset em `/assets/`.
+Os assets versionados podem permanecer cacheados por serem imutáveis.
+
 ## Compose no Easypanel (alternativa)
 
 1. Serviço **Compose** com arquivo `compose.easypanel.yaml` (só `api` + `web`; sem Postgres no Compose)
@@ -68,6 +74,8 @@ Rebuild a Web sempre que mudar `VITE_API_URL` (é embutida no bundle Vite).
 ## Checklist pós-deploy
 
 - [ ] `GET https://api.seudominio.com/health` responde OK
+- [ ] `GET https://hq.seudominio.com/` responde com `Cache-Control: no-store`
+- [ ] O HTML publicado referencia o asset JS gerado no último build
 - [ ] Login em `https://hq.seudominio.com/login`
 - [ ] Senha do Admin inicial alterada
 - [ ] `SKIP_DB_SEED=1` após o primeiro seed (recomendado)
