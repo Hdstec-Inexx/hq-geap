@@ -80,6 +80,12 @@ a {
   background: rgb(239 249 245 / 8%);
 }
 
+.sidebar-brand:focus-visible,
+.sidebar-link:focus-visible {
+  outline: 3px solid #e5b85c;
+  outline-offset: 3px;
+}
+
 .sidebar-link-active {
   color: #123b4a;
   background: #62d4b6;
@@ -594,22 +600,6 @@ h1 {
 
 .configuration-error {
   color: #a73e32;
-}
-
-.admin-feature-link {
-  display: inline-block;
-  margin: 34px 22px 0 0;
-  padding-bottom: 6px;
-  color: #08735f;
-  border-bottom: 2px solid #16816f;
-  font-weight: 800;
-  text-decoration: none;
-}
-
-.admin-feature-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 28px;
 }
 
 .criteria-page {
