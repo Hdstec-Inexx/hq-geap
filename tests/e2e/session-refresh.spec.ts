@@ -14,6 +14,12 @@ async function settleAfterPaint(page: Page) {
 }
 
 async function refreshPerfilOnFocus(page: Page) {
+  // Focus is deduped for ~2s after a successful /me (mount+focus burst).
+  await page.waitForFunction(() => {
+    const raw = window.sessionStorage.getItem('hq-geap.last-me-at');
+    if (!raw) return true;
+    return Date.now() - Number(raw) >= 2100;
+  });
   const perfilGet = page.waitForResponse(
     (response) =>
       response.url().includes('/me') &&

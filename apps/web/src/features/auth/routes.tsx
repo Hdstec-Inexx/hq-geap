@@ -1,5 +1,5 @@
 import type { Perfil, UserRole } from '@hq-geap/contracts/auth';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { PerfilProvider, samePerfil, usePerfil } from './perfil-context';
 import {
@@ -8,10 +8,14 @@ import {
   fetchPerfil,
   getPerfil,
   getSession,
-  savePerfil
+  markPerfilValidatedAt,
+  perfilRefreshMinGapMs,
+  savePerfil,
+  wasPerfilValidatedRecently
 } from './session';
 
 type AccessState = 'checking' | 'authenticated' | 'anonymous';
+type RefreshReason = 'mount' | 'interval' | 'focus';
 
 const roleNames = {
   admin: 'Admin',
@@ -19,7 +23,7 @@ const roleNames = {
   curador: 'Curador'
 } as const;
 
-const focusRefreshDebounceMs = 2000;
+const focusRefreshDebounceMs = perfilRefreshMinGapMs;
 
 export function RequireSession() {
   const location = useLocation();
@@ -29,6 +33,10 @@ export function RequireSession() {
     if (!session) return 'anonymous';
     return getPerfil() ? 'authenticated' : 'checking';
   });
+  const perfilRef = useRef(perfil);
+  const stateRef = useRef(state);
+  perfilRef.current = perfil;
+  stateRef.current = state;
 
   useEffect(() => {
     if (!session) {
@@ -41,39 +49,56 @@ export function RequireSession() {
     let revoked = false;
     let focusTimer: number | undefined;
 
-    async function refreshSession() {
+    async function refreshSession(reason: RefreshReason) {
       if (validating || revoked) return;
+      // Dedupe focus after a recent successful /me (mount+focus burst).
+      // Mount and the ~60s interval always validate for the security SLA.
+      if (reason === 'focus' && wasPerfilValidatedRecently(perfilRefreshMinGapMs)) {
+        return;
+      }
       validating = true;
       try {
         // /me validates the token and refreshes Perfil in one round-trip.
         const nextPerfil = await fetchPerfil(activeSession.token, controller.signal);
         if (controller.signal.aborted || revoked) return;
-        // Equal Perfil is UX no-op: keep object identity so the authenticated
-        // route tree does not remount, refetch, or reopen live sockets.
-        setPerfil((current) =>
-          samePerfil(current, nextPerfil) ? current : nextPerfil
-        );
-        if (!samePerfil(getPerfil(), nextPerfil)) {
-          savePerfil(nextPerfil);
+        markPerfilValidatedAt();
+        // Equal Perfil is UX no-op: keep object identity; no setPerfil.
+        if (samePerfil(perfilRef.current, nextPerfil)) {
+          if (stateRef.current !== 'authenticated') {
+            setState('authenticated');
+          }
+          return;
         }
+        savePerfil(nextPerfil);
+        perfilRef.current = nextPerfil;
+        setPerfil(nextPerfil);
         setState('authenticated');
       } catch (error) {
         if (controller.signal.aborted || revoked) return;
         if (error instanceof AuthExpiredError) {
           revoked = true;
           clearSession();
+          perfilRef.current = null;
           setPerfil(null);
           setState('anonymous');
           return;
         }
         const stored = getPerfil();
         if (stored) {
-          setPerfil((current) => (samePerfil(current, stored) ? current : stored));
+          if (samePerfil(perfilRef.current, stored)) {
+            if (stateRef.current !== 'authenticated') {
+              setState('authenticated');
+            }
+            return;
+          }
+          perfilRef.current = stored;
+          setPerfil(stored);
           setState('authenticated');
           return;
         }
         revoked = true;
         clearSession();
+        perfilRef.current = null;
         setPerfil(null);
         setState('anonymous');
       } finally {
@@ -81,15 +106,15 @@ export function RequireSession() {
       }
     }
 
-    void refreshSession();
+    void refreshSession('mount');
     const interval = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void refreshSession();
+      if (document.visibilityState === 'visible') void refreshSession('interval');
     }, 60_000);
 
     function onFocus() {
       window.clearTimeout(focusTimer);
       focusTimer = window.setTimeout(() => {
-        if (document.visibilityState === 'visible') void refreshSession();
+        if (document.visibilityState === 'visible') void refreshSession('focus');
       }, focusRefreshDebounceMs);
     }
     window.addEventListener('focus', onFocus);
