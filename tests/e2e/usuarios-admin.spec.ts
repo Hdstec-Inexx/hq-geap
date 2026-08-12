@@ -398,6 +398,11 @@ test.describe.serial('administracao de usuarios', () => {
     });
     expect(demotion.status()).toBe(200);
 
+    await page.waitForFunction(() => {
+      const raw = window.sessionStorage.getItem('hq-geap.last-me-at');
+      if (!raw) return true;
+      return Date.now() - Number(raw) >= 2100;
+    });
     const meAfterDemotion = page.waitForResponse(
       (response) =>
         response.url().includes('/me') && response.request().method() === 'GET',
@@ -425,6 +430,11 @@ test.describe.serial('administracao de usuarios', () => {
     );
     expect(deactivation.status()).toBe(200);
 
+    await page.waitForFunction(() => {
+      const raw = window.sessionStorage.getItem('hq-geap.last-me-at');
+      if (!raw) return true;
+      return Date.now() - Number(raw) >= 2100;
+    });
     const meAfterDeactivation = page.waitForResponse(
       (response) =>
         response.url().includes('/me') &&

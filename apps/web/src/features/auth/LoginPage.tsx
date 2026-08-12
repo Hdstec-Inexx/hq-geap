@@ -6,6 +6,7 @@ import {
   fetchPerfil,
   getPerfil,
   getSession,
+  markPerfilValidatedAt,
   savePerfil,
   saveSession
 } from './session';
@@ -48,6 +49,7 @@ export function LoginPage() {
       const perfil = await fetchPerfil(session.token);
       saveSession(session);
       savePerfil(perfil);
+      markPerfilValidatedAt();
       const returnTo = (location.state as { from?: string } | null)?.from ?? '/';
       navigate(returnTo, { replace: true });
     } catch {

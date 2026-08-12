@@ -7,8 +7,12 @@ import {
 
 const sessionKey = 'hq-geap.session';
 const perfilKey = 'hq-geap.perfil';
+const lastMeAtKey = 'hq-geap.last-me-at';
 
 export const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+
+/** Min gap between successful /me validations (dedupe mount+focus / bursts). */
+export const perfilRefreshMinGapMs = 2000;
 
 export class AuthExpiredError extends Error {
   constructor(message = 'Authentication expired') {
@@ -69,9 +73,29 @@ export function savePerfil(perfil: Perfil) {
   );
 }
 
+export function markPerfilValidatedAt(at = Date.now()) {
+  window.sessionStorage.setItem(lastMeAtKey, String(at));
+}
+
+export function lastPerfilValidatedAt(): number {
+  const raw = window.sessionStorage.getItem(lastMeAtKey);
+  if (!raw) return 0;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** True when a successful /me ran recently enough to skip another trigger. */
+export function wasPerfilValidatedRecently(
+  gapMs = perfilRefreshMinGapMs,
+  now = Date.now()
+): boolean {
+  return now - lastPerfilValidatedAt() < gapMs;
+}
+
 export function clearSession() {
   window.sessionStorage.removeItem(sessionKey);
   window.sessionStorage.removeItem(perfilKey);
+  window.sessionStorage.removeItem(lastMeAtKey);
 }
 
 async function readAuthenticatedJson(
