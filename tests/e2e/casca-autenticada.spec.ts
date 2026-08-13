@@ -11,10 +11,11 @@ import {
 } from '../support/e2e-auth.js';
 
 const marcaTetoPx = 168;
+const marcaAlvoMaxPx = 100;
 const conteudoComFaixaMinLeftPx = 200;
 const conteudoSemFaixaMaxLeftPx = 80;
 const faixaEstreitaMinShiftPx = 40;
-const marcaFundoClaroRgb = 'rgb(244, 250, 247)';
+const marcaFundoTransparente = 'rgba(0, 0, 0, 0)';
 const toggleMaxWidthPx = 200;
 
 const apiUrl = 'http://127.0.0.1:3000';
@@ -195,11 +196,17 @@ test.describe('casca autenticada', () => {
     await expect(logo).toHaveAttribute('src', '/geap_saude_transparente.png');
     const logoBox = await visibleBox(logo);
     expect(logoBox.width).toBeLessThan(marcaTetoPx);
+    expect(logoBox.width).toBeLessThanOrEqual(marcaAlvoMaxPx);
     await expect
       .poll(async () =>
         marca.evaluate((el) => getComputedStyle(el).backgroundColor)
       )
-      .not.toBe(marcaFundoClaroRgb);
+      .toBe(marcaFundoTransparente);
+
+    await fecharFaixa(page).focus();
+    await expect(fecharFaixa(page)).toBeFocused();
+    await marca.focus();
+    await expect(marca).toBeFocused();
 
     await marca.click();
     await expect(page).toHaveURL('/');
@@ -320,6 +327,12 @@ test.describe('casca autenticada', () => {
     await expect.poll(async () => page.evaluate(() => window.scrollY)).toBeGreaterThan(500);
     await expect(cascaChrome(page)).toBeInViewport();
     await expect(cascaChrome(page).getByRole('button', { name: 'Sair' })).toBeVisible();
+
+    await fecharFaixa(page).click();
+    await expect(abrirFaixa(page)).toBeInViewport();
+    await page.evaluate(() => window.scrollTo(0, 2400));
+    await expect.poll(async () => page.evaluate(() => window.scrollY)).toBeGreaterThan(500);
+    await expect(abrirFaixa(page)).toBeInViewport();
   });
 
   test('sessão inválida leva ao login e remove a casca', async ({
@@ -347,6 +360,8 @@ test.describe('casca autenticada', () => {
     await page.getByRole('button', { name: 'Entrar' }).click();
     await expect(page).toHaveURL('/');
     await expect(cascaChrome(page)).toBeVisible();
+    await fecharFaixa(page).click();
+    await expect(abrirFaixa(page)).toBeVisible();
 
     const deactivation = await request.post(
       `${apiUrl}/admin/usuarios/${target.id}/desativar`,
@@ -387,6 +402,10 @@ test.describe('casca autenticada', () => {
     await expect(page.getByRole('link', { name: 'GEAP, início' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Sair' })).toHaveCount(0);
     await expect(page).toHaveURL('/atendimentos');
+    await expect(heading).toHaveAttribute('data-mount-probe', probe);
+
+    await refreshPerfilOnFocus(page);
+    await expect(abrirFaixa(page)).toHaveAttribute('aria-expanded', 'false');
     await expect(heading).toHaveAttribute('data-mount-probe', probe);
 
     await abrirFaixa(page).click();

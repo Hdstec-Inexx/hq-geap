@@ -54,6 +54,7 @@ export function AuthenticatedShell() {
         className="app-sidebar"
         hidden={!faixaAberta}
         id="casca-faixa"
+        inert={!faixaAberta}
       >
         <Link className="sidebar-brand" to="/" aria-label="GEAP, início">
           <img
