@@ -245,6 +245,25 @@ function ReviewContent({ detail, onSaved }: { detail: CuradoriaDetail; onSaved: 
         <p>{detail.avaliacaoIa.resumoAtendimento ?? 'Resumo não informado.'}</p>
       </section>
 
+      <div className="atendimento-content">
+        <section className="transcript-panel">
+          <h2>Transcrição</h2>
+          <div className="transcript-lines">
+            {atendimento.transcricao.length === 0 ? <p>Transcrição ainda não disponível.</p> : atendimento.transcricao.map((entry, index) => (
+              <article className={`transcript-line transcript-${entry.role}`} key={`${entry.time_in_call_secs}-${index}`}>
+                <span>{entry.role === 'agent' ? atendimento.agenteVoz.nome : 'Cliente'}</span>
+                <p>{entry.message}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+        <aside className="audio-panel">
+          <p className="panel-label">Áudio</p>
+          <h2>Ouça antes de decidir</h2>
+          {atendimento.audioUrl ? <audio controls preload="metadata" src={atendimento.audioUrl}>Seu navegador não suporta reprodução de áudio.</audio> : <p>Áudio ainda não disponível.</p>}
+        </aside>
+      </div>
+
       {canWrite ? (
         <ReviewForm detail={detail} onSaved={onSaved} />
       ) : (
@@ -277,25 +296,6 @@ function ReviewContent({ detail, onSaved }: { detail: CuradoriaDetail; onSaved: 
           )}
         </section>
       )}
-
-      <div className="atendimento-content">
-        <section className="transcript-panel">
-          <p className="panel-label">Transcrição</p>
-          <div className="transcript-lines">
-            {atendimento.transcricao.length === 0 ? <p>Transcrição ainda não disponível.</p> : atendimento.transcricao.map((entry, index) => (
-              <article className={`transcript-line transcript-${entry.role}`} key={`${entry.time_in_call_secs}-${index}`}>
-                <span>{entry.role === 'agent' ? atendimento.agenteVoz.nome : 'Cliente'}</span>
-                <p>{entry.message}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-        <aside className="audio-panel">
-          <p className="panel-label">Áudio</p>
-          <h2>Ouça antes de decidir</h2>
-          {atendimento.audioUrl ? <audio controls preload="metadata" src={atendimento.audioUrl}>Seu navegador não suporta reprodução de áudio.</audio> : <p>Áudio ainda não disponível.</p>}
-        </aside>
-      </div>
 
       <section className="review-history">
         <div>

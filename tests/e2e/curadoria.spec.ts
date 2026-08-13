@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import pg from 'pg';
 import aprovada from '../fixtures/avaliacoes/avaliacao-aprovada.json' with { type: 'json' };
 import { authUsers } from '../support/auth-fixtures.js';
@@ -399,6 +399,21 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     );
   });
 
+  async function expectSecoesDaRevisaoNaOrdem(page: Page) {
+    await expect(page.getByRole('region', { name: 'Dados do Atendimento' })).toBeVisible();
+    const headings = await page.locator('main h2').allTextContents();
+    const headingIndex = (name: string) => {
+      expect(headings).toContain(name);
+      return headings.findIndex((text) => text.trim() === name);
+    };
+
+    expect(headingIndex('Avaliação original')).toBeLessThan(headingIndex('Transcrição'));
+    expect(headingIndex('Transcrição')).toBeLessThan(headingIndex('Ouça antes de decidir'));
+    expect(headingIndex('Ouça antes de decidir')).toBeLessThan(headingIndex('Conferência humana'));
+    expect(headingIndex('Conferência humana')).toBeLessThan(headingIndex('Revisão mais recente'));
+    expect(headingIndex('Revisão mais recente')).toBeLessThan(headingIndex('Comentários'));
+  }
+
   test('Gestao consulta a conferencia pela interface sem acao de escrita', async ({
     page
   }) => {
@@ -415,6 +430,7 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.getByRole('heading', { name: 'Revisar Atendimento' })).toBeVisible();
     await expect(page.getByText('Consulta somente leitura')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Salvar conferência' })).toHaveCount(0);
+    await expectSecoesDaRevisaoNaOrdem(page);
   });
 
   test('Curador confere o checklist da IA pela interface e consulta o historico', async ({
@@ -433,6 +449,7 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.getByRole('heading', { name: 'Fila de Curadoria' })).toBeVisible();
     await page.getByRole('link', { name: /conv-curadoria-interface/ }).click();
     await expect(page.getByRole('heading', { name: 'Conferência humana' })).toBeVisible();
+    await expectSecoesDaRevisaoNaOrdem(page);
     await expect(page.getByText('Uso Correto de Ferramentas')).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Avaliação original' }).locator('..').getByText('Atendimento objetivo.')
