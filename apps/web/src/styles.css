@@ -77,6 +77,9 @@ a {
   top: 16px;
   left: 260px;
   transform: translateX(-100%);
+  justify-self: start;
+  align-self: start;
+  width: max-content;
   min-height: 40px;
   padding: 0 12px;
   color: #123b4a;

@@ -3,6 +3,10 @@ import { Link, NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom';
 import { usePerfil } from '../features/auth/perfil-context';
 import { clearSession } from '../features/auth/session';
 import { areasPorPapel } from './casca-areas';
+import {
+  abrirFaixaDeNavegacao,
+  fecharFaixaDeNavegacao
+} from './casca-faixa';
 
 export function Shell() {
   return (
@@ -36,7 +40,7 @@ export function AuthenticatedShell() {
         aria-controls="casca-faixa"
         aria-expanded={faixaAberta}
         aria-label={
-          faixaAberta ? 'Fechar faixa de navegação' : 'Abrir faixa de navegação'
+          faixaAberta ? fecharFaixaDeNavegacao : abrirFaixaDeNavegacao
         }
         className="sidebar-toggle"
         onClick={() => setFaixaAberta((aberta) => !aberta)}
