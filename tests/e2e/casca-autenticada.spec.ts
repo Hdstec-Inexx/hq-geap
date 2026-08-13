@@ -74,17 +74,34 @@ async function expectAreasForRole(page: Page, role: AuthRole) {
   }
 }
 
-async function refreshPerfilOnFocus(page: Page) {
+async function waitFocusRefreshGap(page: Page) {
   await page.waitForFunction(() => {
     const raw = window.sessionStorage.getItem('hq-geap.last-me-at');
     if (!raw) return true;
     return Date.now() - Number(raw) >= 2100;
   });
+}
+
+async function refreshPerfilOnFocus(page: Page) {
+  await waitFocusRefreshGap(page);
   const perfilGet = page.waitForResponse(
     (response) =>
       response.url().includes('/me') &&
       response.request().method() === 'GET' &&
       response.ok(),
+    { timeout: 15_000 }
+  );
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await perfilGet;
+}
+
+async function refreshRevokedPerfilOnFocus(page: Page) {
+  await waitFocusRefreshGap(page);
+  const perfilGet = page.waitForResponse(
+    (response) =>
+      response.url().includes('/me') &&
+      response.request().method() === 'GET' &&
+      [401, 403].includes(response.status()),
     { timeout: 15_000 }
   );
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
@@ -194,5 +211,104 @@ test.describe('casca autenticada', () => {
       cascaNav(page).getByRole('link', { name: 'Administrar usuários' })
     ).toHaveCount(0);
     await expectAreasForRole(page, 'gestao');
+  });
+
+  test('rota nested mantém a casca e marca a área atual', async ({ page }) => {
+    await loginPage(page, 'curador');
+    await page.goto('/atendimentos/00000000-4000-8000-0000-000000000001');
+
+    await expect(cascaChrome(page)).toBeVisible();
+    await expect(
+      cascaNav(page).getByRole('link', { name: 'Consultar Atendimentos' })
+    ).toHaveAttribute('aria-current', 'page');
+    await expect(
+      cascaNav(page).getByRole('link', { name: 'Monitoramento ao Vivo' })
+    ).not.toHaveAttribute('aria-current');
+    await expect(cascaChrome(page).getByRole('button', { name: 'Sair' })).toBeVisible();
+  });
+
+  test('viewport estreito mantém áreas, nome e Sair ao alcance', async ({
+    page
+  }) => {
+    const user = authUserFor('admin');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await loginPage(page, 'admin');
+
+    await expect(cascaChrome(page)).toBeVisible();
+    await expect(cascaChrome(page).getByText(user.name, { exact: true })).toBeVisible();
+    await expect(cascaChrome(page).getByRole('button', { name: 'Sair' })).toBeVisible();
+    await expectAreasForRole(page, 'admin');
+
+    await cascaNav(page)
+      .getByRole('link', { name: 'Consultar Atendimentos' })
+      .click();
+    await expect(page).toHaveURL('/atendimentos');
+    await expect(cascaChrome(page)).toBeInViewport();
+  });
+
+  test('casca permanece visível depois de rolar uma área longa', async ({
+    page
+  }) => {
+    await loginPage(page, 'admin');
+    await page.getByRole('link', { name: 'Abrir Dashboard da Gestão' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Pulso da operação' })
+    ).toBeVisible();
+
+    await page.evaluate(() => {
+      const heading = document.querySelector('h1');
+      const pageRoot = heading?.closest('section') ?? heading?.parentElement;
+      if (!pageRoot) {
+        throw new Error('área autenticada não encontrada');
+      }
+      const spacer = document.createElement('div');
+      spacer.style.height = '4000px';
+      spacer.setAttribute('aria-hidden', 'true');
+      pageRoot.appendChild(spacer);
+      window.scrollTo(0, 1600);
+    });
+    await expect.poll(async () => page.evaluate(() => window.scrollY)).toBeGreaterThan(500);
+    await expect(cascaChrome(page)).toBeInViewport();
+    await expect(cascaChrome(page).getByRole('button', { name: 'Sair' })).toBeVisible();
+  });
+
+  test('sessão inválida leva ao login e remove a casca', async ({
+    page,
+    request
+  }) => {
+    const admin = await loginApi(request, 'admin');
+    const headers = { authorization: `Bearer ${admin.token}` };
+    const targetEmail = `casca-revoke-${Date.now()}@hq.test`;
+    const created = await request.post(`${apiUrl}/admin/usuarios`, {
+      data: {
+        email: targetEmail,
+        name: 'Admin casca revoke',
+        password: 'senha-segura',
+        role: 'admin'
+      },
+      headers
+    });
+    expect(created.status()).toBe(201);
+    const target = (await created.json()) as { id: string };
+
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill(targetEmail);
+    await page.getByLabel('Senha').fill('senha-segura');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await expect(cascaChrome(page)).toBeVisible();
+
+    const deactivation = await request.post(
+      `${apiUrl}/admin/usuarios/${target.id}/desativar`,
+      { headers }
+    );
+    expect(deactivation.status()).toBe(200);
+
+    await refreshRevokedPerfilOnFocus(page);
+    await expect(page).toHaveURL('/login');
+    await expect(
+      page.getByRole('heading', { name: 'Acesse o HQ GEAP' })
+    ).toBeVisible();
+    await expectNoCasca(page);
   });
 });
