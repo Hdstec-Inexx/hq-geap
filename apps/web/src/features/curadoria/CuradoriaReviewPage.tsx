@@ -10,7 +10,6 @@ import { apiUrl, getSession } from '../auth/session';
 import { canWriteAsCurador, usePerfil } from '../auth/perfil-context';
 import { formatDuration, useAuthenticatedResource } from '../atendimentos/api';
 import { ComentariosPanel } from '../comentarios/ComentariosPanel';
-import { valorInicialNotaAvaliacaoIa } from './nota-avaliacao-ia-inicial';
 
 const stateLabels: Record<EstadoCriterio, string> = {
   atendido: 'Atendido',
@@ -36,7 +35,7 @@ function ReviewForm({
     )
   );
   const [notaAvaliacaoIa, setNotaAvaliacaoIa] = useState(() =>
-    valorInicialNotaAvaliacaoIa(detail.avaliacaoIa.nota)
+    String(detail.avaliacaoIa.nota)
   );
   const [falhasIdentificadas, setFalhasIdentificadas] = useState(
     detail.avaliacaoIa.falhasIdentificadas.join('\n')

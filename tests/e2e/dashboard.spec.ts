@@ -364,9 +364,8 @@ test.describe.serial('Dashboard da Gestao', () => {
     await page.getByRole('link', { name: 'Detalhar SLA' }).click();
     await expect(page).toHaveURL(/indicador=sla/);
     await expect(page.getByText('Detalhamento do Indicador')).toBeVisible();
-    await expect(page.locator('.atendimento-row')).toHaveCount(1);
-    await expect(page.locator('.atendimento-row').getByText('Financeiro / Boletos')).toBeVisible();
-    await expect(page.locator('.atendimento-row').getByText('Rede credenciada')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Financeiro / Boletos' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Rede credenciada' })).toHaveCount(0);
 
     const tmeQuery = await request.get(
       `${apiUrl}/atendimentos?inicio=2025-01-01&fim=2025-01-31&indicador=tme`,

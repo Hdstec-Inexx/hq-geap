@@ -415,6 +415,8 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     expect(headingIndex('Ouça antes de decidir')).toBeLessThan(headingIndex('Conferência humana'));
     expect(headingIndex('Conferência humana')).toBeLessThan(headingIndex('Revisão mais recente'));
     expect(headingIndex('Revisão mais recente')).toBeLessThan(headingIndex('Comentários'));
+    await expect(page.getByText('Tempo de Espera', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('TME', { exact: true })).toHaveCount(0);
   }
 
   test('Gestao consulta a conferencia pela interface sem acao de escrita', async ({
@@ -471,7 +473,10 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     const protocolo = page.getByRole('group', { name: /Informação de Protocolo/ });
     await protocolo.getByLabel('Não atendido').check();
     await expect(page.getByText('Reprovado', { exact: true })).toBeVisible();
-    await page.getByLabel('Nota da Avaliação da IA').fill('3');
+    await notaAvaliacaoIa.fill('11');
+    await expect(page.getByRole('button', { name: 'Salvar conferência' })).toBeDisabled();
+    await notaAvaliacaoIa.fill('3');
+    await expect(page.getByRole('button', { name: 'Salvar conferência' })).toBeEnabled();
     await page.getByLabel('Comentário da revisão (opcional)').fill('Corrigir protocolo.');
     await page.getByRole('button', { name: 'Salvar conferência' }).click();
 
