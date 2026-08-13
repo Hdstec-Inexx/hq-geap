@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import pg from 'pg';
 import aprovada from '../fixtures/avaliacoes/avaliacao-aprovada.json' with { type: 'json' };
 import { authUsers } from '../support/auth-fixtures.js';
@@ -56,7 +56,10 @@ async function createAtendimento(
   return result.rows[0]!.id;
 }
 
-async function persistirAvaliacaoIa(atendimentoId: string) {
+async function persistirAvaliacaoIa(
+  atendimentoId: string,
+  notaQualidade = aprovada.nota_qualidade
+) {
   await queryDatabase(`
     select * from persistir_avaliacao_ia(
       $1,
@@ -71,7 +74,7 @@ async function persistirAvaliacaoIa(atendimentoId: string) {
     atendimentoId,
     JSON.stringify(aprovada.checklist),
     aprovada.atendimento_aprovado,
-    aprovada.nota_qualidade
+    notaQualidade
   ]);
 }
 
@@ -399,6 +402,23 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     );
   });
 
+  async function expectSecoesDaRevisaoNaOrdem(page: Page) {
+    await expect(page.getByRole('region', { name: 'Dados do Atendimento' })).toBeVisible();
+    const headings = await page.locator('main h2').allTextContents();
+    const headingIndex = (name: string) => {
+      expect(headings).toContain(name);
+      return headings.findIndex((text) => text.trim() === name);
+    };
+
+    expect(headingIndex('Avaliação original')).toBeLessThan(headingIndex('Transcrição'));
+    expect(headingIndex('Transcrição')).toBeLessThan(headingIndex('Ouça antes de decidir'));
+    expect(headingIndex('Ouça antes de decidir')).toBeLessThan(headingIndex('Conferência humana'));
+    expect(headingIndex('Conferência humana')).toBeLessThan(headingIndex('Revisão mais recente'));
+    expect(headingIndex('Revisão mais recente')).toBeLessThan(headingIndex('Comentários'));
+    await expect(page.getByText('Tempo de Espera', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('TME', { exact: true })).toHaveCount(0);
+  }
+
   test('Gestao consulta a conferencia pela interface sem acao de escrita', async ({
     page
   }) => {
@@ -415,13 +435,15 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.getByRole('heading', { name: 'Revisar Atendimento' })).toBeVisible();
     await expect(page.getByText('Consulta somente leitura')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Salvar conferência' })).toHaveCount(0);
+    await expectSecoesDaRevisaoNaOrdem(page);
   });
 
   test('Curador confere o checklist da IA pela interface e consulta o historico', async ({
     page
   }) => {
     const atendimentoId = await createAtendimento('conv-curadoria-interface');
-    await persistirAvaliacaoIa(atendimentoId);
+    // nota_qualidade 4 ≠ Régua 9,5 — o input deve copiar Nota da IA, não o claim da LLM.
+    await persistirAvaliacaoIa(atendimentoId, 4);
 
     await page.goto('/login');
     await page.getByLabel('E-mail').fill('curador@hq.test');
@@ -433,6 +455,15 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.getByRole('heading', { name: 'Fila de Curadoria' })).toBeVisible();
     await page.getByRole('link', { name: /conv-curadoria-interface/ }).click();
     await expect(page.getByRole('heading', { name: 'Conferência humana' })).toBeVisible();
+    await expectSecoesDaRevisaoNaOrdem(page);
+    const notaReguaExibida = page
+      .getByRole('region', { name: 'Dados do Atendimento' })
+      .locator('div')
+      .filter({ hasText: /^Nota da IA/ })
+      .locator('strong');
+    await expect(notaReguaExibida).toHaveText('9,5');
+    const notaAvaliacaoIa = page.getByLabel('Nota da Avaliação da IA');
+    await expect(notaAvaliacaoIa).toHaveValue('9.5');
     await expect(page.getByText('Uso Correto de Ferramentas')).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Avaliação original' }).locator('..').getByText('Atendimento objetivo.')
@@ -442,7 +473,10 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     const protocolo = page.getByRole('group', { name: /Informação de Protocolo/ });
     await protocolo.getByLabel('Não atendido').check();
     await expect(page.getByText('Reprovado', { exact: true })).toBeVisible();
-    await page.getByLabel('Nota da Avaliação da IA').fill('3');
+    await notaAvaliacaoIa.fill('11');
+    await expect(page.getByRole('button', { name: 'Salvar conferência' })).toBeDisabled();
+    await notaAvaliacaoIa.fill('3');
+    await expect(page.getByRole('button', { name: 'Salvar conferência' })).toBeEnabled();
     await page.getByLabel('Comentário da revisão (opcional)').fill('Corrigir protocolo.');
     await page.getByRole('button', { name: 'Salvar conferência' }).click();
 

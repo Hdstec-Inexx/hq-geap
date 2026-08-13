@@ -96,14 +96,6 @@ export function Kpis({
         value={valueOrDash(kpis.tmaSegundos, formatDuration)}
       />
       <KpiLink
-        ariaLabel="Detalhar TME"
-        fim={fim}
-        indicador="tme"
-        inicio={inicio}
-        label="TME"
-        value={valueOrDash(kpis.tmeSegundos, formatDuration)}
-      />
-      <KpiLink
         ariaLabel="Detalhar Taxa de Resolvidas"
         fim={fim}
         indicador="resolvidas"

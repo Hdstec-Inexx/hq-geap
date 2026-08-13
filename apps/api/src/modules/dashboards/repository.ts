@@ -7,7 +7,6 @@ import type pg from 'pg';
 export type DashboardKpisRow = {
   volume: string;
   tmaSegundos: string | null;
-  tmeSegundos: string | null;
   resolvidas: string;
   dentroSla: string;
   notaMediaIa: string | null;
@@ -67,7 +66,6 @@ export function createDashboardRepository(db: pg.Pool) {
         select
           count(*) as volume,
           avg(a.duracao_segundos) as "tmaSegundos",
-          avg(a.tme_segundos) as "tmeSegundos",
           count(*) filter (where not a.houve_transferencia) as resolvidas,
           count(*) filter (
             where a.tme_segundos is not null

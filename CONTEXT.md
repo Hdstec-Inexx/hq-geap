@@ -23,6 +23,10 @@ Papel futuro, fora do escopo do MVP. Teria acesso apenas a dashboards.
 A identidade autenticada no HQ GEAP: quem é a pessoa (nome, e-mail) e qual **papel** exerce (Admin, Gestão ou Curador). É o que a casca autenticada consulta para liberar ou bloquear áreas; mudança de papel ou perda do Perfil (conta desativada / sessão inválida) é o que deve alterar a UI — não o mero fato de o Perfil ter sido revalidado. `GET /me` com Perfil **igual** ao atual é no-op de UX (sem remount, refetch da página ou reabertura do WebSocket do Monitoramento ao Vivo); ver ADR-0013.
 _Avoid_: Usuário (ambíguo com conta genérica), sessão (mecanismo de auth, não o conceito de identidade/papel)
 
+**Casca autenticada**:
+O enquadramento da UI presente só com Perfil válido: expõe as áreas liberadas ao **papel**, identifica a pessoa pelo nome, permite encerrar a sessão e leva à Home pela marca GEAP. Login e health ficam fora dela. A Home mantém o Perfil completo (nome, e-mail, papel); a casca mostra nome, áreas do papel e encerramento de sessão.
+_Avoid_: shell, sidebar (vocabulário de implementação, não de domínio)
+
 ### Objeto central
 
 **Atendimento**:
@@ -86,10 +90,10 @@ _Avoid_: Supervisão (implica intervenção, que não existe no MVP)
 
 **Tempo de Espera**:
 O intervalo, em segundos, entre a **primeira fala do cliente** e a **segunda fala do agente** (a primeira fala do agente é a apresentação). É fato do Atendimento; não é o TME. Fica `null` quando faltam a primeira fala do cliente, a segunda do agente, ou tempos válidos para calcular a diferença.
-_Avoid_: Fila (colide com Fila de Curadoria), instante absoluto desde o início do Atendimento, TME (TME é a média no período)
+_Avoid_: Fila (colide com Fila de Curadoria), instante absoluto desde o início do Atendimento, TME (média, não o intervalo individual)
 
 **TME**:
-Tempo Médio de Espera: no dashboard, a soma dos Tempos de Espera dos Atendimentos do período filtrado que **têm** Tempo de Espera, dividida pela quantidade desses Atendimentos. Não é gravado na finalização do Atendimento — só o Tempo de Espera individual alimenta o cálculo.
+Tempo Médio de Espera: a média dos Tempos de Espera dos Atendimentos que **têm** Tempo de Espera. Distinto do Tempo de Espera individual (fato do Atendimento). Não é gravado na finalização do Atendimento e **não** é indicador do dashboard.
 
 **SLA**:
 Percentual, no dashboard e no período filtrado, dos Atendimentos cujo Tempo de Espera está dentro do prazo (Tempo de Espera ≤ **150 segundos**), sobre o **total** de Atendimentos do período. Atendimento sem Tempo de Espera mensurável não conta como dentro do prazo. O limite define “dentro do prazo”; não é um segundo indicador nem medida de inatividade. A meta de referência é **80%**.

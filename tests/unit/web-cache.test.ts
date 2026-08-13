@@ -26,3 +26,23 @@ test('HTML da SPA não pode ser armazenado entre deploys', async () => {
     new RegExp(`location / \\{[\\s\\S]*?${htmlCacheHeaders}`)
   );
 });
+
+test('favicon e logo GEAP podem ser cacheados pelo navegador', async () => {
+  const nginxConfig = await readFile(nginxConfigPath, 'utf8');
+  const brandAssetCache =
+    'add_header Cache-Control "public, max-age=604800" always;';
+
+  for (const path of ['/favicon.ico', '/geap_saude_transparente.png']) {
+    const escaped = path.replace(/\./g, '\\.');
+    const locationBlock = new RegExp(
+      `location = ${escaped} \\{[^}]*\\}`,
+      'm'
+    );
+    const match = nginxConfig.match(locationBlock);
+    assert.ok(match, `esperado location = ${path}`);
+    const block = match[0];
+    assert.match(block, new RegExp(brandAssetCache));
+    assert.match(block, /try_files \$uri =404;/);
+    assert.doesNotMatch(block, /Cache-Control "no-store/);
+  }
+});

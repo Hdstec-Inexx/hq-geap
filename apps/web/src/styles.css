@@ -27,43 +27,117 @@ a {
     #e8f1ee;
 }
 
-.masthead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: min(1180px, calc(100% - 48px));
-  margin: 0 auto;
-  padding: 28px 0;
-  border-bottom: 1px solid rgb(18 59 74 / 20%);
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-decoration: none;
-  text-transform: uppercase;
-}
-
-.brand-mark {
+.app-shell-auth {
   display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  color: #f8fcfa;
-  background: #123b4a;
-  border-radius: 50%;
-  letter-spacing: -0.04em;
+  grid-template-columns: 260px minmax(0, 1fr);
+  min-height: 100vh;
 }
 
-.environment {
-  color: #52717a;
-  font-family: Consolas, monospace;
-  font-size: 0.72rem;
-  text-transform: uppercase;
+.app-sidebar {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow-y: auto;
+  padding: 28px 20px 24px;
+  color: #eff9f5;
+  background: #123b4a;
+  border-right: 1px solid rgb(18 59 74 / 35%);
+}
+
+.sidebar-brand {
+  display: block;
+  padding: 12px 14px;
+  background: #f4faf7;
+  border-radius: 6px;
+  text-decoration: none;
+}
+
+.sidebar-logo {
+  display: block;
+  width: min(100%, 168px);
+  height: auto;
+}
+
+.sidebar-nav {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  flex: 1;
+}
+
+.sidebar-link {
+  display: block;
+  padding: 10px 12px;
+  color: #b9d1ca;
+  border-radius: 4px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+.sidebar-link:hover {
+  color: #eff9f5;
+  background: rgb(239 249 245 / 8%);
+}
+
+.sidebar-brand:focus-visible,
+.sidebar-link:focus-visible {
+  outline: 3px solid #e5b85c;
+  outline-offset: 3px;
+}
+
+.sidebar-link-active {
+  color: #123b4a;
+  background: #62d4b6;
+}
+
+.sidebar-link-active:hover {
+  color: #123b4a;
+  background: #62d4b6;
+}
+
+.sidebar-footer {
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid rgb(239 249 245 / 16%);
+}
+
+.sidebar-user-name {
+  margin: 0;
+  color: #eff9f5;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.05rem;
+  line-height: 1.3;
+}
+
+.sidebar-logout {
+  min-height: 40px;
+  padding: 0 14px;
+  color: #123b4a;
+  background: #62d4b6;
+  border: 0;
+  border-radius: 3px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.sidebar-logout:focus-visible {
+  outline: 3px solid #e5b85c;
+  outline-offset: 3px;
+}
+
+.app-content {
+  min-width: 0;
+  min-height: 100vh;
 }
 
 .health-page {
@@ -72,7 +146,7 @@ a {
   align-items: center;
   gap: clamp(48px, 8vw, 120px);
   width: min(1120px, calc(100% - 48px));
-  min-height: calc(100vh - 101px);
+  min-height: 100vh;
   margin: 0 auto;
   padding: 72px 0 96px;
 }
@@ -190,7 +264,7 @@ h1 {
   align-items: center;
   gap: clamp(52px, 9vw, 132px);
   width: min(1080px, calc(100% - 48px));
-  min-height: calc(100vh - 101px);
+  min-height: 100vh;
   margin: 0 auto;
   padding: 70px 0 96px;
 }
@@ -388,7 +462,7 @@ h1 {
 
 .session-check {
   display: grid;
-  min-height: calc(100vh - 101px);
+  min-height: 100vh;
   margin: 0;
   place-items: center;
   color: #52717a;
@@ -533,22 +607,6 @@ h1 {
 
 .configuration-error {
   color: #a73e32;
-}
-
-.admin-feature-link {
-  display: inline-block;
-  margin: 34px 22px 0 0;
-  padding-bottom: 6px;
-  color: #08735f;
-  border-bottom: 2px solid #16816f;
-  font-weight: 800;
-  text-decoration: none;
-}
-
-.admin-feature-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 28px;
 }
 
 .criteria-page {
@@ -1266,7 +1324,8 @@ h1 {
   color: #62d4b6;
 }
 
-.audio-panel h2 {
+.audio-panel h2,
+.transcript-panel h2 {
   margin: 14px 0 30px;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 2rem;
@@ -1601,15 +1660,45 @@ h1 {
 }
 
 @media (max-width: 760px) {
-  .masthead,
+  .app-shell-auth {
+    grid-template-columns: 1fr;
+  }
+
+  .app-sidebar {
+    height: auto;
+    max-height: none;
+    gap: 18px;
+    padding: 20px 16px;
+    border-right: 0;
+    border-bottom: 1px solid rgb(18 59 74 / 35%);
+  }
+
+  .sidebar-nav {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .sidebar-link {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .sidebar-footer {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .sidebar-logout {
+    margin: 0;
+  }
+
   .health-page,
   .login-page,
   .session-page {
     width: min(100% - 32px, 560px);
-  }
-
-  .environment {
-    display: none;
   }
 
   .health-page {
@@ -1625,6 +1714,7 @@ h1 {
     align-content: start;
     gap: 52px;
     padding-top: 54px;
+    min-height: auto;
   }
 
   .login-page h1,
