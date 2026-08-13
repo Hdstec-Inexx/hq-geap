@@ -85,7 +85,6 @@ export const atendimentoListSchema = z.array(atendimentoSummarySchema);
 export const detalhamentoIndicadorSchema = z.enum([
   'volume',
   'tma',
-  'tme',
   'resolvidas',
   'sla',
   'nota_media_ia',

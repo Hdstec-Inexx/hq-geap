@@ -201,7 +201,6 @@ test.describe.serial('Dashboard da Gestao', () => {
     expect(dashboard.kpis).toEqual({
       volume: 2,
       tmaSegundos: 90,
-      tmeSegundos: 30,
       taxaResolvidas: 50,
       sla: 50,
       slaMeta: 80,
@@ -282,7 +281,8 @@ test.describe.serial('Dashboard da Gestao', () => {
 
     await expect(page.getByRole('heading', { name: 'Pulso da operação' })).toBeVisible();
     await expect(page.getByText('Total de Atendimentos', { exact: true })).toBeVisible();
-    await expect(page.getByText('TME', { exact: true })).toBeVisible();
+    await expect(page.getByText('TME', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Detalhar TME' })).toHaveCount(0);
     await expect(page.getByText('Taxa de Resolvidas', { exact: true })).toBeVisible();
     await expect(page.getByText('SLA', { exact: true })).toBeVisible();
     await expect(page.getByText('meta 80% · Tempo de Espera ≤ 2:30')).toBeVisible();
@@ -301,6 +301,17 @@ test.describe.serial('Dashboard da Gestao', () => {
     await expect(page.getByRole('heading', { name: 'Piores Atendimentos' })).toBeVisible();
     await expect(page.locator('.piores-panel canvas')).toHaveCount(0);
     await expect(page.getByRole('button', { name: /salvar|editar|excluir/i })).toHaveCount(0);
+  });
+
+  test('Admin nao ve KPI TME e mantem SLA no mesmo dashboard', async ({ page }) => {
+    await loginPage(page, 'admin');
+    await page.goto('/dashboard?inicio=2025-01-01&fim=2025-01-31');
+
+    await expect(page.getByRole('heading', { name: 'Pulso da operação' })).toBeVisible();
+    await expect(page.getByText('TME', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Detalhar TME' })).toHaveCount(0);
+    await expect(page.getByText('SLA', { exact: true })).toBeVisible();
+    await expect(page.getByText('meta 80% · Tempo de Espera ≤ 2:30')).toBeVisible();
   });
 
   test('clique no KPI navega para lista filtrada preservando o periodo', async ({
@@ -340,7 +351,7 @@ test.describe.serial('Dashboard da Gestao', () => {
     ).toBe(403);
   });
 
-  test('detalhamento de TME lista com medida e SLA lista dentro do prazo', async ({
+  test('detalhamento de SLA lista dentro do prazo e rejeita indicador tme', async ({
     page,
     request
   }) => {
@@ -348,14 +359,8 @@ test.describe.serial('Dashboard da Gestao', () => {
     await loginPage(page, 'gestao');
     await page.goto('/gestao/dashboard?inicio=2025-01-01&fim=2025-01-31');
 
-    await page.getByRole('link', { name: 'Detalhar TME' }).click();
-    await expect(page).toHaveURL(/indicador=tme/);
-    await expect(page.getByText('Detalhamento do Indicador')).toBeVisible();
-    await expect(page.locator('.atendimento-row')).toHaveCount(1);
-    await expect(page.locator('.atendimento-row').getByText('Financeiro / Boletos')).toBeVisible();
-    await expect(page.locator('.atendimento-row').getByText('Rede credenciada')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Detalhar TME' })).toHaveCount(0);
 
-    await page.goto('/gestao/dashboard?inicio=2025-01-01&fim=2025-01-31');
     await page.getByRole('link', { name: 'Detalhar SLA' }).click();
     await expect(page).toHaveURL(/indicador=sla/);
     await expect(page.getByText('Detalhamento do Indicador')).toBeVisible();
@@ -363,7 +368,7 @@ test.describe.serial('Dashboard da Gestao', () => {
     await expect(page.locator('.atendimento-row').getByText('Financeiro / Boletos')).toBeVisible();
     await expect(page.locator('.atendimento-row').getByText('Rede credenciada')).toHaveCount(0);
 
-    const tmeList = await request.get(
+    const tmeQuery = await request.get(
       `${apiUrl}/atendimentos?inicio=2025-01-01&fim=2025-01-31&indicador=tme`,
       { headers: { authorization: `Bearer ${gestao.token}` } }
     );
@@ -371,9 +376,8 @@ test.describe.serial('Dashboard da Gestao', () => {
       `${apiUrl}/atendimentos?inicio=2025-01-01&fim=2025-01-31&indicador=sla`,
       { headers: { authorization: `Bearer ${gestao.token}` } }
     );
-    expect(tmeList.status()).toBe(200);
+    expect(tmeQuery.status()).toBe(400);
     expect(slaList.status()).toBe(200);
-    expect(await tmeList.json()).toHaveLength(1);
     expect(await slaList.json()).toHaveLength(1);
   });
 

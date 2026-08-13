@@ -41,7 +41,6 @@ export async function getDashboard(
     kpis: {
       volume,
       tmaSegundos: numberOrNull(kpis.tmaSegundos, 0),
-      tmeSegundos: numberOrNull(kpis.tmeSegundos, 0),
       taxaResolvidas: percentage(resolvidas, volume),
       sla: percentage(dentroSla, volume),
       slaMeta: SLA_META_PERCENTUAL,

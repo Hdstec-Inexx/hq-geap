@@ -41,9 +41,6 @@ export function buildDetalhamentoFilters(
     case 'tma':
       clauses.push('a.duracao_segundos is not null');
       break;
-    case 'tme':
-      clauses.push('a.tme_segundos is not null');
-      break;
     case 'resolvidas':
     case 'tempo_resolucao':
       clauses.push('not a.houve_transferencia');
