@@ -621,6 +621,15 @@ test('detalhe exibe historico com speaker IA/Cliente gravado pelo n8n', () => {
   assert.equal(fromString.transcricao.length, 3);
 });
 
+test('query do Detalhamento rejeita indicador tme', () => {
+  const result = atendimentosQuerySchema.safeParse({
+    inicio: '2025-01-01',
+    fim: '2025-01-31',
+    indicador: 'tme'
+  });
+  assert.equal(result.success, false);
+});
+
 test('query da lista aceita filtros compartilháveis do Detalhamento', () => {
   const parsed = atendimentosQuerySchema.parse({
     inicio: '2025-01-01',

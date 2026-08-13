@@ -25,7 +25,6 @@ test('contrato de KPIs expoe o strip operacional acordado', () => {
   const parsed = dashboardKpisSchema.parse({
     volume: 10,
     tmaSegundos: 90,
-    tmeSegundos: 45,
     taxaResolvidas: 70,
     sla: 80,
     slaMeta: 80,
@@ -44,9 +43,9 @@ test('contrato de KPIs expoe o strip operacional acordado', () => {
     'taxaResolvidas',
     'tempoMedioAteResolucao',
     'tmaSegundos',
-    'tmeSegundos',
     'volume'
   ]);
+  assert.equal('tmeSegundos' in parsed, false);
   assert.equal('transferencias' in parsed, false);
   assert.equal('custoTotal' in parsed, false);
 });
@@ -68,7 +67,6 @@ test('consulta as partes do dashboard sem ocupar varias conexoes simultaneamente
       query({
         volume: '2',
         tmaSegundos: '90',
-        tmeSegundos: '40',
         resolvidas: '1',
         dentroSla: '1',
         notaMediaIa: '7',
@@ -99,7 +97,6 @@ test('consulta as partes do dashboard sem ocupar varias conexoes simultaneamente
   assert.deepEqual(dashboard.kpis, {
     volume: 2,
     tmaSegundos: 90,
-    tmeSegundos: 40,
     taxaResolvidas: 50,
     sla: 50,
     slaMeta: 80,
@@ -115,7 +112,6 @@ test('KPIs nulos quando nao ha amostra para media ou taxa', async () => {
     getKpis: async () => ({
       volume: '0',
       tmaSegundos: null,
-      tmeSegundos: null,
       resolvidas: '0',
       dentroSla: '0',
       notaMediaIa: null,
@@ -144,7 +140,6 @@ test('KPIs nulos quando nao ha amostra para media ou taxa', async () => {
   assert.deepEqual(dashboard.kpis, {
     volume: 0,
     tmaSegundos: null,
-    tmeSegundos: null,
     taxaResolvidas: null,
     sla: null,
     slaMeta: 80,
@@ -160,7 +155,6 @@ test('SLA usa volume do periodo como denominador (volume 2, dentroSla 1 → 50%)
     getKpis: async () => ({
       volume: '2',
       tmaSegundos: '90',
-      tmeSegundos: '30',
       resolvidas: '1',
       dentroSla: '1',
       notaMediaIa: '7',
@@ -186,10 +180,10 @@ test('SLA usa volume do periodo como denominador (volume 2, dentroSla 1 → 50%)
     fim: '2025-01-31'
   });
 
-  // TME media stays on the single measurable sample; SLA divides by volume
-  // so a missing Tempo de Espera still counts against the rate (50%, not 100%).
+  // SLA divides by volume so a missing Tempo de Espera still counts against
+  // the rate (50%, not 100%).
   assert.equal(dashboard.kpis.volume, 2);
-  assert.equal(dashboard.kpis.tmeSegundos, 30);
+  assert.equal('tmeSegundos' in dashboard.kpis, false);
   assert.equal(dashboard.kpis.sla, 50);
   assert.equal(dashboard.kpis.slaMeta, 80);
 });
