@@ -450,6 +450,14 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await page.getByRole('link', { name: /conv-curadoria-interface/ }).click();
     await expect(page.getByRole('heading', { name: 'Conferência humana' })).toBeVisible();
     await expectSecoesDaRevisaoNaOrdem(page);
+    const notaReguaExibida = page
+      .getByRole('region', { name: 'Dados do Atendimento' })
+      .locator('div')
+      .filter({ hasText: /^Nota da IA/ })
+      .locator('strong');
+    await expect(notaReguaExibida).toHaveText('9,5');
+    const notaAvaliacaoIa = page.getByLabel('Nota da Avaliação da IA');
+    await expect(notaAvaliacaoIa).toHaveValue('9.5');
     await expect(page.getByText('Uso Correto de Ferramentas')).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Avaliação original' }).locator('..').getByText('Atendimento objetivo.')
