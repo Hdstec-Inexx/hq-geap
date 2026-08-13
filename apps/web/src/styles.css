@@ -33,6 +33,14 @@ a {
   min-height: 100vh;
 }
 
+.app-shell-auth-collapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-sidebar[hidden] {
+  display: none;
+}
+
 .app-sidebar {
   position: sticky;
   top: 0;
@@ -52,16 +60,40 @@ a {
 
 .sidebar-brand {
   display: block;
-  padding: 12px 14px;
-  background: #f4faf7;
-  border-radius: 6px;
+  padding: 0;
+  background: transparent;
   text-decoration: none;
 }
 
 .sidebar-logo {
   display: block;
-  width: min(100%, 168px);
+  width: min(100%, 100px);
   height: auto;
+}
+
+.sidebar-toggle {
+  position: fixed;
+  z-index: 6;
+  top: 16px;
+  left: 260px;
+  transform: translateX(-100%);
+  width: max-content;
+  min-height: 40px;
+  padding: 0 12px;
+  color: #123b4a;
+  background: #62d4b6;
+  border: 0;
+  border-radius: 3px 0 0 3px;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.app-shell-auth-collapsed .sidebar-toggle {
+  left: 0;
+  transform: none;
+  border-radius: 0 3px 3px 0;
 }
 
 .sidebar-nav {
@@ -88,6 +120,7 @@ a {
 }
 
 .sidebar-brand:focus-visible,
+.sidebar-toggle:focus-visible,
 .sidebar-link:focus-visible {
   outline: 3px solid #e5b85c;
   outline-offset: 3px;
@@ -1660,8 +1693,22 @@ h1 {
 }
 
 @media (max-width: 760px) {
-  .app-shell-auth {
-    grid-template-columns: 1fr;
+  .app-shell-auth,
+  .app-shell-auth-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebar-toggle {
+    left: auto;
+    right: 16px;
+    transform: none;
+    border-radius: 3px;
+  }
+
+  .app-shell-auth-collapsed .sidebar-toggle {
+    left: 0;
+    right: auto;
+    border-radius: 0 3px 3px 0;
   }
 
   .app-sidebar {

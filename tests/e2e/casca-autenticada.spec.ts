@@ -1,10 +1,22 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
+import {
+  abrirFaixaDeNavegacao,
+  fecharFaixaDeNavegacao
+} from '../../apps/web/src/app/casca-faixa.js';
 import {
   authUserFor,
   loginApi,
   loginPage,
   type AuthRole
 } from '../support/e2e-auth.js';
+
+const marcaTetoPx = 168;
+const marcaAlvoMaxPx = 100;
+const conteudoComFaixaMinLeftPx = 200;
+const conteudoSemFaixaMaxLeftPx = 80;
+const faixaEstreitaMinShiftPx = 40;
+const marcaFundoTransparente = 'rgba(0, 0, 0, 0)';
+const toggleMaxWidthPx = 200;
 
 const apiUrl = 'http://127.0.0.1:3000';
 
@@ -44,9 +56,35 @@ function cascaChrome(page: Page) {
   return page.getByRole('complementary', { name: 'Navegação principal' });
 }
 
+function fecharFaixa(page: Page) {
+  return page.getByRole('button', { name: fecharFaixaDeNavegacao });
+}
+
+function abrirFaixa(page: Page) {
+  return page.getByRole('button', { name: abrirFaixaDeNavegacao });
+}
+
+async function markMountProbe(locator: Locator): Promise<string> {
+  return locator.evaluate((el) => {
+    const token = `mount-${Date.now()}`;
+    el.setAttribute('data-mount-probe', token);
+    return token;
+  });
+}
+
+async function visibleBox(locator: Locator) {
+  const box = await locator.boundingBox();
+  if (!box) {
+    throw new Error('elemento visível sem caixa de layout');
+  }
+  return box;
+}
+
 async function expectNoCasca(page: Page) {
   await expect(cascaNav(page)).toHaveCount(0);
   await expect(cascaChrome(page)).toHaveCount(0);
+  await expect(fecharFaixa(page)).toHaveCount(0);
+  await expect(abrirFaixa(page)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Sair' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'GEAP, início' })).toHaveCount(0);
   for (const label of todosOsDestinos) {
@@ -136,6 +174,8 @@ test.describe('casca autenticada', () => {
       await expect(cascaChrome(page)).toBeVisible();
       await expect(cascaChrome(page).getByText(user.name, { exact: true })).toBeVisible();
       await expect(cascaChrome(page).getByRole('button', { name: 'Sair' })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'GEAP, início' })).toBeVisible();
+      await expect(fecharFaixa(page)).toHaveAttribute('aria-expanded', 'true');
       await expectAreasForRole(page, role);
       await expect(page.getByText('Ambiente local')).toHaveCount(0);
       await expectFavicon(page);
@@ -151,7 +191,24 @@ test.describe('casca autenticada', () => {
     await page.getByRole('link', { name: 'Consultar Atendimentos' }).click();
     await expect(page).toHaveURL('/atendimentos');
 
-    await page.getByRole('link', { name: 'GEAP, início' }).click();
+    const marca = page.getByRole('link', { name: 'GEAP, início' });
+    const logo = marca.locator('img');
+    await expect(logo).toHaveAttribute('src', '/geap_saude_transparente.png');
+    const logoBox = await visibleBox(logo);
+    expect(logoBox.width).toBeLessThan(marcaTetoPx);
+    expect(logoBox.width).toBeLessThanOrEqual(marcaAlvoMaxPx);
+    await expect
+      .poll(async () =>
+        marca.evaluate((el) => getComputedStyle(el).backgroundColor)
+      )
+      .toBe(marcaFundoTransparente);
+
+    await fecharFaixa(page).focus();
+    await expect(fecharFaixa(page)).toBeFocused();
+    await marca.focus();
+    await expect(marca).toBeFocused();
+
+    await marca.click();
     await expect(page).toHaveURL('/');
     await expect(
       page.getByRole('heading', { name: `Olá, ${user.name}` })
@@ -270,6 +327,12 @@ test.describe('casca autenticada', () => {
     await expect.poll(async () => page.evaluate(() => window.scrollY)).toBeGreaterThan(500);
     await expect(cascaChrome(page)).toBeInViewport();
     await expect(cascaChrome(page).getByRole('button', { name: 'Sair' })).toBeVisible();
+
+    await fecharFaixa(page).click();
+    await expect(abrirFaixa(page)).toBeInViewport();
+    await page.evaluate(() => window.scrollTo(0, 2400));
+    await expect.poll(async () => page.evaluate(() => window.scrollY)).toBeGreaterThan(500);
+    await expect(abrirFaixa(page)).toBeInViewport();
   });
 
   test('sessão inválida leva ao login e remove a casca', async ({
@@ -297,6 +360,8 @@ test.describe('casca autenticada', () => {
     await page.getByRole('button', { name: 'Entrar' }).click();
     await expect(page).toHaveURL('/');
     await expect(cascaChrome(page)).toBeVisible();
+    await fecharFaixa(page).click();
+    await expect(abrirFaixa(page)).toBeVisible();
 
     const deactivation = await request.post(
       `${apiUrl}/admin/usuarios/${target.id}/desativar`,
@@ -310,5 +375,77 @@ test.describe('casca autenticada', () => {
       page.getByRole('heading', { name: 'Acesse o HQ GEAP' })
     ).toBeVisible();
     await expectNoCasca(page);
+  });
+
+  test('fecha e reabre a faixa sem remount, logout ou mudança de áreas', async ({
+    page
+  }) => {
+    const user = authUserFor('admin');
+    await loginPage(page, 'admin');
+    await page.getByRole('link', { name: 'Consultar Atendimentos' }).click();
+    await expect(page).toHaveURL('/atendimentos');
+
+    const heading = page.getByRole('heading', { name: 'Atendimentos' });
+    await expect(heading).toBeVisible();
+    const probe = await markMountProbe(heading);
+
+    await expect(fecharFaixa(page)).toHaveAttribute('aria-expanded', 'true');
+    await fecharFaixa(page).click();
+
+    await expect(abrirFaixa(page)).toBeVisible();
+    await expect(abrirFaixa(page)).toHaveAttribute('aria-expanded', 'false');
+    await expect(abrirFaixa(page)).toBeInViewport();
+    const toggleBox = await visibleBox(abrirFaixa(page));
+    expect(toggleBox.width).toBeLessThan(toggleMaxWidthPx);
+    await expect(cascaNav(page)).toHaveCount(0);
+    await expect(cascaChrome(page)).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'GEAP, início' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Sair' })).toHaveCount(0);
+    await expect(page).toHaveURL('/atendimentos');
+    await expect(heading).toHaveAttribute('data-mount-probe', probe);
+
+    await refreshPerfilOnFocus(page);
+    await expect(abrirFaixa(page)).toHaveAttribute('aria-expanded', 'false');
+    await expect(heading).toHaveAttribute('data-mount-probe', probe);
+
+    await abrirFaixa(page).click();
+    await expect(fecharFaixa(page)).toHaveAttribute('aria-expanded', 'true');
+    await expect(cascaChrome(page)).toBeVisible();
+    await expect(cascaChrome(page).getByText(user.name, { exact: true })).toBeVisible();
+    await expect(cascaChrome(page).getByRole('button', { name: 'Sair' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'GEAP, início' })).toBeVisible();
+    await expectAreasForRole(page, 'admin');
+    await expect(page).toHaveURL('/atendimentos');
+    await expect(heading).toHaveAttribute('data-mount-probe', probe);
+  });
+
+  test('faixa fechada deixa de ocupar espaço no desktop e no viewport estreito', async ({
+    page
+  }) => {
+    await loginPage(page, 'admin');
+    await page.getByRole('link', { name: 'Consultar Atendimentos' }).click();
+    const heading = page.getByRole('heading', { name: 'Atendimentos' });
+    await expect(heading).toBeVisible();
+
+    const leftOpen = (await visibleBox(heading)).x;
+    expect(leftOpen).toBeGreaterThan(conteudoComFaixaMinLeftPx);
+
+    await fecharFaixa(page).click();
+    await expect(abrirFaixa(page)).toBeVisible();
+    const leftClosed = (await visibleBox(heading)).x;
+    expect(leftClosed).toBeLessThan(conteudoSemFaixaMaxLeftPx);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(abrirFaixa(page)).toBeInViewport();
+    const topClosed = (await visibleBox(heading)).y;
+    await abrirFaixa(page).click();
+    await expect(cascaChrome(page)).toBeVisible();
+    const topOpen = (await visibleBox(heading)).y;
+    expect(topOpen).toBeGreaterThan(topClosed + faixaEstreitaMinShiftPx);
+
+    await fecharFaixa(page).click();
+    await expect(abrirFaixa(page)).toBeInViewport();
+    const topClosedAgain = (await visibleBox(heading)).y;
+    expect(topClosedAgain).toBeLessThan(topOpen - faixaEstreitaMinShiftPx);
   });
 });
