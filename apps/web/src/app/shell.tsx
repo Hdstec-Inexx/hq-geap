@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom';
 import { usePerfil } from '../features/auth/perfil-context';
 import { clearSession } from '../features/auth/session';
@@ -14,6 +15,7 @@ export function Shell() {
 export function AuthenticatedShell() {
   const perfil = usePerfil();
   const navigate = useNavigate();
+  const [faixaAberta, setFaixaAberta] = useState(true);
 
   if (!perfil) {
     return <Navigate replace to="/login" />;
@@ -25,8 +27,30 @@ export function AuthenticatedShell() {
   }
 
   return (
-    <div className="app-shell-auth">
-      <aside className="app-sidebar" aria-label="Navegação principal">
+    <div
+      className={
+        faixaAberta ? 'app-shell-auth' : 'app-shell-auth app-shell-auth-collapsed'
+      }
+    >
+      <button
+        aria-controls="casca-faixa"
+        aria-expanded={faixaAberta}
+        aria-label={
+          faixaAberta ? 'Fechar faixa de navegação' : 'Abrir faixa de navegação'
+        }
+        className="sidebar-toggle"
+        onClick={() => setFaixaAberta((aberta) => !aberta)}
+        type="button"
+      >
+        {faixaAberta ? 'Fechar' : 'Abrir'}
+      </button>
+
+      <aside
+        aria-label="Navegação principal"
+        className="app-sidebar"
+        hidden={!faixaAberta}
+        id="casca-faixa"
+      >
         <Link className="sidebar-brand" to="/" aria-label="GEAP, início">
           <img
             alt=""
