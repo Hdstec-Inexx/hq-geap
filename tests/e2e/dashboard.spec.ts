@@ -303,6 +303,17 @@ test.describe.serial('Dashboard da Gestao', () => {
     await expect(page.getByRole('button', { name: /salvar|editar|excluir/i })).toHaveCount(0);
   });
 
+  test('Admin nao ve KPI TME e mantem SLA no mesmo dashboard', async ({ page }) => {
+    await loginPage(page, 'admin');
+    await page.goto('/dashboard?inicio=2025-01-01&fim=2025-01-31');
+
+    await expect(page.getByRole('heading', { name: 'Pulso da operação' })).toBeVisible();
+    await expect(page.getByText('TME', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Detalhar TME' })).toHaveCount(0);
+    await expect(page.getByText('SLA', { exact: true })).toBeVisible();
+    await expect(page.getByText('meta 80% · Tempo de Espera ≤ 2:30')).toBeVisible();
+  });
+
   test('clique no KPI navega para lista filtrada preservando o periodo', async ({
     page,
     request
