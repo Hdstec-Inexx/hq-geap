@@ -32,6 +32,10 @@ const areasPorPapel: Record<AuthRole, string[]> = {
   ]
 };
 
+const todosOsDestinos = [
+  ...new Set(Object.values(areasPorPapel).flat())
+];
+
 function cascaNav(page: Page) {
   return page.getByRole('navigation', { name: 'Áreas do HQ GEAP' });
 }
@@ -40,22 +44,33 @@ function cascaChrome(page: Page) {
   return page.getByRole('complementary', { name: 'Navegação principal' });
 }
 
+async function expectNoCasca(page: Page) {
+  await expect(cascaNav(page)).toHaveCount(0);
+  await expect(cascaChrome(page)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Sair' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'GEAP, início' })).toHaveCount(0);
+  for (const label of todosOsDestinos) {
+    await expect(page.getByRole('link', { name: label })).toHaveCount(0);
+  }
+  await expect(page.getByText('Ambiente local')).toHaveCount(0);
+}
+
+async function expectFavicon(page: Page) {
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute(
+    'href',
+    '/favicon.ico'
+  );
+}
+
 async function expectAreasForRole(page: Page, role: AuthRole) {
   const nav = cascaNav(page);
   await expect(nav).toBeVisible();
 
   const expected = areasPorPapel[role];
+  await expect(nav.getByRole('link')).toHaveCount(expected.length);
+
   for (const label of expected) {
     await expect(nav.getByRole('link', { name: label })).toBeVisible();
-  }
-
-  const unexpected = (Object.keys(areasPorPapel) as AuthRole[])
-    .filter((candidate) => candidate !== role)
-    .flatMap((candidate) => areasPorPapel[candidate])
-    .filter((label) => !expected.includes(label));
-
-  for (const label of [...new Set(unexpected)]) {
-    await expect(nav.getByRole('link', { name: label })).toHaveCount(0);
   }
 }
 
@@ -84,18 +99,14 @@ test.describe('casca autenticada', () => {
     await expect(
       page.getByRole('heading', { name: 'Acesse o HQ GEAP' })
     ).toBeVisible();
-    await expect(cascaNav(page)).toHaveCount(0);
-    await expect(cascaChrome(page)).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Sair' })).toHaveCount(0);
-    await expect(page.getByText('Ambiente local')).toHaveCount(0);
+    await expectNoCasca(page);
+    await expectFavicon(page);
 
     await page.goto('/health');
     await expect(
       page.getByRole('heading', { name: 'HQ GEAP está operacional' })
     ).toBeVisible();
-    await expect(cascaNav(page)).toHaveCount(0);
-    await expect(cascaChrome(page)).toHaveCount(0);
-    await expect(page.getByText('Ambiente local')).toHaveCount(0);
+    await expectNoCasca(page);
   });
 
   for (const role of ['curador', 'gestao', 'admin'] as const) {
@@ -110,6 +121,7 @@ test.describe('casca autenticada', () => {
       await expect(cascaChrome(page).getByRole('button', { name: 'Sair' })).toBeVisible();
       await expectAreasForRole(page, role);
       await expect(page.getByText('Ambiente local')).toHaveCount(0);
+      await expectFavicon(page);
     });
   }
 
@@ -135,14 +147,7 @@ test.describe('casca autenticada', () => {
     await expect(
       page.getByRole('heading', { name: 'Acesse o HQ GEAP' })
     ).toBeVisible();
-    await expect(cascaNav(page)).toHaveCount(0);
-    await expect(cascaChrome(page)).toHaveCount(0);
-  });
-
-  test('favicon GEAP está presente no documento', async ({ page }) => {
-    await page.goto('/login');
-    const favicon = page.locator('link[rel="icon"]');
-    await expect(favicon).toHaveAttribute('href', '/favicon.ico');
+    await expectNoCasca(page);
   });
 
   test('após demotion de papel, destinos Admin somem da casca', async ({
@@ -185,17 +190,9 @@ test.describe('casca autenticada', () => {
     expect(demotion.status()).toBe(200);
 
     await refreshPerfilOnFocus(page);
-    await expect
-      .poll(
-        async () =>
-          page.evaluate(() => {
-            const raw = window.sessionStorage.getItem('hq-geap.perfil');
-            return raw ? (JSON.parse(raw) as { role: string }).role : null;
-          }),
-        { timeout: 10_000 }
-      )
-      .toBe('gestao');
-
+    await expect(
+      cascaNav(page).getByRole('link', { name: 'Administrar usuários' })
+    ).toHaveCount(0);
     await expectAreasForRole(page, 'gestao');
   });
 });
