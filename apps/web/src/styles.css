@@ -1324,7 +1324,8 @@ h1 {
   color: #62d4b6;
 }
 
-.audio-panel h2 {
+.audio-panel h2,
+.transcript-panel h2 {
   margin: 14px 0 30px;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 2rem;
