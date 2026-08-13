@@ -56,7 +56,10 @@ async function createAtendimento(
   return result.rows[0]!.id;
 }
 
-async function persistirAvaliacaoIa(atendimentoId: string) {
+async function persistirAvaliacaoIa(
+  atendimentoId: string,
+  notaQualidade = aprovada.nota_qualidade
+) {
   await queryDatabase(`
     select * from persistir_avaliacao_ia(
       $1,
@@ -71,7 +74,7 @@ async function persistirAvaliacaoIa(atendimentoId: string) {
     atendimentoId,
     JSON.stringify(aprovada.checklist),
     aprovada.atendimento_aprovado,
-    aprovada.nota_qualidade
+    notaQualidade
   ]);
 }
 
@@ -437,7 +440,8 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     page
   }) => {
     const atendimentoId = await createAtendimento('conv-curadoria-interface');
-    await persistirAvaliacaoIa(atendimentoId);
+    // nota_qualidade 4 ≠ Régua 9,5 — o input deve copiar Nota da IA, não o claim da LLM.
+    await persistirAvaliacaoIa(atendimentoId, 4);
 
     await page.goto('/login');
     await page.getByLabel('E-mail').fill('curador@hq.test');
