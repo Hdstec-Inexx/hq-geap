@@ -69,7 +69,7 @@ export function AtendimentoPage() {
       <div className="atendimento-content">
         <section className="transcript-panel">
           <p className="panel-label">Transcrição</p>
-          <div className="transcript-lines">
+          <div className="transcript-lines transcript-scroll" data-testid="transcript-scroll">
             {atendimento.transcricao.length === 0 ? <p>Transcrição ainda não disponível.</p> : atendimento.transcricao.map((entry, index) => (
               <article className={`transcript-line transcript-${entry.role}`} key={`${entry.time_in_call_secs}-${index}`}>
                 <span>{entry.role === 'agent' ? atendimento.agenteVoz.nome : 'Cliente'} · {Math.floor(entry.time_in_call_secs / 60)}:{String(Math.floor(entry.time_in_call_secs % 60)).padStart(2, '0')}</span>

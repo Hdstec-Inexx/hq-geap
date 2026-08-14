@@ -250,7 +250,7 @@ function ReviewContent({ detail, onSaved }: { detail: CuradoriaDetail; onSaved: 
       <div className="atendimento-content">
         <section className="transcript-panel">
           <h2>Transcrição</h2>
-          <div className="transcript-lines">
+          <div className="transcript-lines transcript-scroll" data-testid="transcript-scroll">
             {atendimento.transcricao.length === 0 ? <p>Transcrição ainda não disponível.</p> : atendimento.transcricao.map((entry, index) => (
               <article className={`transcript-line transcript-${entry.role}`} key={`${entry.time_in_call_secs}-${index}`}>
                 <span>{entry.role === 'agent' ? atendimento.agenteVoz.nome : 'Cliente'}</span>
