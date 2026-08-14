@@ -47,6 +47,13 @@ export function AuthenticatedShell() {
       if (viewportEstreito()) {
         return;
       }
+      if (
+        faixaAbertaRef.current &&
+        !abertaPorHover.current &&
+        !ignorarHoverAteSair.current
+      ) {
+        return;
+      }
       const faixa = faixaRef.current;
       const sobreFaixa =
         faixa !== null &&
@@ -69,7 +76,7 @@ export function AuthenticatedShell() {
       }
     }
 
-    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mousemove', onMouseMove, { passive: true });
     return () => document.removeEventListener('mousemove', onMouseMove);
   }, []);
 
