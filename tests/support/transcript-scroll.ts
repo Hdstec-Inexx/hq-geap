@@ -28,5 +28,6 @@ export async function firstTurnFitsWithoutEmptyBox(scroll: Locator) {
       articleHeight: article?.getBoundingClientRect().height ?? 0
     };
   });
-  return metrics.clientHeight < metrics.articleHeight * 4;
+  const emptyBoxIfTallerThanFirstTurn = metrics.articleHeight * 4;
+  return metrics.clientHeight < emptyBoxIfTallerThanFirstTurn;
 }
