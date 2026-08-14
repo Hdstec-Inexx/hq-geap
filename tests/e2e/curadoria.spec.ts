@@ -2,6 +2,13 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 import pg from 'pg';
 import aprovada from '../fixtures/avaliacoes/avaliacao-aprovada.json' with { type: 'json' };
 import { authUsers } from '../support/auth-fixtures.js';
+import {
+  firstTurnFitsWithoutEmptyBox,
+  longTranscript,
+  shortTranscript,
+  transcriptOverflows,
+  transcriptScroll
+} from '../support/transcript-scroll.js';
 
 const apiUrl = 'http://127.0.0.1:3000';
 const { Client } = pg;
@@ -36,7 +43,8 @@ async function login(
 
 async function createAtendimento(
   conversationId: string,
-  status: 'em_andamento' | 'concluido' = 'concluido'
+  status: 'em_andamento' | 'concluido' = 'concluido',
+  transcricao: unknown[] = shortTranscript
 ) {
   const result = await queryDatabase<{ id: string }>(`
     insert into atendimentos (
@@ -45,14 +53,14 @@ async function createAtendimento(
       motivo_contato
     )
     select id, $1, $2::status_atendimento,
-      '[{"role":"agent","message":"Ola","time_in_call_secs":0}]'::jsonb,
+      $3::jsonb,
       'atendimentos/teste.mp3', false,
       case when $2::text = 'concluido' then now() else null end,
       42, 'Rede credenciada'
     from agentes_voz
     where elevenlabs_agent_id = 'agent-livia-curadoria'
     returning id
-  `, [conversationId, status]);
+  `, [conversationId, status, JSON.stringify(transcricao)]);
   return result.rows[0]!.id;
 }
 
@@ -581,6 +589,46 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     const anterior = page.locator('.review-history details li').first();
     await expect(anterior).toContainText('Informação de Protocolo');
     await expect(anterior).toContainText('Não atendido');
+  });
+
+  test('transcrição longa na revisão rola dentro do painel', async ({ page }) => {
+    const atendimentoId = await createAtendimento(
+      'conv-curadoria-transcricao-longa',
+      'concluido',
+      longTranscript()
+    );
+    await persistirAvaliacaoIa(atendimentoId);
+
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('curador@hq.test');
+    await page.getByLabel('Senha').fill('senha-curador');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto(`/curadoria/${atendimentoId}`);
+
+    await expect(page.getByRole('heading', { name: 'Revisar Atendimento' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Transcrição' })).toBeVisible();
+    await expect.poll(async () => transcriptOverflows(transcriptScroll(page))).toBe(true);
+  });
+
+  test('transcrição curta na revisão não ganha caixa vazia nem barra de rolagem', async ({
+    page
+  }) => {
+    const atendimentoId = await createAtendimento('conv-curadoria-transcricao-curta');
+    await persistirAvaliacaoIa(atendimentoId);
+
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('curador@hq.test');
+    await page.getByLabel('Senha').fill('senha-curador');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto(`/curadoria/${atendimentoId}`);
+
+    await expect(page.getByRole('heading', { name: 'Revisar Atendimento' })).toBeVisible();
+    await expect(page.getByText('Ola')).toBeVisible();
+    const scroll = transcriptScroll(page);
+    await expect.poll(async () => transcriptOverflows(scroll)).toBe(false);
+    expect(await firstTurnFitsWithoutEmptyBox(scroll)).toBe(true);
   });
 
   test('fila mostra no maximo 50, badge desta pagina e numeros clicaveis', async ({

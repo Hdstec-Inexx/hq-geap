@@ -3,6 +3,13 @@ import pg from 'pg';
 import aprovada from '../fixtures/avaliacoes/avaliacao-aprovada.json' with { type: 'json' };
 import fixture from '../fixtures/elevenlabs/atendimento-concluido.json' with { type: 'json' };
 import { authUsers } from '../support/auth-fixtures.js';
+import {
+  firstTurnFitsWithoutEmptyBox,
+  longTranscript,
+  shortTranscript,
+  transcriptOverflows,
+  transcriptScroll
+} from '../support/transcript-scroll.js';
 
 const apiUrl = 'http://127.0.0.1:3000';
 const atendimento = fixture.normalized;
@@ -353,5 +360,67 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await expect(page.getByText(atendimento.contact_reason!).first()).toBeVisible();
     await expect(page.getByText(/US\$\s*0,18/)).toBeVisible();
     await expect(page.getByText(/Preciso da segunda via do boleto/)).toBeVisible();
+  });
+
+  async function createAtendimentoComTranscricao(
+    conversationId: string,
+    transcricao: unknown[]
+  ) {
+    const result = await queryDatabase<{ id: string }>(`
+      insert into atendimentos (
+        agente_voz_id, elevenlabs_conversation_id, status, transcricao,
+        audio_url, houve_transferencia, concluido_em, duracao_segundos,
+        motivo_contato
+      )
+      select id, $1, 'concluido'::status_atendimento,
+        $2::jsonb,
+        'atendimentos/teste.mp3', false, now(), 42, 'Rede credenciada'
+      from agentes_voz
+      where elevenlabs_agent_id = 'agent-livia-test'
+      returning id
+    `, [conversationId, JSON.stringify(transcricao)]);
+    return result.rows[0]!.id;
+  }
+
+  test('transcrição longa no detalhe do Atendimento rola dentro do painel', async ({
+    page
+  }) => {
+    const atendimentoId = await createAtendimentoComTranscricao(
+      'conv-atendimento-transcricao-longa',
+      longTranscript()
+    );
+
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('gestao@hq.test');
+    await page.getByLabel('Senha').fill('senha-gestao');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto(`/atendimentos/${atendimentoId}`);
+
+    await expect(page.getByRole('heading', { name: 'Atendimento' })).toBeVisible();
+    await expect(page.getByText('Transcrição', { exact: true })).toBeVisible();
+    await expect.poll(async () => transcriptOverflows(transcriptScroll(page))).toBe(true);
+  });
+
+  test('transcrição curta no detalhe do Atendimento não ganha caixa vazia nem barra de rolagem', async ({
+    page
+  }) => {
+    const atendimentoId = await createAtendimentoComTranscricao(
+      'conv-atendimento-transcricao-curta',
+      shortTranscript
+    );
+
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('gestao@hq.test');
+    await page.getByLabel('Senha').fill('senha-gestao');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto(`/atendimentos/${atendimentoId}`);
+
+    await expect(page.getByRole('heading', { name: 'Atendimento' })).toBeVisible();
+    await expect(page.getByText('Ola')).toBeVisible();
+    const scroll = transcriptScroll(page);
+    await expect.poll(async () => transcriptOverflows(scroll)).toBe(false);
+    expect(await firstTurnFitsWithoutEmptyBox(scroll)).toBe(true);
   });
 });
