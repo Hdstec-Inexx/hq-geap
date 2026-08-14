@@ -402,6 +402,9 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     const pager = page.getByRole('navigation', {
       name: 'Paginação dos Atendimentos'
     });
+    const pageList = pager.locator('ol');
+    await expect(pageList).toHaveCSS('display', 'flex');
+    await expect(pageList).toHaveCSS('flex-wrap', 'wrap');
     await expect(pager.getByRole('link', { name: 'Página 2' })).toBeVisible();
     await pager.getByRole('link', { name: 'Página 2' }).click();
     await expect(page).toHaveURL(/[?&]page=2/);
