@@ -2,9 +2,18 @@ import {
   filaCuradoriaSchema,
   type FilaCuradoriaItem
 } from '@hq-geap/contracts/curadoria';
-import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { canWriteAsCurador, usePerfil } from '../auth/perfil-context';
 import { formatDuration, useAuthenticatedResource } from '../atendimentos/api';
+import {
+  compactPageItems,
+  FILA_PAGE_SIZE,
+  filaHref,
+  pageFromSearch,
+  resolveFilaPage,
+  reviewHref
+} from './pagination';
 
 const dateTime = new Intl.DateTimeFormat('pt-BR', {
   dateStyle: 'short',
@@ -12,8 +21,28 @@ const dateTime = new Intl.DateTimeFormat('pt-BR', {
 });
 
 export function FilaCuradoriaPage() {
-  const state = useAuthenticatedResource('/curadoria?limit=100', filaCuradoriaSchema);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const requestedPage = pageFromSearch(searchParams);
+  const state = useAuthenticatedResource(
+    `/curadoria?limit=${FILA_PAGE_SIZE}&offset=${(requestedPage - 1) * FILA_PAGE_SIZE}`,
+    filaCuradoriaSchema
+  );
   const canWrite = canWriteAsCurador(usePerfil()?.role);
+  const items = state.status === 'ready' ? state.data.items : [];
+  const total = state.status === 'ready' ? state.data.total : 0;
+  const resolvedPage = resolveFilaPage(requestedPage, total);
+  const pageOutOfRange =
+    state.status === 'ready' && resolvedPage !== requestedPage;
+  const paginaPronta = state.status === 'ready' && !pageOutOfRange;
+  const totalPages = Math.ceil(total / FILA_PAGE_SIZE);
+
+  useEffect(() => {
+    if (state.status !== 'ready') return;
+    if (resolvedPage !== requestedPage) {
+      navigate(filaHref(resolvedPage), { replace: true });
+    }
+  }, [navigate, requestedPage, resolvedPage, state.status]);
 
   return (
     <main className="atendimentos-page curadoria-page">
@@ -28,12 +57,14 @@ export function FilaCuradoriaPage() {
             Voltar ao início
           </Link>
         </div>
-        {state.status === 'ready' ? (
-          <span className="queue-count">{state.data.length} pendente{state.data.length === 1 ? '' : 's'}</span>
+        {paginaPronta && total > 0 ? (
+          <span className="queue-count">
+            {items.length} pendente{items.length === 1 ? '' : 's'}
+          </span>
         ) : null}
       </header>
 
-      {state.status === 'loading' ? (
+      {state.status === 'loading' || pageOutOfRange ? (
         <div className="curadoria-skeleton" aria-label="Carregando fila" />
       ) : null}
       {state.status === 'error' ? (
@@ -41,19 +72,21 @@ export function FilaCuradoriaPage() {
           Não foi possível carregar a Fila de Curadoria.
         </p>
       ) : null}
-      {state.status === 'ready' && state.data.length === 0 ? (
+      {paginaPronta && total === 0 ? (
         <section className="curadoria-empty">
           <h2>Fila em dia</h2>
           <p>Não há Atendimentos aguardando conferência humana.</p>
         </section>
       ) : null}
-      {state.status === 'ready' && state.data.length > 0 ? (
+      {paginaPronta && items.length > 0 ? (
         <section className="curadoria-list" aria-label="Atendimentos pendentes">
-          {state.data.map((item: FilaCuradoriaItem) => (
+          {items.map((item: FilaCuradoriaItem) => (
             <article className="curadoria-row" key={item.id}>
               <div className="curadoria-row-main">
                 <span>{item.agenteVozNome}</span>
-                <Link to={`/curadoria/${item.id}`}>{item.conversationId}</Link>
+                <Link to={reviewHref(item.id, requestedPage)}>
+                  {item.conversationId}
+                </Link>
                 <small>{dateTime.format(new Date(item.concluidoEm))}</small>
               </div>
               <dl>
@@ -61,11 +94,49 @@ export function FilaCuradoriaPage() {
                 <div><dt>Duração</dt><dd>{formatDuration(item.duracaoSegundos)}</dd></div>
                 <div><dt>Nota IA</dt><dd>{item.notaIa.toLocaleString('pt-BR')}</dd></div>
               </dl>
-              <Link className="review-link" to={`/curadoria/${item.id}`}>
+              <Link className="review-link" to={reviewHref(item.id, requestedPage)}>
                 {canWrite ? 'Conferir' : 'Consultar'}
               </Link>
             </article>
           ))}
+          {totalPages > 1 ? (
+            <nav
+              aria-label="Paginação da Fila de Curadoria"
+              className="curadoria-pagination"
+            >
+              {requestedPage > 1 ? (
+                <Link to={filaHref(requestedPage - 1)}>Página anterior</Link>
+              ) : (
+                <span />
+              )}
+              <ol>
+                {compactPageItems(requestedPage, totalPages).map((item, index) =>
+                  item === 'ellipsis' ? (
+                    <li key={`ellipsis-${index}`}>
+                      <span aria-hidden="true">…</span>
+                    </li>
+                  ) : item === requestedPage ? (
+                    <li key={item}>
+                      <span aria-current="page" aria-label={`Página ${item}`}>
+                        {item}
+                      </span>
+                    </li>
+                  ) : (
+                    <li key={item}>
+                      <Link aria-label={`Página ${item}`} to={filaHref(item)}>
+                        {item}
+                      </Link>
+                    </li>
+                  )
+                )}
+              </ol>
+              {requestedPage < totalPages ? (
+                <Link to={filaHref(requestedPage + 1)}>Próxima página</Link>
+              ) : (
+                <span />
+              )}
+            </nav>
+          ) : null}
         </section>
       ) : null}
     </main>
