@@ -5,7 +5,8 @@ import {
 } from '@hq-geap/contracts/curadoria';
 import type { EstadoCriterio } from '@hq-geap/contracts/avaliacoes';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { filaHref, pageFromSearch } from './pagination';
 import { apiUrl, getSession } from '../auth/session';
 import { canWriteAsCurador, usePerfil } from '../auth/perfil-context';
 import { formatDuration, useAuthenticatedResource } from '../atendimentos/api';
@@ -220,7 +221,15 @@ function ReviewForm({
   );
 }
 
-function ReviewContent({ detail, onSaved }: { detail: CuradoriaDetail; onSaved: () => void }) {
+function ReviewContent({
+  detail,
+  originPage,
+  onSaved
+}: {
+  detail: CuradoriaDetail;
+  originPage: number;
+  onSaved: () => void;
+}) {
   const atendimento = detail.atendimento;
   const canWrite = canWriteAsCurador(usePerfil()?.role);
   return (
@@ -231,7 +240,7 @@ function ReviewContent({ detail, onSaved }: { detail: CuradoriaDetail; onSaved: 
           <h1>Revisar Atendimento</h1>
           <p className="atendimento-id">{atendimento.conversationId}</p>
         </div>
-        <Link className="back-link" to="/curadoria">Voltar à fila</Link>
+        <Link className="back-link" to={filaHref(originPage)}>Voltar à fila</Link>
       </header>
 
       <section className="atendimento-facts" aria-label="Dados do Atendimento">
@@ -371,9 +380,11 @@ function ReviewContent({ detail, onSaved }: { detail: CuradoriaDetail; onSaved: 
 
 export function CuradoriaReviewPage() {
   const { atendimentoId } = useParams();
-  const [revision, setRevision] = useState(0);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const originPage = pageFromSearch(searchParams);
   const state = useAuthenticatedResource(
-    `/curadoria/${atendimentoId ?? ''}?revision=${revision}`,
+    `/curadoria/${atendimentoId ?? ''}`,
     curadoriaDetailSchema
   );
   if (state.status !== 'ready') {
@@ -385,5 +396,11 @@ export function CuradoriaReviewPage() {
       </main>
     );
   }
-  return <ReviewContent detail={state.data} onSaved={() => setRevision((current) => current + 1)} />;
+  return (
+    <ReviewContent
+      detail={state.data}
+      originPage={originPage}
+      onSaved={() => navigate(filaHref(originPage))}
+    />
+  );
 }

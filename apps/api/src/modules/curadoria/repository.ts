@@ -118,7 +118,13 @@ async function findCuradorChecklists(
 
 export function createCuradoriaRepository(db: pg.Pool) {
   return {
-    async listPending(limit: number, offset: number): Promise<FilaCuradoriaRow[]> {
+    async listPending(
+      limit: number,
+      offset: number
+    ): Promise<{ items: FilaCuradoriaRow[]; total: number }> {
+      const count = await db.query<{ total: string }>(
+        'select count(*)::text as total from fila_curadoria'
+      );
       const result = await db.query<FilaCuradoriaRow>(`
         select
           a.id,
@@ -134,7 +140,10 @@ export function createCuradoriaRepository(db: pg.Pool) {
         order by a.concluido_em, a.id
         limit $1 offset $2
       `, [limit, offset]);
-      return result.rows;
+      return {
+        items: result.rows,
+        total: Number(count.rows[0]?.total ?? 0)
+      };
     },
 
     async findDetail(atendimentoId: string): Promise<CuradoriaAtendimentoRow | null> {
