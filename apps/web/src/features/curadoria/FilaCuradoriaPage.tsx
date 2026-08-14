@@ -32,7 +32,9 @@ export function FilaCuradoriaPage() {
   const items = state.status === 'ready' ? state.data.items : [];
   const total = state.status === 'ready' ? state.data.total : 0;
   const resolvedPage = resolveFilaPage(requestedPage, total);
-  const receding = state.status === 'ready' && resolvedPage !== requestedPage;
+  const pageOutOfRange =
+    state.status === 'ready' && resolvedPage !== requestedPage;
+  const paginaPronta = state.status === 'ready' && !pageOutOfRange;
   const totalPages = Math.ceil(total / FILA_PAGE_SIZE);
 
   useEffect(() => {
@@ -55,14 +57,14 @@ export function FilaCuradoriaPage() {
             Voltar ao início
           </Link>
         </div>
-        {state.status === 'ready' && !receding && total > 0 ? (
+        {paginaPronta && total > 0 ? (
           <span className="queue-count">
             {items.length} pendente{items.length === 1 ? '' : 's'}
           </span>
         ) : null}
       </header>
 
-      {state.status === 'loading' || receding ? (
+      {state.status === 'loading' || pageOutOfRange ? (
         <div className="curadoria-skeleton" aria-label="Carregando fila" />
       ) : null}
       {state.status === 'error' ? (
@@ -70,13 +72,13 @@ export function FilaCuradoriaPage() {
           Não foi possível carregar a Fila de Curadoria.
         </p>
       ) : null}
-      {state.status === 'ready' && !receding && total === 0 ? (
+      {paginaPronta && total === 0 ? (
         <section className="curadoria-empty">
           <h2>Fila em dia</h2>
           <p>Não há Atendimentos aguardando conferência humana.</p>
         </section>
       ) : null}
-      {state.status === 'ready' && !receding && items.length > 0 ? (
+      {paginaPronta && items.length > 0 ? (
         <section className="curadoria-list" aria-label="Atendimentos pendentes">
           {items.map((item: FilaCuradoriaItem) => (
             <article className="curadoria-row" key={item.id}>
