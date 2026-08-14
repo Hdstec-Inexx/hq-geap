@@ -178,24 +178,42 @@ export function createAtendimentosRepository(db: pg.Pool) {
       }
     },
 
-    async list(query: AtendimentosQuery): Promise<AtendimentoSummaryRow[]> {
+    async list(
+      query: AtendimentosQuery
+    ): Promise<{ items: AtendimentoSummaryRow[]; total: number }> {
       const detalhamento = buildDetalhamentoFilters(query, 4);
       const clauses = [
         '($3::status_atendimento is null or a.status = $3::status_atendimento)',
         ...detalhamento.clauses
       ];
-      const result = await db.query<AtendimentoSummaryRow>(`
-        ${selectAtendimentoSummary}
-        where ${clauses.join(' and ')}
-        order by a.criado_em desc, a.id desc
-        limit $1 offset $2
-      `, [
-        query.limit,
-        query.offset,
-        query.status ?? null,
-        ...detalhamento.values
+      const countDetalhamento = buildDetalhamentoFilters(query, 2);
+      const countClauses = [
+        '($1::status_atendimento is null or a.status = $1::status_atendimento)',
+        ...countDetalhamento.clauses
+      ];
+      const [count, result] = await Promise.all([
+        db.query<{ total: string }>(`
+          select count(*)::text as total
+          from atendimentos a
+          join agentes_voz av on av.id = a.agente_voz_id
+          where ${countClauses.join(' and ')}
+        `, [query.status ?? null, ...countDetalhamento.values]),
+        db.query<AtendimentoSummaryRow>(`
+          ${selectAtendimentoSummary}
+          where ${clauses.join(' and ')}
+          order by a.criado_em desc, a.id desc
+          limit $1 offset $2
+        `, [
+          query.limit,
+          query.offset,
+          query.status ?? null,
+          ...detalhamento.values
+        ])
       ]);
-      return result.rows;
+      return {
+        items: result.rows,
+        total: Number(count.rows[0]?.total ?? 0)
+      };
     },
 
     async findById(id: string): Promise<AtendimentoRow | null> {

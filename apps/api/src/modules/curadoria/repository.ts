@@ -118,23 +118,34 @@ async function findCuradorChecklists(
 
 export function createCuradoriaRepository(db: pg.Pool) {
   return {
-    async listPending(limit: number, offset: number): Promise<FilaCuradoriaRow[]> {
-      const result = await db.query<FilaCuradoriaRow>(`
-        select
-          a.id,
-          a.elevenlabs_conversation_id as "conversationId",
-          agente.nome as "agenteVozNome",
-          a.concluido_em as "concluidoEm",
-          a.duracao_segundos as "duracaoSegundos",
-          a.motivo_contato as "motivoContato",
-          ia.nota as "notaIa"
-        from fila_curadoria a
-        join agentes_voz agente on agente.id = a.agente_voz_id
-        join avaliacoes ia on ia.atendimento_id = a.id and ia.autor = 'ia'
-        order by a.concluido_em, a.id
-        limit $1 offset $2
-      `, [limit, offset]);
-      return result.rows;
+    async listPending(
+      limit: number,
+      offset: number
+    ): Promise<{ items: FilaCuradoriaRow[]; total: number }> {
+      const [count, result] = await Promise.all([
+        db.query<{ total: string }>(
+          'select count(*)::text as total from fila_curadoria'
+        ),
+        db.query<FilaCuradoriaRow>(`
+          select
+            a.id,
+            a.elevenlabs_conversation_id as "conversationId",
+            agente.nome as "agenteVozNome",
+            a.concluido_em as "concluidoEm",
+            a.duracao_segundos as "duracaoSegundos",
+            a.motivo_contato as "motivoContato",
+            ia.nota as "notaIa"
+          from fila_curadoria a
+          join agentes_voz agente on agente.id = a.agente_voz_id
+          join avaliacoes ia on ia.atendimento_id = a.id and ia.autor = 'ia'
+          order by a.concluido_em, a.id
+          limit $1 offset $2
+        `, [limit, offset])
+      ]);
+      return {
+        items: result.rows,
+        total: Number(count.rows[0]?.total ?? 0)
+      };
     },
 
     async findDetail(atendimentoId: string): Promise<CuradoriaAtendimentoRow | null> {

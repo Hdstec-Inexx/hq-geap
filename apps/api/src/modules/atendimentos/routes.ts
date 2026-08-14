@@ -2,7 +2,7 @@ import {
   ingestAtendimentoSchema,
   atendimentosQuerySchema,
   type AtendimentoDetail,
-  type AtendimentoSummary
+  type AtendimentoList
 } from '@hq-geap/contracts/atendimentos';
 import type { FastifyPluginAsync } from 'fastify';
 import { isDetalhamentoQuery } from './detalhamentoFilters.js';
@@ -57,7 +57,7 @@ const routes: FastifyPluginAsync = async (app) => {
     }
   );
 
-  app.get('/atendimentos', async (request): Promise<AtendimentoSummary[]> => {
+  app.get('/atendimentos', async (request): Promise<AtendimentoList> => {
     const query = atendimentosQuerySchema.safeParse(request.query);
     if (!query.success) {
       throw app.httpErrors.badRequest('Invalid Atendimentos query');
@@ -68,7 +68,11 @@ const routes: FastifyPluginAsync = async (app) => {
         throw app.httpErrors.forbidden('Role does not have permission');
       }
     }
-    return (await repository.list(query.data)).map(toAtendimentoSummary);
+    const list = await repository.list(query.data);
+    return {
+      items: list.items.map(toAtendimentoSummary),
+      total: list.total
+    };
   });
 
   app.get<{ Params: { id: string } }>(
