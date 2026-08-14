@@ -56,6 +56,76 @@ async function createAtendimento(
   return result.rows[0]!.id;
 }
 
+async function esvaziarFila() {
+  await queryDatabase(`
+    insert into avaliacoes_curador (
+      atendimento_id, avaliacao_ia_id, autor_usuario_id, autor_usuario_nome,
+      nota, falhas_identificadas, nota_avaliacao_ia
+    )
+    select
+      pendente.id,
+      ia.id,
+      u.id,
+      u.nome,
+      8,
+      '[]'::jsonb,
+      8
+    from fila_curadoria pendente
+    join avaliacoes ia on ia.atendimento_id = pendente.id and ia.autor = 'ia'
+    join usuarios u on u.email = 'curador@hq.test'
+  `);
+}
+
+async function seedFilaPendentes(prefix: string, count: number) {
+  const result = await queryDatabase<{ id: string; conversationId: string }>(`
+    with inserted as (
+      insert into atendimentos (
+        agente_voz_id, elevenlabs_conversation_id, status, transcricao,
+        audio_url, houve_transferencia, concluido_em, duracao_segundos,
+        motivo_contato
+      )
+      select
+        agente.id,
+        $1 || '-' || gs::text,
+        'concluido',
+        '[{"role":"agent","message":"Ola","time_in_call_secs":0}]'::jsonb,
+        'atendimentos/teste.mp3',
+        false,
+        timestamptz '2024-01-01T00:00:00Z' + (gs * interval '1 minute'),
+        42,
+        'Rede credenciada'
+      from agentes_voz agente
+      cross join generate_series(1, $2::int) as gs
+      where agente.elevenlabs_agent_id = 'agent-livia-curadoria'
+      returning id, elevenlabs_conversation_id as "conversationId", concluido_em
+    ),
+    avaliadas as (
+      insert into avaliacoes (
+        atendimento_id, autor, prompt_id, nota,
+        saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
+        resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
+        encerramento_geap, uso_correto_ferramentas, atendimento_aprovado,
+        nota_qualidade
+      )
+      select inserted.id, 'ia', p.id, 10,
+        true, true, true, true, true, true, true, true, true, 10
+      from inserted
+      cross join (select id from prompts_ia_avaliadora where ativo limit 1) p
+    )
+    select id, "conversationId" from inserted order by concluido_em, id
+  `, [prefix, count]);
+  return result.rows;
+}
+
+async function loginUi(page: Page, role: 'admin' | 'gestao' | 'curador') {
+  const user = authUsers.find((candidate) => candidate.role === role)!;
+  await page.goto('/login');
+  await page.getByLabel('E-mail').fill(user.email);
+  await page.getByLabel('Senha').fill(user.password);
+  await page.getByRole('button', { name: 'Entrar' }).click();
+  await expect(page).toHaveURL('/');
+}
+
 async function persistirAvaliacaoIa(
   atendimentoId: string,
   notaQualidade = aprovada.nota_qualidade
@@ -116,10 +186,12 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     });
 
     expect(response.status()).toBe(200);
-    const ids = ((await response.json()) as Array<{ id: string }>).map(({ id }) => id);
+    const fila = (await response.json()) as { items: Array<{ id: string }>; total: number };
+    const ids = fila.items.map(({ id }) => id);
     expect(ids).toContain(pendenteId);
     expect(ids).not.toContain(semIaId);
     expect(ids).not.toContain(emAndamentoId);
+    expect(fila.total).toBeGreaterThanOrEqual(fila.items.length);
   });
 
   test('salva correcoes imutaveis, deriva resultado e identifica a revisao mais recente', async ({
@@ -250,8 +322,8 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     ).rejects.toThrow(/imutavel/i);
 
     const fila = await request.get(`${apiUrl}/curadoria`, { headers });
-    const filaIds = ((await fila.json()) as Array<{ id: string }>).map(({ id }) => id);
-    expect(filaIds).not.toContain(atendimentoId);
+    const filaBody = (await fila.json()) as { items: Array<{ id: string }> };
+    expect(filaBody.items.map(({ id }) => id)).not.toContain(atendimentoId);
 
     await queryDatabase(
       `update atendimentos
@@ -480,9 +552,12 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await page.getByLabel('Comentário da revisão (opcional)').fill('Corrigir protocolo.');
     await page.getByRole('button', { name: 'Salvar conferência' }).click();
 
-    // onSaved remounts the form (flash "Conferência salva" is ephemeral).
+    await expect(page.getByRole('heading', { name: 'Fila de Curadoria' })).toBeVisible();
+    await expect(page.getByRole('link', { name: /conv-curadoria-interface/ })).toHaveCount(0);
+
+    await page.goto(`/curadoria/${atendimentoId}`);
     await expect(page.getByRole('heading', { name: 'Revisão mais recente' })).toBeVisible();
-    await expect(page.getByText('Caio Curador')).toBeVisible();
+    await expect(page.getByRole('main').getByText('Caio Curador')).toBeVisible();
     await expect(page.getByText('1 revisão')).toBeVisible();
     const revisaoRecente = page
       .locator('.review-history article')
@@ -492,15 +567,147 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(revisaoRecente.getByText('Corrigir protocolo.')).toBeVisible();
     await expect(revisaoRecente.getByText('Não atendido').first()).toBeVisible();
 
-    await protocolo.getByLabel('Atendido', { exact: true }).check();
+    const protocoloSalvo = page.getByRole('group', { name: /Informação de Protocolo/ });
+    await protocoloSalvo.getByLabel('Atendido', { exact: true }).check();
     await page.getByLabel('Nota da Avaliação da IA').fill('8');
     await page.getByLabel('Comentário da revisão (opcional)').fill('');
     await page.getByRole('button', { name: 'Salvar conferência' }).click();
+    await expect(page.getByRole('heading', { name: 'Fila de Curadoria' })).toBeVisible();
+
+    await page.goto(`/curadoria/${atendimentoId}`);
     await expect(page.getByText('2 revisões')).toBeVisible();
 
     await page.getByText('Consultar revisões anteriores').click();
     const anterior = page.locator('.review-history details li').first();
     await expect(anterior).toContainText('Informação de Protocolo');
     await expect(anterior).toContainText('Não atendido');
+  });
+
+  test('fila mostra no maximo 50, badge desta pagina e numeros clicaveis', async ({
+    page
+  }) => {
+    await esvaziarFila();
+    await seedFilaPendentes('conv-fila-numeros', 101);
+    await loginUi(page, 'curador');
+    await page.goto('/curadoria');
+
+    const rows = page
+      .getByRole('region', { name: 'Atendimentos pendentes' })
+      .getByRole('article');
+    const pager = page.getByRole('navigation', {
+      name: 'Paginação da Fila de Curadoria'
+    });
+    await expect(rows).toHaveCount(50);
+    await expect(page.getByText('50 pendentes')).toBeVisible();
+    await expect(pager.getByLabel('Página 1')).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+    await expect(pager.getByRole('link', { name: 'Página 2' })).toBeVisible();
+    await expect(pager.getByRole('link', { name: 'Página 3' })).toBeVisible();
+    await expect(pager.getByRole('link', { name: 'Página 4' })).toHaveCount(0);
+
+    await pager.getByRole('link', { name: 'Página 3' }).click();
+    await expect(page).toHaveURL(/[?&]page=3/);
+    await expect(rows).toHaveCount(1);
+    await expect(page.getByText('1 pendente', { exact: true })).toBeVisible();
+
+    await pager.getByRole('link', { name: 'Página 1' }).click();
+    await expect(page).toHaveURL('/curadoria');
+    await expect(rows).toHaveCount(50);
+  });
+
+  test('Voltar à fila devolve à pagina de origem', async ({ page }) => {
+    await esvaziarFila();
+    const seeded = await seedFilaPendentes('conv-fila-voltar', 51);
+    const pageTwoItem = seeded[50]!;
+    await loginUi(page, 'curador');
+    await page.goto('/curadoria?page=2');
+    await page.getByRole('link', { name: pageTwoItem.conversationId }).click();
+    await expect(page.getByRole('heading', { name: 'Revisar Atendimento' })).toBeVisible();
+    await page.getByRole('link', { name: 'Voltar à fila' }).click();
+    await expect(page).toHaveURL(/[?&]page=2/);
+    await expect(
+      page.getByRole('link', { name: pageTwoItem.conversationId })
+    ).toBeVisible();
+  });
+
+  test('salvar o ultimo da ultima pagina recua para a anterior', async ({
+    page
+  }) => {
+    await esvaziarFila();
+    const seeded = await seedFilaPendentes('conv-fila-recuo', 51);
+    const last = seeded[50]!;
+    await loginUi(page, 'curador');
+    await page.goto('/curadoria?page=2');
+    await page.getByRole('link', { name: last.conversationId }).click();
+    await page.getByRole('button', { name: 'Salvar conferência' }).click();
+    await expect(page.getByRole('heading', { name: 'Fila de Curadoria' })).toBeVisible();
+    await expect(page).toHaveURL('/curadoria');
+    await expect(page.getByText('50 pendentes')).toBeVisible();
+    await expect(
+      page.getByRole('navigation', { name: 'Paginação da Fila de Curadoria' })
+    ).toHaveCount(0);
+  });
+
+  test('salvar o ultimo pendente da pagina 1 mostra Fila em dia', async ({
+    page
+  }) => {
+    await esvaziarFila();
+    const [only] = await seedFilaPendentes('conv-fila-em-dia', 1);
+    await loginUi(page, 'curador');
+    await page.goto('/curadoria');
+    await expect(page.getByText('1 pendente', { exact: true })).toBeVisible();
+    await page.getByRole('link', { name: only!.conversationId }).click();
+    await page.getByRole('button', { name: 'Salvar conferência' }).click();
+    await expect(page.getByRole('heading', { name: 'Fila em dia' })).toBeVisible();
+    await expect(
+      page.getByRole('navigation', { name: 'Paginação da Fila de Curadoria' })
+    ).toHaveCount(0);
+  });
+
+  test('deep link sem origem volta para a pagina 1', async ({ page }) => {
+    await esvaziarFila();
+    const [only] = await seedFilaPendentes('conv-fila-deeplink', 1);
+    await loginUi(page, 'curador');
+    await page.goto(`/curadoria/${only!.id}`);
+    await page.getByRole('link', { name: 'Voltar à fila' }).click();
+    await expect(page).toHaveURL('/curadoria');
+  });
+
+  test('Gestao pagina a fila e segue sem Salvar conferencia', async ({
+    page
+  }) => {
+    await esvaziarFila();
+    const seeded = await seedFilaPendentes('conv-fila-gestao', 51);
+    await loginUi(page, 'gestao');
+    await page.goto('/curadoria');
+    await expect(page.getByRole('link', { name: 'Página 2' })).toBeVisible();
+    await page.getByRole('link', { name: 'Página 2' }).click();
+    await expect(page).toHaveURL(/[?&]page=2/);
+    await page.getByRole('link', { name: seeded[50]!.conversationId }).click();
+    await expect(page.getByRole('button', { name: 'Salvar conferência' })).toHaveCount(0);
+    await page.getByRole('link', { name: 'Voltar à fila' }).click();
+    await expect(page).toHaveURL(/[?&]page=2/);
+  });
+
+  test('Admin pagina a mesma Fila de Curadoria', async ({ page }) => {
+    await esvaziarFila();
+    await seedFilaPendentes('conv-fila-admin', 51);
+    await loginUi(page, 'admin');
+    await page.goto('/curadoria');
+    await expect(page.getByText('50 pendentes')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Página 2' })).toBeVisible();
+  });
+
+  test('pagina alem de totalPages recua para uma pagina valida', async ({
+    page
+  }) => {
+    await esvaziarFila();
+    await seedFilaPendentes('conv-fila-clamp', 51);
+    await loginUi(page, 'curador');
+    await page.goto('/curadoria?page=999');
+    await expect(page).toHaveURL(/[?&]page=2/);
+    await expect(page.getByText('1 pendente', { exact: true })).toBeVisible();
   });
 });

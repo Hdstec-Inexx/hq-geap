@@ -3,7 +3,7 @@ import {
   salvarConferenciaSchema,
   type AvaliacaoCurador,
   type CuradoriaDetail,
-  type FilaCuradoriaItem
+  type FilaCuradoriaPage
 } from '@hq-geap/contracts/curadoria';
 import type { FastifyPluginAsync } from 'fastify';
 import { createCuradoriaRepository } from './repository.js';
@@ -25,14 +25,16 @@ const routes: FastifyPluginAsync = async (app) => {
     config: { auth: { roles: ['curador' as const, 'admin' as const] } }
   };
 
-  app.get('/curadoria', readAuth, async (request): Promise<FilaCuradoriaItem[]> => {
+  app.get('/curadoria', readAuth, async (request): Promise<FilaCuradoriaPage> => {
     const query = filaCuradoriaQuerySchema.safeParse(request.query);
     if (!query.success) {
       throw app.httpErrors.badRequest('Invalid pagination');
     }
-    return (await repository.listPending(query.data.limit, query.data.offset)).map(
-      toFilaCuradoriaItem
-    );
+    const page = await repository.listPending(query.data.limit, query.data.offset);
+    return {
+      items: page.items.map(toFilaCuradoriaItem),
+      total: page.total
+    };
   });
 
   app.get<{ Params: { atendimentoId: string } }>(

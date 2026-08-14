@@ -22,7 +22,10 @@ export const filaCuradoriaItemSchema = z.object({
   notaIa: z.number().min(0).max(10)
 });
 
-export const filaCuradoriaSchema = z.array(filaCuradoriaItemSchema);
+export const filaCuradoriaSchema = z.object({
+  items: z.array(filaCuradoriaItemSchema),
+  total: z.number().int().min(0)
+});
 
 export const filaCuradoriaQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -74,6 +77,7 @@ export const salvarConferenciaSchema = z.object({
 });
 
 export type FilaCuradoriaItem = z.infer<typeof filaCuradoriaItemSchema>;
+export type FilaCuradoriaPage = z.infer<typeof filaCuradoriaSchema>;
 export type AvaliacaoCurador = z.infer<typeof avaliacaoCuradorSchema>;
 export type CuradoriaDetail = z.infer<typeof curadoriaDetailSchema>;
 export type SalvarConferencia = z.infer<typeof salvarConferenciaSchema>;
