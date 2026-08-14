@@ -9,6 +9,7 @@ import { formatDuration, useAuthenticatedResource } from '../atendimentos/api';
 import {
   compactPageItems,
   FILA_PAGE_SIZE,
+  MAX_FILA_PAGE,
   filaHref,
   pageFromSearch,
   resolveFilaPage,
@@ -24,25 +25,27 @@ export function FilaCuradoriaPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const requestedPage = pageFromSearch(searchParams);
-  const state = useAuthenticatedResource(
-    `/curadoria?limit=${FILA_PAGE_SIZE}&offset=${(requestedPage - 1) * FILA_PAGE_SIZE}`,
-    filaCuradoriaSchema
-  );
+  const requestPath = `/curadoria?limit=${FILA_PAGE_SIZE}&offset=${(requestedPage - 1) * FILA_PAGE_SIZE}`;
+  const state = useAuthenticatedResource(requestPath, filaCuradoriaSchema);
+  const currentState = state.path === requestPath;
   const canWrite = canWriteAsCurador(usePerfil()?.role);
-  const items = state.status === 'ready' ? state.data.items : [];
-  const total = state.status === 'ready' ? state.data.total : 0;
-  const resolvedPage = resolveFilaPage(requestedPage, total);
+  const items = state.status === 'ready' && currentState ? state.data.items : [];
+  const total = state.status === 'ready' && currentState ? state.data.total : 0;
+  const resolvedPage = resolveFilaPage(requestedPage, total, items.length);
   const pageOutOfRange =
-    state.status === 'ready' && resolvedPage !== requestedPage;
-  const paginaPronta = state.status === 'ready' && !pageOutOfRange;
-  const totalPages = Math.ceil(total / FILA_PAGE_SIZE);
+    state.status === 'ready' && currentState && resolvedPage !== requestedPage;
+  const paginaPronta = state.status === 'ready' && currentState && !pageOutOfRange;
+  const totalPages = Math.min(
+    Math.ceil(total / FILA_PAGE_SIZE),
+    MAX_FILA_PAGE
+  );
 
   useEffect(() => {
-    if (state.status !== 'ready') return;
+    if (state.status !== 'ready' || !currentState) return;
     if (resolvedPage !== requestedPage) {
       navigate(filaHref(resolvedPage), { replace: true });
     }
-  }, [navigate, requestedPage, resolvedPage, state.status]);
+  }, [currentState, navigate, requestedPage, resolvedPage, state.status]);
 
   return (
     <main className="atendimentos-page curadoria-page">
@@ -64,10 +67,10 @@ export function FilaCuradoriaPage() {
         ) : null}
       </header>
 
-      {state.status === 'loading' || pageOutOfRange ? (
+      {state.status === 'loading' || !currentState || pageOutOfRange ? (
         <div className="curadoria-skeleton" aria-label="Carregando fila" />
       ) : null}
-      {state.status === 'error' ? (
+      {state.status === 'error' && currentState ? (
         <p className="atendimentos-state atendimentos-state-error">
           Não foi possível carregar a Fila de Curadoria.
         </p>

@@ -2,7 +2,7 @@ import {
   atendimentoDetailSchema,
   type AtendimentoDetail
 } from '@hq-geap/contracts/atendimentos';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { AvaliacaoCuradorPanel } from '../avaliacoes/AvaliacaoCuradorPanel';
 import { AvaliacaoIaPanel } from '../avaliacoes/AvaliacaoIaPanel';
 import { ComentariosPanel } from '../comentarios/ComentariosPanel';
@@ -15,6 +15,7 @@ const currency = new Intl.NumberFormat('pt-BR', {
 
 export function AtendimentoPage() {
   const { atendimentoId } = useParams();
+  const [searchParams] = useSearchParams();
   const state = useAuthenticatedResource(
     `/atendimentos/${atendimentoId ?? ''}`,
     atendimentoDetailSchema
@@ -41,7 +42,12 @@ export function AtendimentoPage() {
           <h1>Atendimento</h1>
           <p className="atendimento-id">{atendimento.conversationId}</p>
         </div>
-        <Link className="back-link" to="/atendimentos">Voltar à lista</Link>
+        <Link
+          className="back-link"
+          to={searchParams.toString() ? `/atendimentos?${searchParams}` : '/atendimentos'}
+        >
+          Voltar à lista
+        </Link>
       </header>
 
       <section className="atendimento-facts" aria-label="Dados do Atendimento">

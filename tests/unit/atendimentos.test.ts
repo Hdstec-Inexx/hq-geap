@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import test from 'node:test';
 import {
+  atendimentoListSchema,
   atendimentosQuerySchema,
   ingestAtendimentoSchema,
   transcriptEntrySchema
@@ -49,6 +50,14 @@ function detailRow(
     ...overrides
   };
 }
+
+test('lista de Atendimentos usa envelope paginado com items e total', () => {
+  assert.equal(atendimentoListSchema.safeParse([]).success, false);
+  assert.deepEqual(atendimentoListSchema.parse({ items: [], total: 0 }), {
+    items: [],
+    total: 0
+  });
+});
 
 const fixturePath = new URL(
   '../fixtures/elevenlabs/atendimento-concluido.json',

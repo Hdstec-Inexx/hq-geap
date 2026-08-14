@@ -1,12 +1,17 @@
 import {
   atendimentoListSchema
 } from '@hq-geap/contracts/atendimentos';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { formatDuration, useAuthenticatedResource } from './api';
 import { detalhamentoQueryFromSearch } from '../dashboards/detalhamento';
-
-const pageSize = 50;
-const maximumPage = 201;
+import {
+  compactPageItems,
+  MAX_PAGE,
+  PAGE_SIZE,
+  pageFromSearch,
+  resolvePage
+} from '../pagination';
 
 function formatDate(value: string | null) {
   return value
@@ -37,33 +42,47 @@ function paginationHref(
     next.set('page', String(page));
   }
   const query = next.toString();
-  return query ? `?${query}` : '?';
+  return query ? `/atendimentos?${query}` : '/atendimentos';
+}
+
+function atendimentoHref(id: string, searchParams: URLSearchParams): string {
+  const query = searchParams.toString();
+  return query ? `/atendimentos/${id}?${query}` : `/atendimentos/${id}`;
 }
 
 export function AtendimentosPage() {
   const [searchParams] = useSearchParams();
-  const page = Math.min(
-    maximumPage,
-    Math.max(1, Math.floor(Number(searchParams.get('page')) || 1))
-  );
+  const navigate = useNavigate();
+  const page = pageFromSearch(searchParams);
   const detalhamentoQuery = detalhamentoQueryFromSearch(searchParams);
   const listQuery = new URLSearchParams({
-    limit: String(pageSize),
-    offset: String((page - 1) * pageSize)
+    limit: String(PAGE_SIZE),
+    offset: String((page - 1) * PAGE_SIZE)
   });
   if (detalhamentoQuery) {
     for (const [key, value] of new URLSearchParams(detalhamentoQuery)) {
       listQuery.set(key, value);
     }
   }
-  const state = useAuthenticatedResource(
-    `/atendimentos?${listQuery.toString()}`,
-    atendimentoListSchema
-  );
+  const requestPath = `/atendimentos?${listQuery.toString()}`;
+  const state = useAuthenticatedResource(requestPath, atendimentoListSchema);
+  const currentState = state.path === requestPath;
+  const items = state.status === 'ready' && currentState ? state.data.items : [];
+  const total = state.status === 'ready' && currentState ? state.data.total : 0;
+  const resolvedPage = resolvePage(page, total, items.length);
+  const pageOutOfRange =
+    state.status === 'ready' && currentState && resolvedPage !== page;
+  const totalPages = Math.min(Math.ceil(total / PAGE_SIZE), MAX_PAGE);
   const indicador = searchParams.get('indicador');
   const inicio = searchParams.get('inicio');
   const fim = searchParams.get('fim');
   const isDetalhamento = Boolean(indicador && inicio && fim);
+
+  useEffect(() => {
+    if (state.status === 'ready' && currentState && resolvedPage !== page) {
+      navigate(paginationHref(searchParams, resolvedPage), { replace: true });
+    }
+  }, [currentState, navigate, page, resolvedPage, searchParams, state.status]);
 
   return (
     <main className="atendimentos-page">
@@ -98,20 +117,20 @@ export function AtendimentosPage() {
         )}
       </header>
 
-      {state.status === 'loading' ? (
+      {state.status === 'loading' || !currentState || pageOutOfRange ? (
         <p className="atendimentos-state">Carregando Atendimentos...</p>
       ) : null}
-      {state.status === 'error' ? (
+      {state.status === 'error' && currentState ? (
         <p className="atendimentos-state atendimentos-state-error">
           Não foi possível carregar os Atendimentos.
         </p>
       ) : null}
-      {state.status === 'ready' && state.data.length === 0 ? (
+      {state.status === 'ready' && currentState && !pageOutOfRange && total === 0 ? (
         <p className="atendimentos-state">Nenhum Atendimento recebido.</p>
       ) : null}
-      {state.status === 'ready' && state.data.length > 0 ? (
+      {state.status === 'ready' && currentState && !pageOutOfRange && items.length > 0 ? (
         <div className="atendimentos-list">
-          {state.data.map((atendimento) => {
+          {items.map((atendimento) => {
             const cost = formatCost(atendimento.custo);
             return (
               <article className="atendimento-row" key={atendimento.id}>
@@ -119,7 +138,7 @@ export function AtendimentosPage() {
                   <span className={`atendimento-status ${atendimento.status}`}>
                     {atendimento.status === 'concluido' ? 'Concluído' : 'Em andamento'}
                   </span>
-                  <Link to={`/atendimentos/${atendimento.id}`}>
+                  <Link to={atendimentoHref(atendimento.id, searchParams)}>
                     {atendimento.motivoContato ?? 'Motivo não informado'}
                   </Link>
                   <span>{atendimento.agenteVoz.nome}</span>
@@ -133,16 +152,42 @@ export function AtendimentosPage() {
               </article>
             );
           })}
-          <nav className="atendimentos-pagination" aria-label="Paginação">
+          {totalPages > 1 ? <nav className="atendimentos-pagination" aria-label="Paginação dos Atendimentos">
             {page > 1 ? (
               <Link to={paginationHref(searchParams, page - 1)}>Página anterior</Link>
             ) : (
               <span />
             )}
-            {state.data.length === pageSize && page < maximumPage ? (
+            <ol>
+              {compactPageItems(page, totalPages).map((item, index) =>
+                item === 'ellipsis' ? (
+                  <li key={`ellipsis-${index}`}>
+                    <span aria-hidden="true">…</span>
+                  </li>
+                ) : item === page ? (
+                  <li key={item}>
+                    <span aria-current="page" aria-label={`Página ${item}`}>
+                      {item}
+                    </span>
+                  </li>
+                ) : (
+                  <li key={item}>
+                    <Link
+                      aria-label={`Página ${item}`}
+                      to={paginationHref(searchParams, item)}
+                    >
+                      {item}
+                    </Link>
+                  </li>
+                )
+              )}
+            </ol>
+            {page < totalPages ? (
               <Link to={paginationHref(searchParams, page + 1)}>Próxima página</Link>
-            ) : null}
-          </nav>
+            ) : (
+              <span />
+            )}
+          </nav> : null}
         </div>
       ) : null}
     </main>

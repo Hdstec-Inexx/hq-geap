@@ -295,7 +295,11 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       headers: headersFor(admin.token)
     });
     expect(listResponse.status()).toBe(200);
-    const list = (await listResponse.json()) as Array<Record<string, unknown>>;
+    const listPage = (await listResponse.json()) as {
+      items: Array<Record<string, unknown>>;
+      total: number;
+    };
+    const list = listPage.items;
     const summary = list.find(
       (item) => item.conversationId === atendimento.conversation_id
     );
@@ -314,7 +318,12 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       { headers: headersFor(admin.token) }
     );
     expect(limitedList.status()).toBe(200);
-    expect((await limitedList.json()) as unknown[]).toHaveLength(1);
+    const limitedPage = (await limitedList.json()) as {
+      items: unknown[];
+      total: number;
+    };
+    expect(limitedPage.items).toHaveLength(1);
+    expect(limitedPage.total).toBeGreaterThanOrEqual(1);
     const invalidPagination = await request.get(
       `${apiUrl}/atendimentos?limit=101`,
       { headers: headersFor(admin.token) }
@@ -360,6 +369,46 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await expect(page.getByText(atendimento.contact_reason!).first()).toBeVisible();
     await expect(page.getByText(/US\$\s*0,18/)).toBeVisible();
     await expect(page.getByText(/Preciso da segunda via do boleto/)).toBeVisible();
+  });
+
+  async function seedAtendimentosForPagination(prefix: string, count: number) {
+    await queryDatabase(`
+      insert into atendimentos (
+        agente_voz_id, elevenlabs_conversation_id, status, transcricao,
+        audio_url, houve_transferencia, concluido_em, duracao_segundos,
+        motivo_contato
+      )
+      select id, $1 || '-' || gs::text, 'concluido'::status_atendimento,
+        '[{"role":"agent","message":"Ola","time_in_call_secs":0}]'::jsonb,
+        'atendimentos/teste.mp3', false,
+        now() - (gs * interval '1 minute'), 42, 'Rede credenciada'
+      from agentes_voz
+      cross join generate_series(1, $2::int) as gs
+      where elevenlabs_agent_id = 'agent-livia-test'
+    `, [prefix, count]);
+  }
+
+  test('pagina Atendimentos com numeros e preserva a pagina ao voltar do detalhe', async ({
+    page
+  }) => {
+    await seedAtendimentosForPagination('conv-atendimentos-paginacao', 51);
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('admin@hq.test');
+    await page.getByLabel('Senha').fill('senha-admin');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto('/atendimentos');
+
+    const pager = page.getByRole('navigation', {
+      name: 'Paginação dos Atendimentos'
+    });
+    await expect(pager.getByRole('link', { name: 'Página 2' })).toBeVisible();
+    await pager.getByRole('link', { name: 'Página 2' }).click();
+    await expect(page).toHaveURL(/[?&]page=2/);
+    await expect(page.getByRole('link', { name: 'Página 1' })).toBeVisible();
+    await page.getByRole('link', { name: 'Rede credenciada' }).first().click();
+    await page.getByRole('link', { name: 'Voltar à lista' }).click();
+    await expect(page).toHaveURL(/[?&]page=2/);
   });
 
   async function createAtendimentoComTranscricao(

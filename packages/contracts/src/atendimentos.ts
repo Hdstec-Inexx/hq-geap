@@ -79,7 +79,10 @@ export const atendimentoDetailSchema = atendimentoSummarySchema.extend({
   audioUrl: z.url().nullable()
 });
 
-export const atendimentoListSchema = z.array(atendimentoSummarySchema);
+export const atendimentoListSchema = z.object({
+  items: z.array(atendimentoSummarySchema),
+  total: z.number().int().min(0)
+});
 
 /** Dimensão do Detalhamento do Indicador (Dashboard → lista filtrada). */
 export const detalhamentoIndicadorSchema = z.enum([
@@ -170,4 +173,5 @@ export type DetalhamentoIndicador = z.infer<typeof detalhamentoIndicadorSchema>;
 export type AtendimentosQuery = z.infer<typeof atendimentosQuerySchema>;
 export type IngestAtendimento = z.infer<typeof ingestAtendimentoSchema>;
 export type AtendimentoSummary = z.infer<typeof atendimentoSummarySchema>;
+export type AtendimentoList = z.infer<typeof atendimentoListSchema>;
 export type AtendimentoDetail = z.infer<typeof atendimentoDetailSchema>;

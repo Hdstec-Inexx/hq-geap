@@ -3,19 +3,19 @@ import type { z } from 'zod';
 import { apiUrl, getSession } from '../auth/session';
 
 type ResourceState<T> =
-  | { status: 'loading' }
-  | { status: 'error' }
-  | { status: 'ready'; data: T };
+  | { path: string; status: 'loading' }
+  | { path: string; status: 'error' }
+  | { path: string; status: 'ready'; data: T };
 
 export function useAuthenticatedResource<T>(path: string, schema: z.ZodType<T>) {
-  const [state, setState] = useState<ResourceState<T>>({ status: 'loading' });
+  const [state, setState] = useState<ResourceState<T>>({ path, status: 'loading' });
 
   useEffect(() => {
     const session = getSession();
     const controller = new AbortController();
-    setState({ status: 'loading' });
+    setState({ path, status: 'loading' });
     if (!session) {
-      setState({ status: 'error' });
+      setState({ path, status: 'error' });
       return () => controller.abort();
     }
 
@@ -29,10 +29,10 @@ export function useAuthenticatedResource<T>(path: string, schema: z.ZodType<T>) 
         }
         return schema.parse(await response.json());
       })
-      .then((data) => setState({ status: 'ready', data }))
+      .then((data) => setState({ path, status: 'ready', data }))
       .catch((error: unknown) => {
         if (!(error instanceof DOMException && error.name === 'AbortError')) {
-          setState({ status: 'error' });
+          setState({ path, status: 'error' });
         }
       });
 

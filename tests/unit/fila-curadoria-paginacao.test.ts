@@ -37,6 +37,8 @@ test('resolveFilaPage recua alem de totalPages e pagina 1 vazia permanece 1', ()
   assert.equal(resolveFilaPage(1, 0), 1);
   assert.equal(resolveFilaPage(3, 0), 1);
   assert.equal(resolveFilaPage(3, 100), 2);
+  assert.equal(resolveFilaPage(3, 101, 0), 2);
+  assert.equal(resolveFilaPage(999, 51, 0), 2);
   assert.equal(resolveFilaPage(2, 51), 2);
   assert.equal(resolveFilaPage(0, 51), 1);
   assert.equal(resolveFilaPage(999, 51), 2);
