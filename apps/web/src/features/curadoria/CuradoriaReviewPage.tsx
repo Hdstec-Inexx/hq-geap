@@ -11,6 +11,7 @@ import { apiUrl, getSession } from '../auth/session';
 import { canWriteAsCurador, usePerfil } from '../auth/perfil-context';
 import { formatDuration, useAuthenticatedResource } from '../atendimentos/api';
 import { ComentariosPanel } from '../comentarios/ComentariosPanel';
+import { AudioPlayer, TranscriptPanel, useAudioPlayer } from '../player';
 
 const stateLabels: Record<EstadoCriterio, string> = {
   atendido: 'Atendido',
@@ -22,6 +23,31 @@ const dateTime = new Intl.DateTimeFormat('pt-BR', {
   dateStyle: 'short',
   timeStyle: 'short'
 });
+
+function CuradoriaMedia({ detail }: { detail: CuradoriaDetail }) {
+  const atendimento = detail.atendimento;
+  const player = useAudioPlayer({
+    audioUrl: atendimento.audioUrl,
+    durationSeconds: atendimento.duracaoSegundos
+  });
+
+  return (
+    <div className="atendimento-content">
+      <TranscriptPanel
+        transcricao={atendimento.transcricao}
+        agenteNome={atendimento.agenteVoz.nome}
+        currentTime={player.currentTime}
+        onSeek={player.seek}
+        headerContent={<h2>Transcrição</h2>}
+      />
+      <aside className="audio-panel">
+        <p className="panel-label">Áudio</p>
+        <h2>Ouça antes de decidir</h2>
+        <AudioPlayer audioUrl={atendimento.audioUrl} controller={player} />
+      </aside>
+    </div>
+  );
+}
 
 function ReviewForm({
   detail,
@@ -256,24 +282,7 @@ function ReviewContent({
         <p>{detail.avaliacaoIa.resumoAtendimento ?? 'Resumo não informado.'}</p>
       </section>
 
-      <div className="atendimento-content">
-        <section className="transcript-panel">
-          <h2>Transcrição</h2>
-          <div className="transcript-lines transcript-scroll" data-testid="transcript-scroll">
-            {atendimento.transcricao.length === 0 ? <p>Transcrição ainda não disponível.</p> : atendimento.transcricao.map((entry, index) => (
-              <article className={`transcript-line transcript-${entry.role}`} key={`${entry.time_in_call_secs}-${index}`}>
-                <span>{entry.role === 'agent' ? atendimento.agenteVoz.nome : 'Cliente'}</span>
-                <p>{entry.message}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-        <aside className="audio-panel">
-          <p className="panel-label">Áudio</p>
-          <h2>Ouça antes de decidir</h2>
-          {atendimento.audioUrl ? <audio controls preload="metadata" src={atendimento.audioUrl}>Seu navegador não suporta reprodução de áudio.</audio> : <p>Áudio ainda não disponível.</p>}
-        </aside>
-      </div>
+      <CuradoriaMedia detail={detail} />
 
       {canWrite ? (
         <ReviewForm detail={detail} onSaved={onSaved} />

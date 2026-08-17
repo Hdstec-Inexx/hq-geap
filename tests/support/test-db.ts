@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import { ensureMinioTestAudio } from './audio-fixture.js';
 import { authUsers } from './auth-fixtures.js';
 
 const { Client } = pg;
@@ -18,6 +19,7 @@ async function runSqlDirectory(client: pg.Client, directory: string) {
 }
 
 export default async function prepareTestDatabase() {
+  await ensureMinioTestAudio().catch(() => {});
   const connectionString =
     process.env.TEST_DATABASE_URL ??
     'postgres://hq_geap:hq_geap@127.0.0.1:5432/hq_geap_test';
