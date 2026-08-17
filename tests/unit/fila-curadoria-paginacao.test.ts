@@ -6,9 +6,12 @@ import {
 } from '../../packages/contracts/src/curadoria.js';
 import {
   compactPageItems,
+  filaHref,
   pageFromSearch,
-  resolveFilaPage
+  resolveFilaPage,
+  reviewHref
 } from '../../apps/web/src/features/curadoria/pagination.js';
+import { motivosAtendimentosSchema } from '../../packages/contracts/src/atendimentos.js';
 
 test('GET /curadoria usa envelope com items e total, nao um array solto', () => {
   assert.equal(filaCuradoriaSchema.safeParse([]).success, false);
@@ -30,6 +33,92 @@ test('limit/offset da Fila de Curadoria padrao 50 e rejeitam pagina alem do teto
   assert.equal(
     filaCuradoriaQuerySchema.safeParse({ offset: 10_001 }).success,
     false
+  );
+});
+
+test('query da Fila de Curadoria aceita dia unico com default fim=inicio e periodo', () => {
+  assert.deepEqual(
+    filaCuradoriaQuerySchema.parse({ inicio: '2024-01-15' }),
+    {
+      limit: 50,
+      offset: 0,
+      inicio: '2024-01-15',
+      fim: '2024-01-15'
+    }
+  );
+
+  assert.deepEqual(
+    filaCuradoriaQuerySchema.parse({
+      inicio: '2024-01-01',
+      fim: '2024-01-15',
+      motivo: '  Rede credenciada  '
+    }),
+    {
+      limit: 50,
+      offset: 0,
+      inicio: '2024-01-01',
+      fim: '2024-01-15',
+      motivo: 'Rede credenciada'
+    }
+  );
+
+  assert.deepEqual(
+    filaCuradoriaQuerySchema.parse({ motivo: 'Financeiro/Boletos' }),
+    {
+      limit: 50,
+      offset: 0,
+      motivo: 'Financeiro/Boletos'
+    }
+  );
+});
+
+test('query da Fila de Curadoria valida consistencia de datas e fuso', () => {
+  assert.equal(
+    filaCuradoriaQuerySchema.safeParse({ fim: '2024-01-15' }).success,
+    false
+  );
+  assert.equal(
+    filaCuradoriaQuerySchema.safeParse({
+      inicio: '2024-01-20',
+      fim: '2024-01-10'
+    }).success,
+    false
+  );
+  assert.equal(
+    filaCuradoriaQuerySchema.safeParse({
+      inicio: '2024-01-01',
+      fim: '2025-01-02'
+    }).success,
+    false
+  );
+  assert.equal(
+    filaCuradoriaQuerySchema.safeParse({ inicio: 'data-invalida' }).success,
+    false
+  );
+});
+
+test('contrato de motivos de Atendimentos valida array de strings', () => {
+  assert.deepEqual(
+    motivosAtendimentosSchema.parse(['Cancelamento', 'Financeiro/Boletos']),
+    ['Cancelamento', 'Financeiro/Boletos']
+  );
+  assert.equal(motivosAtendimentosSchema.safeParse('string-solta').success, false);
+  assert.equal(motivosAtendimentosSchema.safeParse([123]).success, false);
+});
+
+test('filaHref e reviewHref preservam searchParams com filtros', () => {
+  const params = new URLSearchParams('page=2&inicio=2024-01-01&fim=2024-01-15&motivo=Rede');
+  assert.equal(
+    filaHref(params),
+    '/curadoria?page=2&inicio=2024-01-01&fim=2024-01-15&motivo=Rede'
+  );
+  assert.equal(
+    filaHref(params, 1),
+    '/curadoria?inicio=2024-01-01&fim=2024-01-15&motivo=Rede'
+  );
+  assert.equal(
+    reviewHref('11111111-1111-1111-1111-111111111111', params),
+    '/curadoria/11111111-1111-1111-1111-111111111111?page=2&inicio=2024-01-01&fim=2024-01-15&motivo=Rede'
   );
 });
 

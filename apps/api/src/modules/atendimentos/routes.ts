@@ -75,6 +75,10 @@ const routes: FastifyPluginAsync = async (app) => {
     };
   });
 
+  app.get('/atendimentos/motivos', async (): Promise<string[]> => {
+    return repository.listDistinctMotivos();
+  });
+
   app.get<{ Params: { id: string } }>(
     '/atendimentos/:id',
     async (request): Promise<AtendimentoDetail> => {

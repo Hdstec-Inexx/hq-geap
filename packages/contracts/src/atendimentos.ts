@@ -84,6 +84,8 @@ export const atendimentoListSchema = z.object({
   total: z.number().int().min(0)
 });
 
+export const motivosAtendimentosSchema = z.array(z.string());
+
 /** Dimensão do Detalhamento do Indicador (Dashboard → lista filtrada). */
 export const detalhamentoIndicadorSchema = z.enum([
   'volume',
@@ -175,3 +177,4 @@ export type IngestAtendimento = z.infer<typeof ingestAtendimentoSchema>;
 export type AtendimentoSummary = z.infer<typeof atendimentoSummarySchema>;
 export type AtendimentoList = z.infer<typeof atendimentoListSchema>;
 export type AtendimentoDetail = z.infer<typeof atendimentoDetailSchema>;
+export type MotivosAtendimentos = z.infer<typeof motivosAtendimentosSchema>;

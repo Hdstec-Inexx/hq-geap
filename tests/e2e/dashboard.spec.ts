@@ -335,10 +335,13 @@ test.describe.serial('Dashboard da Gestao', () => {
       { headers: { authorization: `Bearer ${gestao.token}` } }
     );
     expect(list.status()).toBe(200);
-    const rows = await list.json();
-    expect(rows).toHaveLength(1);
-    expect(rows[0].motivoContato).toBe('Financeiro / Boletos');
-    expect(rows[0].houveTransferencia).toBe(false);
+    const body = (await list.json()) as {
+      items: Array<{ motivoContato: string; houveTransferencia: boolean }>;
+      total: number;
+    };
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0]!.motivoContato).toBe('Financeiro / Boletos');
+    expect(body.items[0]!.houveTransferencia).toBe(false);
 
     const curador = await loginApi(request, 'curador');
     expect(
@@ -377,7 +380,8 @@ test.describe.serial('Dashboard da Gestao', () => {
     );
     expect(tmeQuery.status()).toBe(400);
     expect(slaList.status()).toBe(200);
-    expect(await slaList.json()).toHaveLength(1);
+    const slaBody = (await slaList.json()) as { items: unknown[] };
+    expect(slaBody.items).toHaveLength(1);
   });
 
   test('clique no Motivo de Contato navega com a populacao correta', async ({
