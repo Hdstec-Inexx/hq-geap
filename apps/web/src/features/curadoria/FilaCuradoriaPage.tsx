@@ -75,8 +75,12 @@ export function FilaCuradoriaPage() {
   function handleFilterSubmit(event: React.FormEvent) {
     event.preventDefault();
     const next = new URLSearchParams();
-    if (draftInicio) next.set('inicio', draftInicio);
-    if (draftFim) next.set('fim', draftFim);
+    if (draftInicio) {
+      next.set('inicio', draftInicio);
+      if (draftFim && draftFim >= draftInicio) {
+        next.set('fim', draftFim);
+      }
+    }
     if (draftMotivo.trim()) next.set('motivo', draftMotivo.trim());
     navigate(filaHref(next, 1));
   }
@@ -114,7 +118,13 @@ export function FilaCuradoriaPage() {
             Data inicial
             <input
               name="inicio"
-              onChange={(event) => setDraftInicio(event.target.value)}
+              onChange={(event) => {
+                const nextInicio = event.target.value;
+                setDraftInicio(nextInicio);
+                if (!nextInicio) {
+                  setDraftFim('');
+                }
+              }}
               type="date"
               value={draftInicio}
             />
@@ -125,10 +135,12 @@ export function FilaCuradoriaPage() {
           <label>
             Data final (opcional)
             <input
+              disabled={!draftInicio}
+              min={draftInicio || undefined}
               name="fim"
               onChange={(event) => setDraftFim(event.target.value)}
               type="date"
-              value={draftFim}
+              value={draftInicio ? draftFim : ''}
             />
           </label>
           <label>
