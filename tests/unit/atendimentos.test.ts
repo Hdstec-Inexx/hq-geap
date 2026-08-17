@@ -493,7 +493,7 @@ test('contrato aceita message null de tool call da ElevenLabs', () => {
   );
 });
 
-test('detalhe do Atendimento nao quebra com message null na transcricao', () => {
+test('detalhe do Atendimento preserva tool call com message null na transcricao', () => {
   const detail = toAtendimentoDetail(
     detailRow(),
     'https://example.com/atendimentos/conv-tool-null-message.mp3'
@@ -511,6 +511,11 @@ test('detalhe do Atendimento nao quebra com message null na transcricao', () => 
         role: 'agent',
         message: 'Olá, como posso ajudar?',
         time_in_call_secs: 0
+      },
+      {
+        role: 'agent',
+        message: '',
+        time_in_call_secs: 12
       },
       {
         role: 'user',
@@ -574,6 +579,7 @@ test('detalhe tolera raw_transcript gravado direto no Postgres pelo n8n', () => 
     })),
     [
       { role: 'agent', message: 'Olá', time_in_call_secs: 0 },
+      { role: 'agent', message: '', time_in_call_secs: 12 },
       { role: 'user', message: 'Preciso do boleto', time_in_call_secs: 18 },
       { role: 'agent', message: 'turno sem timestamp', time_in_call_secs: 3 }
     ]
@@ -583,7 +589,7 @@ test('detalhe tolera raw_transcript gravado direto no Postgres pelo n8n', () => 
     detailRow({ transcricao: JSON.stringify(rawTranscript) }),
     null
   );
-  assert.equal(fromString.transcricao.length, 3);
+  assert.equal(fromString.transcricao.length, 4);
 });
 
 test('detalhe exibe historico com speaker IA/Cliente gravado pelo n8n', () => {
@@ -619,6 +625,10 @@ test('detalhe exibe historico com speaker IA/Cliente gravado pelo n8n', () => {
       },
       {
         role: 'agent',
+        message: ''
+      },
+      {
+        role: 'agent',
         message: 'A GEAP agradece o seu contato. Tenha um ótimo dia!'
       }
     ]
@@ -628,7 +638,7 @@ test('detalhe exibe historico com speaker IA/Cliente gravado pelo n8n', () => {
     detailRow({ transcricao: JSON.stringify(historico) }),
     null
   );
-  assert.equal(fromString.transcricao.length, 3);
+  assert.equal(fromString.transcricao.length, 4);
 });
 
 test('query do Detalhamento rejeita indicador tme', () => {
