@@ -116,16 +116,68 @@ async function findCuradorChecklists(
   return byId;
 }
 
+export type FilaCuradoriaFilters = {
+  inicio?: string;
+  fim?: string;
+  motivo?: string;
+};
+
+export function buildFilaCuradoriaFilters(
+  filters: FilaCuradoriaFilters,
+  startIndex = 1
+) {
+  const clauses: string[] = [];
+  const values: unknown[] = [];
+  let next = startIndex;
+
+  const param = (value: unknown) => {
+    values.push(value);
+    const placeholder = `$${next}`;
+    next += 1;
+    return placeholder;
+  };
+
+  const inicio = filters.inicio;
+  const fim = filters.fim ?? filters.inicio;
+  if (inicio && fim) {
+    const inicioPlaceholder = param(inicio);
+    const fimPlaceholder = param(fim);
+    clauses.push(
+      `a.concluido_em at time zone 'America/Sao_Paulo' >= ${inicioPlaceholder}::date and a.concluido_em at time zone 'America/Sao_Paulo' < ${fimPlaceholder}::date + interval '1 day'`
+    );
+  }
+
+  if (filters.motivo) {
+    const motivo = param(filters.motivo);
+    clauses.push(`coalesce(a.motivo_contato, 'Nao informado') = ${motivo}`);
+  }
+
+  return { clauses, values };
+}
+
 export function createCuradoriaRepository(db: pg.Pool) {
   return {
     async listPending(
-      limit: number,
-      offset: number
+      query: { limit: number; offset: number; inicio?: string; fim?: string; motivo?: string }
     ): Promise<{ items: FilaCuradoriaRow[]; total: number }> {
+      const selectFilters = buildFilaCuradoriaFilters(query, 3);
+      const countFilters = buildFilaCuradoriaFilters(query, 1);
+
+      const whereClauseSelect =
+        selectFilters.clauses.length > 0
+          ? `where ${selectFilters.clauses.join(' and ')}`
+          : '';
+      const whereClauseCount =
+        countFilters.clauses.length > 0
+          ? `where ${countFilters.clauses.join(' and ')}`
+          : '';
+
       const [count, result] = await Promise.all([
-        db.query<{ total: string }>(
-          'select count(*)::text as total from fila_curadoria'
-        ),
+        db.query<{ total: string }>(`
+          select count(*)::text as total
+          from fila_curadoria a
+          ${whereClauseCount}
+        `, countFilters.values),
         db.query<FilaCuradoriaRow>(`
           select
             a.id,
@@ -138,9 +190,10 @@ export function createCuradoriaRepository(db: pg.Pool) {
           from fila_curadoria a
           join agentes_voz agente on agente.id = a.agente_voz_id
           join avaliacoes ia on ia.atendimento_id = a.id and ia.autor = 'ia'
+          ${whereClauseSelect}
           order by a.concluido_em, a.id
           limit $1 offset $2
-        `, [limit, offset])
+        `, [query.limit, query.offset, ...selectFilters.values])
       ]);
       return {
         items: result.rows,

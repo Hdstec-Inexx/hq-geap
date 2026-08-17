@@ -223,11 +223,11 @@ function ReviewForm({
 
 function ReviewContent({
   detail,
-  originPage,
+  searchParams,
   onSaved
 }: {
   detail: CuradoriaDetail;
-  originPage: number;
+  searchParams: URLSearchParams;
   onSaved: () => void;
 }) {
   const atendimento = detail.atendimento;
@@ -240,7 +240,7 @@ function ReviewContent({
           <h1>Revisar Atendimento</h1>
           <p className="atendimento-id">{atendimento.conversationId}</p>
         </div>
-        <Link className="back-link" to={filaHref(originPage)}>Voltar à fila</Link>
+        <Link className="back-link" to={filaHref(searchParams)}>Voltar à fila</Link>
       </header>
 
       <section className="atendimento-facts" aria-label="Dados do Atendimento">
@@ -382,7 +382,6 @@ export function CuradoriaReviewPage() {
   const { atendimentoId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const originPage = pageFromSearch(searchParams);
   const state = useAuthenticatedResource(
     `/curadoria/${atendimentoId ?? ''}`,
     curadoriaDetailSchema
@@ -399,8 +398,8 @@ export function CuradoriaReviewPage() {
   return (
     <ReviewContent
       detail={state.data}
-      originPage={originPage}
-      onSaved={() => navigate(filaHref(originPage))}
+      searchParams={searchParams}
+      onSaved={() => navigate(filaHref(searchParams))}
     />
   );
 }

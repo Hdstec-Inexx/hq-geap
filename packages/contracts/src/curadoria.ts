@@ -27,10 +27,53 @@ export const filaCuradoriaSchema = z.object({
   total: z.number().int().min(0)
 });
 
-export const filaCuradoriaQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(50),
-  offset: z.coerce.number().int().min(0).max(10_000).default(0)
-});
+const isoDateSchema = z.iso.date();
+
+export const filaCuradoriaQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+    offset: z.coerce.number().int().min(0).max(10_000).default(0),
+    inicio: isoDateSchema.optional(),
+    fim: isoDateSchema.optional(),
+    motivo: z.string().trim().min(1).max(200).optional()
+  })
+  .superRefine((query, ctx) => {
+    if (!query.inicio && query.fim) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Periodo incompleto: informe inicio',
+        path: ['inicio']
+      });
+      return;
+    }
+    const effectiveFim = query.fim ?? query.inicio;
+    if (query.inicio && effectiveFim) {
+      if (query.inicio > effectiveFim) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'A data inicial deve ser anterior ou igual a data final',
+          path: ['inicio']
+        });
+      }
+      const maximumEnd = new Date(`${query.inicio}T00:00:00Z`);
+      if (!Number.isNaN(maximumEnd.getTime())) {
+        maximumEnd.setUTCFullYear(maximumEnd.getUTCFullYear() + 1);
+        if (effectiveFim > maximumEnd.toISOString().slice(0, 10)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'O periodo nao pode exceder um ano',
+            path: ['fim']
+          });
+        }
+      }
+    }
+  })
+  .transform((query) => {
+    if (query.inicio && !query.fim) {
+      return { ...query, fim: query.inicio };
+    }
+    return query;
+  });
 
 export const avaliacaoCuradorSchema = z.object({
   id: z.uuid(),
@@ -78,6 +121,7 @@ export const salvarConferenciaSchema = z.object({
 
 export type FilaCuradoriaItem = z.infer<typeof filaCuradoriaItemSchema>;
 export type FilaCuradoriaPage = z.infer<typeof filaCuradoriaSchema>;
+export type FilaCuradoriaQuery = z.infer<typeof filaCuradoriaQuerySchema>;
 export type AvaliacaoCurador = z.infer<typeof avaliacaoCuradorSchema>;
 export type CuradoriaDetail = z.infer<typeof curadoriaDetailSchema>;
 export type SalvarConferencia = z.infer<typeof salvarConferenciaSchema>;

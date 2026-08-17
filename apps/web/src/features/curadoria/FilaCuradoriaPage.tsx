@@ -2,10 +2,11 @@ import {
   filaCuradoriaSchema,
   type FilaCuradoriaItem
 } from '@hq-geap/contracts/curadoria';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { canWriteAsCurador, usePerfil } from '../auth/perfil-context';
 import { formatDuration, useAuthenticatedResource } from '../atendimentos/api';
+import { MotivoCombobox } from '../atendimentos/MotivoCombobox';
 import {
   compactPageItems,
   FILA_PAGE_SIZE,
@@ -25,7 +26,31 @@ export function FilaCuradoriaPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const requestedPage = pageFromSearch(searchParams);
-  const requestPath = `/curadoria?limit=${FILA_PAGE_SIZE}&offset=${(requestedPage - 1) * FILA_PAGE_SIZE}`;
+
+  const inicioParam = searchParams.get('inicio') ?? '';
+  const fimParam = searchParams.get('fim') ?? '';
+  const motivoParam = searchParams.get('motivo') ?? '';
+  const hasActiveFilters = Boolean(inicioParam || fimParam || motivoParam);
+
+  const [draftInicio, setDraftInicio] = useState(inicioParam);
+  const [draftFim, setDraftFim] = useState(fimParam);
+  const [draftMotivo, setDraftMotivo] = useState(motivoParam);
+
+  useEffect(() => {
+    setDraftInicio(inicioParam);
+    setDraftFim(fimParam);
+    setDraftMotivo(motivoParam);
+  }, [inicioParam, fimParam, motivoParam]);
+
+  const query = new URLSearchParams({
+    limit: String(FILA_PAGE_SIZE),
+    offset: String((requestedPage - 1) * FILA_PAGE_SIZE)
+  });
+  if (inicioParam) query.set('inicio', inicioParam);
+  if (fimParam) query.set('fim', fimParam);
+  if (motivoParam) query.set('motivo', motivoParam);
+
+  const requestPath = `/curadoria?${query.toString()}`;
   const state = useAuthenticatedResource(requestPath, filaCuradoriaSchema);
   const currentState = state.path === requestPath;
   const canWrite = canWriteAsCurador(usePerfil()?.role);
@@ -43,9 +68,25 @@ export function FilaCuradoriaPage() {
   useEffect(() => {
     if (state.status !== 'ready' || !currentState) return;
     if (resolvedPage !== requestedPage) {
-      navigate(filaHref(resolvedPage), { replace: true });
+      navigate(filaHref(searchParams, resolvedPage), { replace: true });
     }
-  }, [currentState, navigate, requestedPage, resolvedPage, state.status]);
+  }, [currentState, navigate, requestedPage, resolvedPage, searchParams, state.status]);
+
+  function handleFilterSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    const next = new URLSearchParams();
+    if (draftInicio) next.set('inicio', draftInicio);
+    if (draftFim) next.set('fim', draftFim);
+    if (draftMotivo.trim()) next.set('motivo', draftMotivo.trim());
+    navigate(filaHref(next, 1));
+  }
+
+  function handleClearFilters() {
+    setDraftInicio('');
+    setDraftFim('');
+    setDraftMotivo('');
+    navigate('/curadoria');
+  }
 
   return (
     <main className="atendimentos-page curadoria-page">
@@ -67,8 +108,58 @@ export function FilaCuradoriaPage() {
         ) : null}
       </header>
 
+      <form className="curadoria-filters" onSubmit={handleFilterSubmit}>
+        <div className="curadoria-filters-fields">
+          <label>
+            Data inicial
+            <input
+              name="inicio"
+              onChange={(event) => setDraftInicio(event.target.value)}
+              type="date"
+              value={draftInicio}
+            />
+          </label>
+          <span aria-hidden="true" className="curadoria-filters-arrow">
+            →
+          </span>
+          <label>
+            Data final (opcional)
+            <input
+              name="fim"
+              onChange={(event) => setDraftFim(event.target.value)}
+              type="date"
+              value={draftFim}
+            />
+          </label>
+          <label>
+            Motivo de Contato
+            <MotivoCombobox
+              id="curadoria-motivo-filtro"
+              name="motivo"
+              onChange={setDraftMotivo}
+              placeholder="Todos os motivos"
+              value={draftMotivo}
+            />
+          </label>
+        </div>
+        <div className="curadoria-filters-actions">
+          <button className="primary-action" type="submit">
+            Filtrar
+          </button>
+          {hasActiveFilters ? (
+            <button
+              className="curadoria-filter-clear"
+              onClick={handleClearFilters}
+              type="button"
+            >
+              Limpar filtros
+            </button>
+          ) : null}
+        </div>
+      </form>
+
       {state.status === 'loading' || !currentState || pageOutOfRange ? (
-        <div className="curadoria-skeleton" aria-label="Carregando fila" />
+        <div aria-label="Carregando fila" className="curadoria-skeleton" />
       ) : null}
       {state.status === 'error' && currentState ? (
         <p className="atendimentos-state atendimentos-state-error">
@@ -77,17 +168,21 @@ export function FilaCuradoriaPage() {
       ) : null}
       {paginaPronta && total === 0 ? (
         <section className="curadoria-empty">
-          <h2>Fila em dia</h2>
-          <p>Não há Atendimentos aguardando conferência humana.</p>
+          <h2>{hasActiveFilters ? 'Nenhum Atendimento encontrado' : 'Fila em dia'}</h2>
+          <p>
+            {hasActiveFilters
+              ? 'Não há Atendimentos pendentes para os filtros selecionados.'
+              : 'Não há Atendimentos aguardando conferência humana.'}
+          </p>
         </section>
       ) : null}
       {paginaPronta && items.length > 0 ? (
-        <section className="curadoria-list" aria-label="Atendimentos pendentes">
+        <section aria-label="Atendimentos pendentes" className="curadoria-list">
           {items.map((item: FilaCuradoriaItem) => (
             <article className="curadoria-row" key={item.id}>
               <div className="curadoria-row-main">
                 <span>{item.agenteVozNome}</span>
-                <Link to={reviewHref(item.id, requestedPage)}>
+                <Link to={reviewHref(item.id, searchParams)}>
                   {item.conversationId}
                 </Link>
                 <small>{dateTime.format(new Date(item.concluidoEm))}</small>
@@ -97,7 +192,7 @@ export function FilaCuradoriaPage() {
                 <div><dt>Duração</dt><dd>{formatDuration(item.duracaoSegundos)}</dd></div>
                 <div><dt>Nota IA</dt><dd>{item.notaIa.toLocaleString('pt-BR')}</dd></div>
               </dl>
-              <Link className="review-link" to={reviewHref(item.id, requestedPage)}>
+              <Link className="review-link" to={reviewHref(item.id, searchParams)}>
                 {canWrite ? 'Conferir' : 'Consultar'}
               </Link>
             </article>
@@ -108,7 +203,7 @@ export function FilaCuradoriaPage() {
               className="curadoria-pagination"
             >
               {requestedPage > 1 ? (
-                <Link to={filaHref(requestedPage - 1)}>Página anterior</Link>
+                <Link to={filaHref(searchParams, requestedPage - 1)}>Página anterior</Link>
               ) : (
                 <span />
               )}
@@ -126,7 +221,7 @@ export function FilaCuradoriaPage() {
                     </li>
                   ) : (
                     <li key={item}>
-                      <Link aria-label={`Página ${item}`} to={filaHref(item)}>
+                      <Link aria-label={`Página ${item}`} to={filaHref(searchParams, item)}>
                         {item}
                       </Link>
                     </li>
@@ -134,7 +229,7 @@ export function FilaCuradoriaPage() {
                 )}
               </ol>
               {requestedPage < totalPages ? (
-                <Link to={filaHref(requestedPage + 1)}>Próxima página</Link>
+                <Link to={filaHref(searchParams, requestedPage + 1)}>Próxima página</Link>
               ) : (
                 <span />
               )}
