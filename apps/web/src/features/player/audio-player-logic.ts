@@ -42,3 +42,20 @@ export function getActiveTurnIndex(
 
   return activeIndex;
 }
+
+export function shouldShowMiniplayer(params: {
+  isPastMainPlayer: boolean;
+  hasEnded?: boolean;
+  hasAudioUrl?: boolean;
+}): boolean {
+  if (!params.hasAudioUrl) {
+    return false;
+  }
+  if (!params.isPastMainPlayer) {
+    return false;
+  }
+  if (params.hasEnded) {
+    return false;
+  }
+  return true;
+}

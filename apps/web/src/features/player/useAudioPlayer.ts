@@ -12,6 +12,7 @@ export interface AudioPlayerController {
   isPlaying: boolean;
   currentTime: number;
   duration: number;
+  hasEnded: boolean;
   togglePlay: () => void;
   seek: (time: number) => void;
   skip: (delta: number) => void;
@@ -31,6 +32,17 @@ export function useAudioPlayer({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState<number>(() => durationSeconds ?? 0);
+  const [hasEnded, setHasEnded] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      const audio = audioRef.current;
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (durationSeconds && durationSeconds > 0) {
@@ -41,12 +53,14 @@ export function useAudioPlayer({
   useEffect(() => {
     setIsPlaying(false);
     setCurrentTime(0);
+    setHasEnded(false);
   }, [audioUrl]);
 
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
     if (audio.paused) {
+      setHasEnded(false);
       const playPromise = audio.play();
       if (playPromise !== undefined) {
         playPromise.catch(() => {
@@ -60,6 +74,7 @@ export function useAudioPlayer({
 
   const seek = useCallback(
     (targetTime: number) => {
+      setHasEnded(false);
       const audio = audioRef.current;
       const targetDuration =
         duration > 0
@@ -78,6 +93,7 @@ export function useAudioPlayer({
 
   const skip = useCallback(
     (delta: number) => {
+      setHasEnded(false);
       const audio = audioRef.current;
       const current = audio ? audio.currentTime : currentTime;
       seek(current + delta);
@@ -103,15 +119,26 @@ export function useAudioPlayer({
     }
   }, []);
 
-  const handlePlay = useCallback(() => setIsPlaying(true), []);
-  const handlePause = useCallback(() => setIsPlaying(false), []);
-  const handleEnded = useCallback(() => setIsPlaying(false), []);
+  const handlePlay = useCallback(() => {
+    setIsPlaying(true);
+    setHasEnded(false);
+  }, []);
+
+  const handlePause = useCallback(() => {
+    setIsPlaying(false);
+  }, []);
+
+  const handleEnded = useCallback(() => {
+    setIsPlaying(false);
+    setHasEnded(true);
+  }, []);
 
   return {
     audioRef,
     isPlaying,
     currentTime,
     duration,
+    hasEnded,
     togglePlay,
     seek,
     skip,

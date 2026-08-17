@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import {
   atendimentoDetailSchema,
   type AtendimentoDetail
@@ -6,7 +7,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { AvaliacaoCuradorPanel } from '../avaliacoes/AvaliacaoCuradorPanel';
 import { AvaliacaoIaPanel } from '../avaliacoes/AvaliacaoIaPanel';
 import { ComentariosPanel } from '../comentarios/ComentariosPanel';
-import { AudioPlayer, TranscriptPanel, useAudioPlayer } from '../player';
+import { AudioPlayer, Miniplayer, TranscriptPanel, useAudioPlayer } from '../player';
 import { formatDuration, useAuthenticatedResource } from './api';
 
 const currency = new Intl.NumberFormat('pt-BR', {
@@ -15,26 +16,35 @@ const currency = new Intl.NumberFormat('pt-BR', {
 });
 
 function AtendimentoMedia({ atendimento }: { atendimento: AtendimentoDetail }) {
+  const mainPlayerRef = useRef<HTMLElement | null>(null);
   const player = useAudioPlayer({
     audioUrl: atendimento.audioUrl,
     durationSeconds: atendimento.duracaoSegundos
   });
 
   return (
-    <div className="atendimento-content">
-      <TranscriptPanel
-        transcricao={atendimento.transcricao}
-        agenteNome={atendimento.agenteVoz.nome}
-        currentTime={player.currentTime}
-        onSeek={player.seek}
-        headerContent={<p className="panel-label">Transcrição</p>}
+    <>
+      <Miniplayer
+        audioUrl={atendimento.audioUrl}
+        controller={player}
+        mainPlayerRef={mainPlayerRef}
+        title={atendimento.agenteVoz.nome}
       />
-      <aside className="audio-panel">
-        <p className="panel-label">Áudio</p>
-        <h2>Ouça o contato completo</h2>
-        <AudioPlayer audioUrl={atendimento.audioUrl} controller={player} />
-      </aside>
-    </div>
+      <div className="atendimento-content">
+        <TranscriptPanel
+          transcricao={atendimento.transcricao}
+          agenteNome={atendimento.agenteVoz.nome}
+          currentTime={player.currentTime}
+          onSeek={player.seek}
+          headerContent={<p className="panel-label">Transcrição</p>}
+        />
+        <aside ref={mainPlayerRef} className="audio-panel">
+          <p className="panel-label">Áudio</p>
+          <h2>Ouça o contato completo</h2>
+          <AudioPlayer audioUrl={atendimento.audioUrl} controller={player} />
+        </aside>
+      </div>
+    </>
   );
 }
 

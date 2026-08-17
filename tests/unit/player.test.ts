@@ -3,7 +3,8 @@ import test from 'node:test';
 import {
   clampSeekTime,
   formatPlayerTime,
-  getActiveTurnIndex
+  getActiveTurnIndex,
+  shouldShowMiniplayer
 } from '../../apps/web/src/features/player/audio-player-logic.js';
 
 test('formatPlayerTime formata segundos em mm:ss e hh:mm:ss', () => {
@@ -78,4 +79,45 @@ test('getActiveTurnIndex tolera turnos nao ordenados cronologicamente', () => {
   assert.equal(getActiveTurnIndex(unsorted, 5), 1); // 0s
   assert.equal(getActiveTurnIndex(unsorted, 12), 2); // 10s
   assert.equal(getActiveTurnIndex(unsorted, 30), 0); // 25s
+});
+
+test('shouldShowMiniplayer requer audioUrl, scroll alem do player e audio nao finalizado', () => {
+  assert.equal(
+    shouldShowMiniplayer({
+      isPastMainPlayer: true,
+      hasEnded: false,
+      hasAudioUrl: true
+    }),
+    true
+  );
+
+  // Sem audioUrl
+  assert.equal(
+    shouldShowMiniplayer({
+      isPastMainPlayer: true,
+      hasEnded: false,
+      hasAudioUrl: false
+    }),
+    false
+  );
+
+  // Player principal ainda visivel no viewport
+  assert.equal(
+    shouldShowMiniplayer({
+      isPastMainPlayer: false,
+      hasEnded: false,
+      hasAudioUrl: true
+    }),
+    false
+  );
+
+  // Audio finalizado
+  assert.equal(
+    shouldShowMiniplayer({
+      isPastMainPlayer: true,
+      hasEnded: true,
+      hasAudioUrl: true
+    }),
+    false
+  );
 });
