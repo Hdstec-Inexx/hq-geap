@@ -4,14 +4,14 @@ import {
   type CuradoriaDetail
 } from '@hq-geap/contracts/curadoria';
 import type { EstadoCriterio } from '@hq-geap/contracts/avaliacoes';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { filaHref, pageFromSearch } from './pagination';
 import { apiUrl, getSession } from '../auth/session';
 import { canWriteAsCurador, usePerfil } from '../auth/perfil-context';
 import { formatDuration, useAuthenticatedResource } from '../atendimentos/api';
 import { ComentariosPanel } from '../comentarios/ComentariosPanel';
-import { AudioPlayer, TranscriptPanel, useAudioPlayer } from '../player';
+import { AudioPlayer, Miniplayer, TranscriptPanel, useAudioPlayer } from '../player';
 
 const stateLabels: Record<EstadoCriterio, string> = {
   atendido: 'Atendido',
@@ -25,6 +25,7 @@ const dateTime = new Intl.DateTimeFormat('pt-BR', {
 });
 
 function CuradoriaMedia({ detail }: { detail: CuradoriaDetail }) {
+  const mainPlayerRef = useRef<HTMLElement | null>(null);
   const atendimento = detail.atendimento;
   const player = useAudioPlayer({
     audioUrl: atendimento.audioUrl,
@@ -32,20 +33,28 @@ function CuradoriaMedia({ detail }: { detail: CuradoriaDetail }) {
   });
 
   return (
-    <div className="atendimento-content">
-      <TranscriptPanel
-        transcricao={atendimento.transcricao}
-        agenteNome={atendimento.agenteVoz.nome}
-        currentTime={player.currentTime}
-        onSeek={player.seek}
-        headerContent={<h2>Transcrição</h2>}
+    <>
+      <Miniplayer
+        audioUrl={atendimento.audioUrl}
+        controller={player}
+        mainPlayerRef={mainPlayerRef}
+        title={atendimento.agenteVoz.nome}
       />
-      <aside className="audio-panel">
-        <p className="panel-label">Áudio</p>
-        <h2>Ouça antes de decidir</h2>
-        <AudioPlayer audioUrl={atendimento.audioUrl} controller={player} />
-      </aside>
-    </div>
+      <div className="atendimento-content">
+        <TranscriptPanel
+          transcricao={atendimento.transcricao}
+          agenteNome={atendimento.agenteVoz.nome}
+          currentTime={player.currentTime}
+          onSeek={player.seek}
+          headerContent={<h2>Transcrição</h2>}
+        />
+        <aside ref={mainPlayerRef} className="audio-panel">
+          <p className="panel-label">Áudio</p>
+          <h2>Ouça antes de decidir</h2>
+          <AudioPlayer audioUrl={atendimento.audioUrl} controller={player} />
+        </aside>
+      </div>
+    </>
   );
 }
 
