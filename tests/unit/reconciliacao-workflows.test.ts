@@ -136,6 +136,8 @@ test('os tres fluxos persistem audio opcional com chave flat e content-type de M
     assert.ok(downloaded, 'workflow deve ignorar falha no download');
     assert.ok(prepare, 'workflow deve preparar o contrato mesmo sem áudio');
     assert.equal(download?.continueOnFail, true);
+    assert.equal((download?.parameters.options as { timeout?: number })?.timeout, 120_000);
+    assert.match(JSON.stringify(download?.parameters), /encodeURIComponent/);
     assert.equal(upload?.continueOnFail, true);
     assert.equal(upload?.retryOnFail, true);
     assert.equal(upload?.parameters.bucketName, '={{ $env.STORAGE_BUCKET }}');
@@ -181,6 +183,42 @@ test('os tres fluxos persistem audio opcional com chave flat e content-type de M
     assert.equal(withoutUpload.audio_reference, null);
     assert.equal(withFailedUpload.audio_reference, null);
     assert.equal(withSuccessfulUpload.audio_reference, normalized.audio_object_key);
+  }
+});
+
+test('os tres fluxos validam conversation_id antes de formar a chave do áudio', async () => {
+  const [webhook, reconciliacao, reprocessamento] = await Promise.all([
+    loadWorkflow(webhookPath),
+    loadWorkflow(reconciliacaoPath),
+    loadWorkflow(reprocessamentoPath)
+  ]);
+
+  for (const workflow of [webhook, reconciliacao, reprocessamento]) {
+    const code = node(workflow, 'Contrato normalizado')?.parameters.jsCode ?? '';
+    const normalize = new Function('$json', '$env', code) as (
+      input: unknown,
+      environment: unknown
+    ) => unknown;
+    const invalid = {
+      conversation_id: '../audio-fora-do-bucket',
+      agent_id: 'agent-livia-test',
+      status: 'done',
+      transcript: [],
+      metadata: {
+        start_time_unix_secs: 1785330000,
+        call_duration_secs: 60,
+        cost_fiat: 0.1
+      },
+      analysis: { data_collection_results: {} }
+    };
+    const input = workflow === webhook
+      ? { event: { type: 'post_call_transcription', event_timestamp: 1, data: invalid } }
+      : invalid;
+
+    assert.throws(
+      () => normalize(input, { ELEVENLABS_TRANSFER_TOOL_NAME: 'transfer_to_number' }),
+      /conversation_id inválido/
+    );
   }
 });
 

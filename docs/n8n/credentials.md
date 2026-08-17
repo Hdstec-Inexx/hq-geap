@@ -28,7 +28,7 @@ Para os Code nodes acessarem essas variáveis, defina `N8N_BLOCK_ENV_ACCESS_IN_N
 
 Distinga as chaves ElevenLabs: `ELEVENLABS_API_KEY` no `.env` do HQ serve **somente** ao Monitoramento ao Vivo (proxy WebSocket no servidor; a chave nunca chega ao browser; ADR-0005). A Credential `ElevenLabs API Key` do n8n serve **somente** à ingestão/reconciliação. A chave do OpenRouter permanece só no Credentials do n8n. Proteja o Form Trigger “Buscar Conversa” com Basic Auth da instância ou restrinja-o à rede interna; o formulário reprocessa Atendimentos e não deve ficar público.
 
-No ambiente local, configure `HQ Audio Storage` para o endpoint S3 `http://localhost:9000`, região `us-east-1`, access key `minioadmin` e secret key `minioadmin`. O Compose cria o bucket `hq-geap`; produção deve usar `STORAGE_BUCKET=hq-geap`, credenciais próprias e bucket privado.
+No ambiente local, configure `HQ Audio Storage` para o endpoint S3 `http://localhost:9000`, região `us-east-1`, access key `minioadmin` e secret key `minioadmin`. O Compose cria o bucket privado `hq-geap`; a API local deve usar `STORAGE_PROVIDER=minio`. Produção deve usar `STORAGE_BUCKET=hq-geap`, credenciais próprias e bucket privado.
 
 ## Verificação antes da ativação
 
