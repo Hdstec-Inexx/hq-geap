@@ -1,5 +1,7 @@
-# Dia civil America/Sao_Paulo fixado na filtragem de datas
+# Dia civil dos filtros e períodos em America/Sao_Paulo
 
-A filtragem por dia ou período sobre `concluido_em` (Fila de Curadoria, listagem de Atendimentos, Detalhamento de Indicadores e Dashboards) fixa o fuso horário em `America/Sao_Paulo` diretamente nas consultas SQL utilizando `AT TIME ZONE 'America/Sao_Paulo'`.
+Os limites de dia nos filtros de Atendimentos, Fila de Curadoria e períodos de dashboard seguem o dia civil de **America/Sao_Paulo**, não o timezone da sessão do banco nem do servidor. Como `concluido_em` é `timestamptz` e os filtros usam casts `::date`, o resultado depende do `TimeZone` da sessão Postgres — que, sem configuração explícita, tende a UTC, deslocando a virada do dia em 3h. As consultas devem fixar o fuso (ex: `AT TIME ZONE 'America/Sao_Paulo'`) em vez de depender de configuração de ambiente. A convenção de filtrar Atendimentos por `concluido_em` é mantida: Atendimentos `em_andamento` não aparecem em filtros de dia.
 
-A conversão explícita garante que a interpretação de "dia civil" (início e fim de dia) corresponda sempre ao horário de Brasília, independentemente do timezone configurado na sessão do PostgreSQL ou no servidor da aplicação. Atendimentos com status `em_andamento` não possuem data de conclusão e não entram em filtros de dia civil.
+## Consequences
+
+Filtros de dia existentes (Detalhamento de Indicador) que usam `::date` sem fuso explícito precisam ser corrigidos para o mesmo padrão, sob pena de divergência entre telas.

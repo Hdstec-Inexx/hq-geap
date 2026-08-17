@@ -574,4 +574,56 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await expect(resumeBtn).toBeHidden();
     await expect(turn3).toHaveClass(/active/);
   });
+
+  test('filtros de dia e motivo na tela de Atendimentos', async ({ page, request }) => {
+    // Cria atendimentos com diferentes datas e motivos
+    await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: {
+        ...atendimento,
+        conversation_id: 'conv-filtro-atend-1',
+        contact_reason: 'Boleto/Pagamento',
+        status: 'concluido',
+        completed_at: '2026-08-10T14:00:00.000Z',
+        duration_seconds: 120
+      },
+      headers: ingestionHeaders
+    });
+    await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: {
+        ...atendimento,
+        conversation_id: 'conv-filtro-atend-2',
+        contact_reason: 'Rede Credenciada',
+        status: 'concluido',
+        completed_at: '2026-08-15T15:00:00.000Z',
+        duration_seconds: 180
+      },
+      headers: ingestionHeaders
+    });
+
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('gestao@hq.test');
+    await page.getByLabel('Senha').fill('senha-gestao');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto('/atendimentos');
+
+    // Filtro de dia único
+    await page.locator('input[name="inicio"]').fill('2026-08-10');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page).toHaveURL(/inicio=2026-08-10/);
+    await expect(page.getByText('Boleto/Pagamento')).toBeVisible();
+
+    // Filtro de motivo via combobox
+    const motivoCombobox = page.locator('#atendimentos-motivo-filtro');
+    await motivoCombobox.click();
+    await motivoCombobox.fill('Rede Credenciada');
+    await page.locator('input[name="inicio"]').fill('');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page).toHaveURL(/motivo=Rede\+Credenciada|motivo=Rede%20Credenciada/);
+    await expect(page.getByText('Rede Credenciada')).toBeVisible();
+
+    // Limpar filtros
+    await page.getByRole('button', { name: 'Limpar filtros' }).click();
+    await expect(page).toHaveURL('/atendimentos');
+  });
 });

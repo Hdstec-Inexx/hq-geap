@@ -41,6 +41,7 @@ export function Miniplayer({
   // Monitor scroll position relative to the main player
   useEffect(() => {
     let observer: IntersectionObserver | null = null;
+    let rafId: number | null = null;
 
     const checkPosition = () => {
       const el = mainPlayerRef.current;
@@ -55,7 +56,7 @@ export function Miniplayer({
       if (!observer && typeof IntersectionObserver !== 'undefined') {
         observer = new IntersectionObserver(
           () => {
-            checkPosition();
+            scheduleCheck();
           },
           {
             threshold: [0, 0.25, 0.5, 0.75, 1]
@@ -65,17 +66,28 @@ export function Miniplayer({
       }
     };
 
+    const scheduleCheck = () => {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        checkPosition();
+      });
+    };
+
     checkPosition();
 
-    window.addEventListener('scroll', checkPosition, { passive: true });
-    window.addEventListener('resize', checkPosition, { passive: true });
+    window.addEventListener('scroll', scheduleCheck, { passive: true });
+    window.addEventListener('resize', scheduleCheck, { passive: true });
 
     return () => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
       if (observer) {
         observer.disconnect();
       }
-      window.removeEventListener('scroll', checkPosition);
-      window.removeEventListener('resize', checkPosition);
+      window.removeEventListener('scroll', scheduleCheck);
+      window.removeEventListener('resize', scheduleCheck);
     };
   }, [mainPlayerRef]);
 

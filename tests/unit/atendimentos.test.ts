@@ -708,6 +708,26 @@ test('query do Detalhamento exige periodo valido quando ha indicador', () => {
   );
 });
 
+test('query da lista aceita dia unico sem fim e defaultiza fim para inicio', () => {
+  const singleDay = atendimentosQuerySchema.parse({
+    inicio: '2026-08-03'
+  });
+  assert.equal(singleDay.inicio, '2026-08-03');
+  assert.equal(singleDay.fim, '2026-08-03');
+
+  const standaloneFim = atendimentosQuerySchema.safeParse({
+    fim: '2026-08-03'
+  });
+  assert.equal(standaloneFim.success, false);
+});
+
+test('query da lista aceita filtro livre de motivo sem indicador', () => {
+  const parsed = atendimentosQuerySchema.parse({
+    motivo: 'Financeiro/Boletos'
+  });
+  assert.equal(parsed.motivo, 'Financeiro/Boletos');
+});
+
 test('filtros SQL do Detalhamento espelham populacoes positivas do Dashboard', async () => {
   const { buildDetalhamentoFilters } = await import(
     '../../apps/api/src/modules/atendimentos/detalhamentoFilters.js'
@@ -724,6 +744,7 @@ test('filtros SQL do Detalhamento espelham populacoes positivas do Dashboard', a
     })
   );
   assert.match(resolvidas.clauses.join(' '), /not a\.houve_transferencia/);
+  assert.match(resolvidas.clauses.join(' '), /at time zone 'America\/Sao_Paulo'/);
   assert.deepEqual(resolvidas.values, ['2025-01-01', '2025-01-31']);
 
   const sla = buildDetalhamentoFilters(
@@ -753,4 +774,15 @@ test('filtros SQL do Detalhamento espelham populacoes positivas do Dashboard', a
     /coalesce\(a\.motivo_contato, 'Nao informado'\) = \$3/
   );
   assert.equal(motivo.values[2], 'Rede credenciada');
+
+  const generalMotivo = buildDetalhamentoFilters(
+    atendimentosQuerySchema.parse({
+      motivo: 'Financeiro/Boletos'
+    })
+  );
+  assert.match(
+    generalMotivo.clauses.join(' '),
+    /coalesce\(a\.motivo_contato, 'Nao informado'\) = \$1/
+  );
+  assert.equal(generalMotivo.values[0], 'Financeiro/Boletos');
 });

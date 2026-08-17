@@ -29,8 +29,13 @@ export function buildDetalhamentoFilters(
     const inicio = param(query.inicio);
     const fim = param(query.fim);
     clauses.push(
-      `a.status = 'concluido' and a.concluido_em >= ${inicio}::date and a.concluido_em < ${fim}::date + interval '1 day'`
+      `a.status = 'concluido' and a.concluido_em at time zone 'America/Sao_Paulo' >= ${inicio}::date and a.concluido_em at time zone 'America/Sao_Paulo' < ${fim}::date + interval '1 day'`
     );
+  }
+
+  if (query.motivo && query.indicador !== 'motivo') {
+    const motivo = param(query.motivo);
+    clauses.push(`coalesce(a.motivo_contato, 'Nao informado') = ${motivo}`);
   }
 
   switch (query.indicador) {

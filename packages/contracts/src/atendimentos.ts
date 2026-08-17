@@ -116,7 +116,6 @@ export const atendimentosQuerySchema = z
     criterioId: z.uuid().optional()
   })
   .superRefine((query, ctx) => {
-    const hasPeriod = query.inicio !== undefined || query.fim !== undefined;
     if (query.indicador !== undefined && (!query.inicio || !query.fim)) {
       ctx.addIssue({
         code: 'custom',
@@ -125,16 +124,17 @@ export const atendimentosQuerySchema = z
       });
       return;
     }
-    if (hasPeriod && (!query.inicio || !query.fim)) {
+    if (!query.inicio && query.fim) {
       ctx.addIssue({
         code: 'custom',
-        message: 'Periodo incompleto: informe inicio e fim',
-        path: query.inicio ? ['fim'] : ['inicio']
+        message: 'Periodo incompleto: informe inicio',
+        path: ['inicio']
       });
       return;
     }
-    if (query.inicio && query.fim) {
-      if (query.inicio > query.fim) {
+    const effectiveFim = query.fim ?? query.inicio;
+    if (query.inicio && effectiveFim) {
+      if (query.inicio > effectiveFim) {
         ctx.addIssue({
           code: 'custom',
           message: 'A data inicial deve ser anterior ou igual a data final',
@@ -142,13 +142,15 @@ export const atendimentosQuerySchema = z
         });
       }
       const maximumEnd = new Date(`${query.inicio}T00:00:00Z`);
-      maximumEnd.setUTCFullYear(maximumEnd.getUTCFullYear() + 1);
-      if (query.fim > maximumEnd.toISOString().slice(0, 10)) {
-        ctx.addIssue({
-          code: 'custom',
-          message: 'O periodo nao pode exceder um ano',
-          path: ['fim']
-        });
+      if (!Number.isNaN(maximumEnd.getTime())) {
+        maximumEnd.setUTCFullYear(maximumEnd.getUTCFullYear() + 1);
+        if (effectiveFim > maximumEnd.toISOString().slice(0, 10)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'O periodo nao pode exceder um ano',
+            path: ['fim']
+          });
+        }
       }
     }
     if (query.indicador === 'motivo' && !query.motivo) {
@@ -169,6 +171,12 @@ export const atendimentosQuerySchema = z
         path: ['criterioId']
       });
     }
+  })
+  .transform((query) => {
+    if (query.inicio && !query.fim) {
+      return { ...query, fim: query.inicio };
+    }
+    return query;
   });
 
 export type DetalhamentoIndicador = z.infer<typeof detalhamentoIndicadorSchema>;
