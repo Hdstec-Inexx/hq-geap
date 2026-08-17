@@ -23,8 +23,8 @@ const configSchema = z
       .min(32)
       .default('development-ingestion-key-change-me'),
     STORAGE_PROVIDER: z.enum(['public', 'minio', 'gcs']).default('public'),
-    STORAGE_BUCKET: z.string().trim().min(1).default('hq-geap-audio'),
-    STORAGE_PUBLIC_URL: z.url().default('http://127.0.0.1:9000/hq-geap-audio'),
+    STORAGE_BUCKET: z.string().trim().min(1).default('hq-geap'),
+    STORAGE_PUBLIC_URL: z.url().default('http://127.0.0.1:9000/hq-geap'),
     STORAGE_ENDPOINT: z.preprocess(
       (value) =>
         typeof value === 'string' && value.trim() === '' ? undefined : value,

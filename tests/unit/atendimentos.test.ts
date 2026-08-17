@@ -251,9 +251,10 @@ test('o workflow valida HMAC sobre o corpo bruto antes da ingestao', async () =>
     'Confirmar recebimento'
   );
   assert.equal(
-    workflow.connections['Confirmar recebimento']?.main[0]?.[0]?.node,
-    'Possui áudio?'
+    workflow.connections['Contrato normalizado']?.main[0]?.[0]?.node,
+    workflow.nodes.find((node) => node.name.startsWith('Possui'))?.name
   );
+  assert.equal(workflow.connections['Confirmar recebimento'], undefined);
 });
 
 test('o workflow transforma a fixture real no contrato esperado', async () => {

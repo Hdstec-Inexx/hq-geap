@@ -110,6 +110,109 @@ test('reconciliacao usa janela configuravel, pagina a ElevenLabs e seleciona som
   assert.equal(node(workflow, 'Listar Atendimentos ElevenLabs')?.retryOnFail, true);
 });
 
+test('os tres fluxos persistem audio opcional com chave flat e content-type de MP3', async () => {
+  const [webhook, reconciliacao, reprocessamento] = await Promise.all([
+    loadWorkflow(webhookPath),
+    loadWorkflow(reconciliacaoPath),
+    loadWorkflow(reprocessamentoPath)
+  ]);
+  const fixture = JSON.parse(await readFile(detalheFixturePath, 'utf8')) as {
+    data: Record<string, any>;
+  };
+
+  for (const workflow of [webhook, reconciliacao, reprocessamento]) {
+    const serialized = JSON.stringify(workflow);
+    const download = node(workflow, 'Baixar áudio ElevenLabs');
+    const setContentType = node(workflow, 'Definir Content-Type do áudio');
+    const upload = node(workflow, 'Armazenar áudio');
+    const hasAudio = node(workflow, 'Possui áudio?');
+    const downloaded = node(workflow, 'Áudio baixado?');
+    const prepare = node(workflow, 'Preparar contrato API');
+
+    assert.ok(download, 'workflow deve baixar o áudio da ElevenLabs');
+    assert.ok(setContentType, 'workflow deve definir o metadata MIME do binário');
+    assert.ok(upload, 'workflow deve subir o áudio no S3/MinIO');
+    assert.ok(hasAudio, 'workflow deve tratar áudio ausente sem falhar');
+    assert.ok(downloaded, 'workflow deve ignorar falha no download');
+    assert.ok(prepare, 'workflow deve preparar o contrato mesmo sem áudio');
+    assert.equal(download?.continueOnFail, true);
+    assert.equal(upload?.continueOnFail, true);
+    assert.equal(upload?.retryOnFail, true);
+    assert.equal(upload?.parameters.bucketName, '={{ $env.STORAGE_BUCKET }}');
+    assert.equal(upload?.parameters.binaryPropertyName, 'data');
+    assert.equal(upload?.credentials?.s3?.name, 'HQ Audio Storage');
+    assert.equal(
+      upload?.parameters.fileName,
+      "={{ $('Contrato normalizado').item.json.audio_object_key }}"
+    );
+    assert.match(serialized, /audio\/mpeg/);
+
+    const normalizedCode = node(workflow, 'Contrato normalizado')?.parameters.jsCode ?? '';
+    const normalize = new Function('$json', '$env', normalizedCode) as (
+      input: unknown,
+      environment: unknown
+    ) => Array<{ json: Record<string, unknown> }>;
+    const normalized = normalize(
+      workflow === webhook
+        ? { event: { type: 'post_call_transcription', event_timestamp: 1, data: fixture.data } }
+        : fixture.data,
+      { ELEVENLABS_TRANSFER_TOOL_NAME: 'transfer_to_number' }
+    )[0]!.json;
+    assert.equal(normalized.audio_object_key, 'conv-fixture-concluido-001.mp3');
+
+    const prepareCode = prepare?.parameters.jsCode ?? '';
+    const prepareContract = new Function('$items', '$json', prepareCode) as (
+      items: (name: string) => Array<{ json: Record<string, unknown> }>,
+      item: Record<string, unknown>
+    ) => Array<{ json: Record<string, unknown> }>;
+    const withoutUpload = prepareContract(
+      (name) => name === 'Contrato normalizado' ? [{ json: normalized }] : [],
+      normalized
+    )[0]!.json;
+    const withFailedUpload = prepareContract(
+      (name) => name === 'Contrato normalizado' ? [{ json: normalized }] : [],
+      { error: 'bucket indisponível' }
+    )[0]!.json;
+    const withSuccessfulUpload = prepareContract(
+      (name) => name === 'Contrato normalizado' ? [{ json: normalized }] : [],
+      { success: true }
+    )[0]!.json;
+
+    assert.equal(withoutUpload.audio_reference, null);
+    assert.equal(withFailedUpload.audio_reference, null);
+    assert.equal(withSuccessfulUpload.audio_reference, normalized.audio_object_key);
+  }
+});
+
+test('o node de content-type preserva o Atendimento quando o download não retorna binário', async () => {
+  const [webhook, reconciliacao, reprocessamento] = await Promise.all([
+    loadWorkflow(webhookPath),
+    loadWorkflow(reconciliacaoPath),
+    loadWorkflow(reprocessamentoPath)
+  ]);
+
+  for (const workflow of [webhook, reconciliacao, reprocessamento]) {
+    const code = node(workflow, 'Definir Content-Type do áudio')?.parameters.jsCode ?? '';
+    const execute = new Function('$input', code) as (input: {
+      first: () => { json: Record<string, unknown>; binary?: Record<string, any> };
+    }) => Array<{ json: Record<string, unknown>; binary?: Record<string, any> }>;
+    const missingBinary = execute({ first: () => ({ json: { conversation_id: 'conv-audio-falhou' } }) });
+    assert.deepEqual(missingBinary[0]?.json, {
+      conversation_id: 'conv-audio-falhou',
+      audio_downloaded: false
+    });
+
+    const withBinary = execute({
+      first: () => ({
+        json: { conversation_id: 'conv-audio-ok' },
+        binary: { data: { fileName: 'audio', mimeType: 'application/octet-stream' } }
+      })
+    });
+    assert.equal(withBinary[0]?.json.audio_downloaded, true);
+    assert.equal(withBinary[0]?.binary?.data?.mimeType, 'audio/mpeg');
+  }
+});
+
 test('webhook, reconciliacao e Buscar Conversa convergem para a ingestao idempotente', async () => {
   const [reconciliacao, reprocessamento, webhook] = await Promise.all([
     loadWorkflow(reconciliacaoPath),
@@ -141,7 +244,10 @@ test('webhook, reconciliacao e Buscar Conversa convergem para a ingestao idempot
     assert.match(JSON.stringify(persistir?.parameters), /\/atendimentos\/ingestao/);
     assert.equal(persistir?.parameters.body, '={{ JSON.stringify($json) }}');
     assert.equal(generated.tme_seconds, 11);
-    assert.deepEqual(generated, {
+    const { has_audio, audio_object_key, ...contract } = generated;
+    assert.equal(has_audio, true);
+    assert.equal(audio_object_key, 'conv-fixture-concluido-001.mp3');
+    assert.deepEqual(contract, {
       ...fixture.normalized,
       audio_reference: null
     });

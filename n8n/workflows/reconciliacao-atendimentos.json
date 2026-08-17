@@ -140,7 +140,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const data = $json;\nif (data?.error || !data?.conversation_id) return [];\nif (data.status !== 'done') return [];\nconst transferToolName = $env.ELEVENLABS_TRANSFER_TOOL_NAME;\nif (!transferToolName) throw new Error('ELEVENLABS_TRANSFER_TOOL_NAME is required');\nconst startedAt = new Date(data.metadata.start_time_unix_secs * 1000);\nconst duration = data.metadata.call_duration_secs;\nconst contactReason = data.analysis?.data_collection_results?.['Classificação']?.value ?? null;\nconst transferred = data.transcript.some(turn => turn.tool_calls?.some(call => call.tool_name === transferToolName && call.tool_has_been_called === true));\n\nconst agentSpeeches = data.transcript.filter(turn => turn.role === 'agent' && String(turn.message ?? '').trim());\nconst firstClientSpeech = data.transcript.find(turn => turn.role === 'user' && String(turn.message ?? '').trim());\nconst secondAgentSpeech = agentSpeeches[1];\nlet tme_seconds = null;\nif (agentSpeeches[0] && secondAgentSpeech && firstClientSpeech) {\n  const clientAt = Number(firstClientSpeech.time_in_call_secs);\n  const secondAgentAt = Number(secondAgentSpeech.time_in_call_secs);\n  if (Number.isFinite(clientAt) && Number.isFinite(secondAgentAt)) {\n    const delta = secondAgentAt - clientAt;\n    if (delta >= 0) tme_seconds = Math.round(delta);\n  }\n}\nconst resultsByCallId = new Map();\nfor (const turn of data.transcript) {\n  for (const result of turn.tool_results ?? []) {\n    if (result?.tool_call_id) resultsByCallId.set(result.tool_call_id, result);\n  }\n}\nconst executions = [];\nfor (const turn of data.transcript) {\n  for (const call of turn.tool_calls ?? []) {\n    if (call?.tool_has_been_called !== true) continue;\n    const result = call.tool_call_id ? resultsByCallId.get(call.tool_call_id) : undefined;\n    // Sucesso só com tool_result explícito e sem erro (US12 / Taxa de Promessas Cumpridas).\n    const success = Boolean(result) && result.is_error !== true;\n    executions.push({ success });\n  }\n}\nreturn [{ json: {\n  conversation_id: data.conversation_id,\n  agent_id: data.agent_id,\n  event_timestamp: data.metadata.start_time_unix_secs + duration,\n  status: 'concluido',\n  started_at: startedAt.toISOString(),\n  completed_at: new Date(startedAt.getTime() + duration * 1000).toISOString(),\n  duration_seconds: duration,\n  transcript: data.transcript.filter(turn => turn.role === 'agent' || turn.role === 'user').map(({ role, message, time_in_call_secs }) => ({ role, message: message ?? '', time_in_call_secs })),\n  audio_reference: null,\n  contact_reason: contactReason,\n  transferred,\n  cost: data.metadata.cost_fiat ?? null,\n  tme_seconds,\n  tool_executions: { total: executions.length, successful: executions.filter(item => item.success).length }\n} }];"
+        "jsCode": "const data = $json;\nif (data?.error || !data?.conversation_id) return [];\nif (data.status !== 'done') return [];\nconst transferToolName = $env.ELEVENLABS_TRANSFER_TOOL_NAME;\nif (!transferToolName) throw new Error('ELEVENLABS_TRANSFER_TOOL_NAME is required');\nconst startedAt = new Date(data.metadata.start_time_unix_secs * 1000);\nconst duration = data.metadata.call_duration_secs;\nconst contactReason = data.analysis?.data_collection_results?.['Classificação']?.value ?? null;\nconst transferred = data.transcript.some(turn => turn.tool_calls?.some(call => call.tool_name === transferToolName && call.tool_has_been_called === true));\n\nconst agentSpeeches = data.transcript.filter(turn => turn.role === 'agent' && String(turn.message ?? '').trim());\nconst firstClientSpeech = data.transcript.find(turn => turn.role === 'user' && String(turn.message ?? '').trim());\nconst secondAgentSpeech = agentSpeeches[1];\nlet tme_seconds = null;\nif (agentSpeeches[0] && secondAgentSpeech && firstClientSpeech) {\n  const clientAt = Number(firstClientSpeech.time_in_call_secs);\n  const secondAgentAt = Number(secondAgentSpeech.time_in_call_secs);\n  if (Number.isFinite(clientAt) && Number.isFinite(secondAgentAt)) {\n    const delta = secondAgentAt - clientAt;\n    if (delta >= 0) tme_seconds = Math.round(delta);\n  }\n}\nconst resultsByCallId = new Map();\nfor (const turn of data.transcript) {\n  for (const result of turn.tool_results ?? []) {\n    if (result?.tool_call_id) resultsByCallId.set(result.tool_call_id, result);\n  }\n}\nconst executions = [];\nfor (const turn of data.transcript) {\n  for (const call of turn.tool_calls ?? []) {\n    if (call?.tool_has_been_called !== true) continue;\n    const result = call.tool_call_id ? resultsByCallId.get(call.tool_call_id) : undefined;\n    // Sucesso só com tool_result explícito e sem erro (US12 / Taxa de Promessas Cumpridas).\n    const success = Boolean(result) && result.is_error !== true;\n    executions.push({ success });\n  }\n}\nreturn [{ json: {\n  conversation_id: data.conversation_id,\n  agent_id: data.agent_id,\n  event_timestamp: data.metadata.start_time_unix_secs + duration,\n  status: 'concluido',\n  started_at: startedAt.toISOString(),\n  completed_at: new Date(startedAt.getTime() + duration * 1000).toISOString(),\n  duration_seconds: duration,\n  transcript: data.transcript.filter(turn => turn.role === 'agent' || turn.role === 'user').map(({ role, message, time_in_call_secs }) => ({ role, message: message ?? '', time_in_call_secs })),\n  audio_reference: null,\n  contact_reason: contactReason,\n  transferred,\n  cost: data.metadata.cost_fiat ?? null,\n  tme_seconds,\n  tool_executions: { total: executions.length, successful: executions.filter(item => item.success).length },\n  has_audio: data.has_audio === true,\n  audio_object_key: `${data.conversation_id}.mp3`\n} }];"
       },
       "id": "9b8f626b-00f1-4bb4-8440-9d250c0ccf10",
       "name": "Contrato normalizado",
@@ -229,6 +229,159 @@
         880,
         120
       ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const normalized = $items('Contrato normalizado')[0].json;\nconst { has_audio, audio_object_key, ...payload } = normalized;\nconst audio_reference = has_audio === true && $json?.success === true ? audio_object_key : null;\nreturn [{ json: { ...payload, audio_reference } }];"
+      },
+      "id": "f979572c-28a2-4ad8-a2a8-36b93153bef0",
+      "name": "Preparar contrato API",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-audio",
+              "leftValue": "={{ $('Contrato normalizado').item.json.has_audio }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3ab77410-d251-4471-a194-d1fd18999ac2",
+      "name": "Possui áudio?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1320,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ ($env.ELEVENLABS_API_URL || 'https://api.elevenlabs.io') + '/v1/convai/conversations/' + $('Contrato normalizado').item.json.conversation_id + '/audio' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "8e0e5561-d5a1-4e3b-9bad-d3316ed1462d",
+      "name": "Baixar áudio ElevenLabs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        -180
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CONFIGURE_NO_N8N",
+          "name": "ElevenLabs API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const item = $input.first();\nif (!item.binary?.data) return [{ json: { ...item.json, audio_downloaded: false } }];\nitem.binary.data.mimeType = 'audio/mpeg';\nreturn [{ json: { ...item.json, audio_downloaded: true }, binary: item.binary }];"
+      },
+      "id": "55cf6cc1-2c7d-48fc-bc1e-8d84bc2d19ce",
+      "name": "Definir Content-Type do áudio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "audio-downloaded",
+              "leftValue": "={{ $json.audio_downloaded }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "878d4b95-2b28-4d78-879e-2709d60725d4",
+      "name": "Áudio baixado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1980,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "={{ $env.STORAGE_BUCKET }}",
+        "fileName": "={{ $('Contrato normalizado').item.json.audio_object_key }}",
+        "binaryPropertyName": "data"
+      },
+      "id": "bc74f683-c05d-4fd2-9826-c12cb0bd5a1e",
+      "name": "Armazenar áudio",
+      "type": "n8n-nodes-base.s3",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        -180
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "continueOnFail": true,
+      "credentials": {
+        "s3": {
+          "id": "CONFIGURE_NO_N8N",
+          "name": "HQ Audio Storage"
+        }
+      }
     }
   ],
   "pinData": {},
@@ -319,7 +472,7 @@
       "main": [
         [
           {
-            "node": "Persistir Atendimento",
+            "node": "Possui áudio?",
             "type": "main",
             "index": 0
           }
@@ -343,6 +496,86 @@
         [
           {
             "node": "Listar Atendimentos ElevenLabs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Possui áudio?": {
+      "main": [
+        [
+          {
+            "node": "Baixar áudio ElevenLabs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar contrato API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar áudio ElevenLabs": {
+      "main": [
+        [
+          {
+            "node": "Definir Content-Type do áudio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Definir Content-Type do áudio": {
+      "main": [
+        [
+          {
+            "node": "Áudio baixado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Áudio baixado?": {
+      "main": [
+        [
+          {
+            "node": "Armazenar áudio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar contrato API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armazenar áudio": {
+      "main": [
+        [
+          {
+            "node": "Preparar contrato API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar contrato API": {
+      "main": [
+        [
+          {
+            "node": "Persistir Atendimento",
             "type": "main",
             "index": 0
           }

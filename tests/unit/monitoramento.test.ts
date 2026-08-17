@@ -30,8 +30,8 @@ const baseEnv = {
   JWT_EXPIRES_IN_SECONDS: '28800',
   INGESTION_API_KEY: 'development-ingestion-key-change-me',
   STORAGE_PROVIDER: 'public',
-  STORAGE_BUCKET: 'hq-geap-audio',
-  STORAGE_PUBLIC_URL: 'http://127.0.0.1:9000/hq-geap-audio'
+  STORAGE_BUCKET: 'hq-geap',
+  STORAGE_PUBLIC_URL: 'http://127.0.0.1:9000/hq-geap'
 } as const;
 
 test('ELEVENLABS_API_KEY e documentada e obrigatoria em producao', () => {
