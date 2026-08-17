@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import {
   atendimentoDetailSchema,
   type AtendimentoDetail
@@ -6,12 +7,46 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { AvaliacaoCuradorPanel } from '../avaliacoes/AvaliacaoCuradorPanel';
 import { AvaliacaoIaPanel } from '../avaliacoes/AvaliacaoIaPanel';
 import { ComentariosPanel } from '../comentarios/ComentariosPanel';
+import { AudioPlayer, Miniplayer, TranscriptPanel, useAudioPlayer } from '../player';
 import { formatDuration, useAuthenticatedResource } from './api';
 
 const currency = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
   currency: 'USD'
 });
+
+function AtendimentoMedia({ atendimento }: { atendimento: AtendimentoDetail }) {
+  const mainPlayerRef = useRef<HTMLElement | null>(null);
+  const player = useAudioPlayer({
+    audioUrl: atendimento.audioUrl,
+    durationSeconds: atendimento.duracaoSegundos
+  });
+
+  return (
+    <>
+      <Miniplayer
+        audioUrl={atendimento.audioUrl}
+        controller={player}
+        mainPlayerRef={mainPlayerRef}
+        title={atendimento.agenteVoz.nome}
+      />
+      <div className="atendimento-content">
+        <TranscriptPanel
+          transcricao={atendimento.transcricao}
+          agenteNome={atendimento.agenteVoz.nome}
+          currentTime={player.currentTime}
+          onSeek={player.seek}
+          headerContent={<p className="panel-label">Transcrição</p>}
+        />
+        <aside ref={mainPlayerRef} className="audio-panel">
+          <p className="panel-label">Áudio</p>
+          <h2>Ouça o contato completo</h2>
+          <AudioPlayer audioUrl={atendimento.audioUrl} controller={player} />
+        </aside>
+      </div>
+    </>
+  );
+}
 
 export function AtendimentoPage() {
   const { atendimentoId } = useParams();
@@ -72,24 +107,7 @@ export function AtendimentoPage() {
         </div>
       ) : null}
 
-      <div className="atendimento-content">
-        <section className="transcript-panel">
-          <p className="panel-label">Transcrição</p>
-          <div className="transcript-lines transcript-scroll" data-testid="transcript-scroll">
-            {atendimento.transcricao.length === 0 ? <p>Transcrição ainda não disponível.</p> : atendimento.transcricao.map((entry, index) => (
-              <article className={`transcript-line transcript-${entry.role}`} key={`${entry.time_in_call_secs}-${index}`}>
-                <span>{entry.role === 'agent' ? atendimento.agenteVoz.nome : 'Cliente'} · {Math.floor(entry.time_in_call_secs / 60)}:{String(Math.floor(entry.time_in_call_secs % 60)).padStart(2, '0')}</span>
-                <p>{entry.message}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-        <aside className="audio-panel">
-          <p className="panel-label">Áudio</p>
-          <h2>Ouça o contato completo</h2>
-          {atendimento.audioUrl ? <audio controls preload="metadata" src={atendimento.audioUrl}>Seu navegador não suporta reprodução de áudio.</audio> : <p>Áudio ainda não disponível.</p>}
-        </aside>
-      </div>
+      <AtendimentoMedia atendimento={atendimento} />
       <ComentariosPanel atendimentoId={atendimento.id} />
     </main>
   );

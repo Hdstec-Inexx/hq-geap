@@ -33,11 +33,11 @@ JWT_SECRET=troque-por-segredo-com-pelo-menos-32-chars
 INGESTION_API_KEY=troque-por-chave-com-pelo-menos-32-chars
 ELEVENLABS_API_KEY=sk_...
 STORAGE_PROVIDER=minio
-STORAGE_BUCKET=hq-geap-audio
+STORAGE_BUCKET=hq-geap
 STORAGE_ENDPOINT=https://minio.seudominio.com
 STORAGE_ACCESS_KEY=...
 STORAGE_SECRET_KEY=...
-STORAGE_PUBLIC_URL=https://minio.seudominio.com/hq-geap-audio
+STORAGE_PUBLIC_URL=https://minio.seudominio.com/hq-geap
 ```
 
 O entrypoint valida a config de produção, aplica `migrate` e, por padrão, `seed` antes de subir a API. O seed é idempotente e cria o Admin `admin@hq.local` / `senha-admin` se ainda não houver Admin ativo — **troque a senha no primeiro acesso**. Depois do primeiro deploy, defina `SKIP_DB_SEED=1` para não reexecutar seeds a cada restart.

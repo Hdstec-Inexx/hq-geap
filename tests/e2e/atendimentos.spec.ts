@@ -475,4 +475,155 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await expect.poll(async () => transcriptOverflows(scroll)).toBe(false);
     expect(await firstTurnFitsWithoutEmptyBox(scroll)).toBe(true);
   });
+
+  test('player no detalhe do Atendimento controla áudio real, avança/retorna 30s e busca pela barra de progresso', async ({
+    page
+  }) => {
+    const transcript = [
+      { role: 'agent' as const, message: 'Olá! Sou a Lívia da GEAP.', time_in_call_secs: 0 },
+      { role: 'user' as const, message: 'Preciso da segunda via do boleto.', time_in_call_secs: 15 },
+      { role: 'agent' as const, message: 'Vou consultar o sistema para você.', time_in_call_secs: 35 },
+      { role: 'user' as const, message: 'Muito obrigado pela ajuda.', time_in_call_secs: 55 }
+    ];
+    const atendimentoId = await createAtendimentoComTranscricao(
+      'conv-atendimento-player-sync',
+      transcript
+    );
+
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('gestao@hq.test');
+    await page.getByLabel('Senha').fill('senha-gestao');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto(`/atendimentos/${atendimentoId}`);
+
+    const player = page.getByTestId('audio-player');
+    await expect(player).toBeVisible();
+    const playBtn = page.getByRole('button', { name: 'Reproduzir áudio' });
+    await expect(playBtn).toBeVisible();
+
+    await playBtn.click();
+    await expect(page.getByRole('button', { name: 'Pausar áudio' })).toBeVisible();
+    await page.getByRole('button', { name: 'Pausar áudio' }).click();
+    await expect(page.getByRole('button', { name: 'Reproduzir áudio' })).toBeVisible();
+
+    const forwardBtn = page.getByRole('button', { name: 'Avançar 30 segundos' });
+    await forwardBtn.click();
+    await expect(page.getByTestId('audio-current-time')).toHaveText('00:30');
+    await expect(page.getByTestId('transcript-turn-1')).toHaveClass(/active/);
+
+    const backBtn = page.getByRole('button', { name: 'Voltar 30 segundos' });
+    await backBtn.click();
+    await expect(page.getByTestId('audio-current-time')).toHaveText('00:00');
+    await expect(page.getByTestId('transcript-turn-0')).toHaveClass(/active/);
+
+    const progressBar = page.getByTestId('audio-progress-bar');
+    await progressBar.fill('35');
+    await expect(page.getByTestId('audio-current-time')).toHaveText('00:35');
+    await expect(page.getByTestId('transcript-turn-2')).toHaveClass(/active/);
+  });
+
+  test('sincronia no detalhe: clique no turno faz seek, tool_call aparece vazia e scroll manual pausa auto-scroll', async ({
+    page
+  }) => {
+    const transcript = [
+      { role: 'agent' as const, message: 'Olá, sou a Lívia.', time_in_call_secs: 0 },
+      { role: 'user' as const, message: 'Preciso de atendimento.', time_in_call_secs: 10 },
+      { role: 'agent' as const, message: '', time_in_call_secs: 22 }, // tool_call vazia
+      { role: 'agent' as const, message: 'Localizei seus dados no cadastro.', time_in_call_secs: 32 },
+      { role: 'user' as const, message: 'Excelente.', time_in_call_secs: 42 },
+      ...Array.from({ length: 20 }, (_, i) => ({
+        role: (i % 2 === 0 ? 'agent' : 'user') as 'agent' | 'user',
+        message: `Turno adicional ${i + 5} de acompanhamento.`,
+        time_in_call_secs: 50 + i * 5
+      }))
+    ];
+    const atendimentoId = await createAtendimentoComTranscricao(
+      'conv-atendimento-toolcall-sync',
+      transcript
+    );
+
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('gestao@hq.test');
+    await page.getByLabel('Senha').fill('senha-gestao');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto(`/atendimentos/${atendimentoId}`);
+
+    const toolCallBox = page.getByTestId('transcript-tool-call');
+    await expect(toolCallBox).toBeVisible();
+
+    const toolCallTurn = page.getByTestId('transcript-turn-2');
+    await toolCallTurn.click();
+    await expect(page.getByTestId('audio-current-time')).toHaveText('00:22');
+    await expect(toolCallTurn).toHaveClass(/active/);
+
+    const turn3 = page.getByTestId('transcript-turn-3');
+    await turn3.click();
+    await expect(page.getByTestId('audio-current-time')).toHaveText('00:32');
+    await expect(turn3).toHaveClass(/active/);
+
+    const scroll = transcriptScroll(page);
+    await scroll.hover();
+    await page.mouse.wheel(0, 300);
+
+    const resumeBtn = page.getByRole('button', { name: 'Voltar ao momento atual' });
+    await expect(resumeBtn).toBeVisible();
+
+    await resumeBtn.click();
+    await expect(resumeBtn).toBeHidden();
+    await expect(turn3).toHaveClass(/active/);
+  });
+
+  test('filtros de dia e motivo na tela de Atendimentos', async ({ page, request }) => {
+    // Cria atendimentos com diferentes datas e motivos
+    await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: {
+        ...atendimento,
+        conversation_id: 'conv-filtro-atend-1',
+        contact_reason: 'Boleto/Pagamento',
+        status: 'concluido',
+        completed_at: '2026-08-10T14:00:00.000Z',
+        duration_seconds: 120
+      },
+      headers: ingestionHeaders
+    });
+    await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: {
+        ...atendimento,
+        conversation_id: 'conv-filtro-atend-2',
+        contact_reason: 'Rede Credenciada',
+        status: 'concluido',
+        completed_at: '2026-08-15T15:00:00.000Z',
+        duration_seconds: 180
+      },
+      headers: ingestionHeaders
+    });
+
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('gestao@hq.test');
+    await page.getByLabel('Senha').fill('senha-gestao');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto('/atendimentos');
+
+    // Filtro de dia único
+    await page.locator('input[name="inicio"]').fill('2026-08-10');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page).toHaveURL(/inicio=2026-08-10/);
+    await expect(page.getByText('Boleto/Pagamento')).toBeVisible();
+
+    // Filtro de motivo via combobox
+    const motivoCombobox = page.locator('#atendimentos-motivo-filtro');
+    await motivoCombobox.click();
+    await motivoCombobox.fill('Rede Credenciada');
+    await page.locator('input[name="inicio"]').fill('');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page).toHaveURL(/motivo=Rede\+Credenciada|motivo=Rede%20Credenciada/);
+    await expect(page.getByText('Rede Credenciada')).toBeVisible();
+
+    // Limpar filtros
+    await page.getByRole('button', { name: 'Limpar filtros' }).click();
+    await expect(page).toHaveURL('/atendimentos');
+  });
 });

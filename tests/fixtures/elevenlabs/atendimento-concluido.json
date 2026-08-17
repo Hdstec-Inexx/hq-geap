@@ -64,7 +64,7 @@
         "time_in_call_secs": 19
       }
     ],
-    "audio_reference": "atendimentos/conv-fixture-concluido-001.mp3",
+    "audio_reference": "conv-fixture-concluido-001.mp3",
     "contact_reason": "Financeiro/Boletos",
     "transferred": false,
     "cost": 0.1842,

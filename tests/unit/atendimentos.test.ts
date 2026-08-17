@@ -251,9 +251,10 @@ test('o workflow valida HMAC sobre o corpo bruto antes da ingestao', async () =>
     'Confirmar recebimento'
   );
   assert.equal(
-    workflow.connections['Confirmar recebimento']?.main[0]?.[0]?.node,
-    'Possui áudio?'
+    workflow.connections['Contrato normalizado']?.main[0]?.[0]?.node,
+    workflow.nodes.find((node) => node.name.startsWith('Possui'))?.name
   );
+  assert.equal(workflow.connections['Confirmar recebimento'], undefined);
 });
 
 test('o workflow transforma a fixture real no contrato esperado', async () => {
@@ -492,7 +493,7 @@ test('contrato aceita message null de tool call da ElevenLabs', () => {
   );
 });
 
-test('detalhe do Atendimento nao quebra com message null na transcricao', () => {
+test('detalhe do Atendimento preserva tool call com message null na transcricao', () => {
   const detail = toAtendimentoDetail(
     detailRow(),
     'https://example.com/atendimentos/conv-tool-null-message.mp3'
@@ -510,6 +511,11 @@ test('detalhe do Atendimento nao quebra com message null na transcricao', () => 
         role: 'agent',
         message: 'Olá, como posso ajudar?',
         time_in_call_secs: 0
+      },
+      {
+        role: 'agent',
+        message: '',
+        time_in_call_secs: 12
       },
       {
         role: 'user',
@@ -573,6 +579,7 @@ test('detalhe tolera raw_transcript gravado direto no Postgres pelo n8n', () => 
     })),
     [
       { role: 'agent', message: 'Olá', time_in_call_secs: 0 },
+      { role: 'agent', message: '', time_in_call_secs: 12 },
       { role: 'user', message: 'Preciso do boleto', time_in_call_secs: 18 },
       { role: 'agent', message: 'turno sem timestamp', time_in_call_secs: 3 }
     ]
@@ -582,7 +589,7 @@ test('detalhe tolera raw_transcript gravado direto no Postgres pelo n8n', () => 
     detailRow({ transcricao: JSON.stringify(rawTranscript) }),
     null
   );
-  assert.equal(fromString.transcricao.length, 3);
+  assert.equal(fromString.transcricao.length, 4);
 });
 
 test('detalhe exibe historico com speaker IA/Cliente gravado pelo n8n', () => {
@@ -618,6 +625,10 @@ test('detalhe exibe historico com speaker IA/Cliente gravado pelo n8n', () => {
       },
       {
         role: 'agent',
+        message: ''
+      },
+      {
+        role: 'agent',
         message: 'A GEAP agradece o seu contato. Tenha um ótimo dia!'
       }
     ]
@@ -627,7 +638,7 @@ test('detalhe exibe historico com speaker IA/Cliente gravado pelo n8n', () => {
     detailRow({ transcricao: JSON.stringify(historico) }),
     null
   );
-  assert.equal(fromString.transcricao.length, 3);
+  assert.equal(fromString.transcricao.length, 4);
 });
 
 test('query do Detalhamento rejeita indicador tme', () => {
@@ -697,6 +708,26 @@ test('query do Detalhamento exige periodo valido quando ha indicador', () => {
   );
 });
 
+test('query da lista aceita dia unico sem fim e defaultiza fim para inicio', () => {
+  const singleDay = atendimentosQuerySchema.parse({
+    inicio: '2026-08-03'
+  });
+  assert.equal(singleDay.inicio, '2026-08-03');
+  assert.equal(singleDay.fim, '2026-08-03');
+
+  const standaloneFim = atendimentosQuerySchema.safeParse({
+    fim: '2026-08-03'
+  });
+  assert.equal(standaloneFim.success, false);
+});
+
+test('query da lista aceita filtro livre de motivo sem indicador', () => {
+  const parsed = atendimentosQuerySchema.parse({
+    motivo: 'Financeiro/Boletos'
+  });
+  assert.equal(parsed.motivo, 'Financeiro/Boletos');
+});
+
 test('filtros SQL do Detalhamento espelham populacoes positivas do Dashboard', async () => {
   const { buildDetalhamentoFilters } = await import(
     '../../apps/api/src/modules/atendimentos/detalhamentoFilters.js'
@@ -713,6 +744,7 @@ test('filtros SQL do Detalhamento espelham populacoes positivas do Dashboard', a
     })
   );
   assert.match(resolvidas.clauses.join(' '), /not a\.houve_transferencia/);
+  assert.match(resolvidas.clauses.join(' '), /at time zone 'America\/Sao_Paulo'/);
   assert.deepEqual(resolvidas.values, ['2025-01-01', '2025-01-31']);
 
   const sla = buildDetalhamentoFilters(
@@ -742,4 +774,15 @@ test('filtros SQL do Detalhamento espelham populacoes positivas do Dashboard', a
     /coalesce\(a\.motivo_contato, 'Nao informado'\) = \$3/
   );
   assert.equal(motivo.values[2], 'Rede credenciada');
+
+  const generalMotivo = buildDetalhamentoFilters(
+    atendimentosQuerySchema.parse({
+      motivo: 'Financeiro/Boletos'
+    })
+  );
+  assert.match(
+    generalMotivo.clauses.join(' '),
+    /coalesce\(a\.motivo_contato, 'Nao informado'\) = \$1/
+  );
+  assert.equal(generalMotivo.values[0], 'Financeiro/Boletos');
 });

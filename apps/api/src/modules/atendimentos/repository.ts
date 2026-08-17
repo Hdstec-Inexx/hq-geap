@@ -222,6 +222,17 @@ export function createAtendimentosRepository(db: pg.Pool) {
         [id]
       );
       return result.rows[0] ?? null;
+    },
+
+    async listDistinctMotivos(): Promise<string[]> {
+      const result = await db.query<{ motivo: string }>(`
+        select distinct motivo_contato as motivo
+        from atendimentos
+        where motivo_contato is not null
+          and trim(motivo_contato) <> ''
+        order by motivo_contato
+      `);
+      return result.rows.map((row) => row.motivo);
     }
   };
 }

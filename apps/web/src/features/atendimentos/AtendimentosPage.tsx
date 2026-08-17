@@ -1,9 +1,10 @@
 import {
   atendimentoListSchema
 } from '@hq-geap/contracts/atendimentos';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { formatDuration, useAuthenticatedResource } from './api';
+import { MotivoCombobox } from './MotivoCombobox';
 import { detalhamentoQueryFromSearch } from '../dashboards/detalhamento';
 import {
   compactPageItems,
@@ -55,6 +56,24 @@ export function AtendimentosPage() {
   const navigate = useNavigate();
   const page = pageFromSearch(searchParams);
   const detalhamentoQuery = detalhamentoQueryFromSearch(searchParams);
+
+  const inicioParam = searchParams.get('inicio') ?? '';
+  const fimParam = searchParams.get('fim') ?? '';
+  const motivoParam = searchParams.get('motivo') ?? '';
+  const indicador = searchParams.get('indicador');
+  const isDetalhamento = Boolean(indicador && inicioParam && fimParam);
+  const hasActiveFilters = Boolean(!isDetalhamento && (inicioParam || fimParam || motivoParam));
+
+  const [draftInicio, setDraftInicio] = useState(inicioParam);
+  const [draftFim, setDraftFim] = useState(fimParam);
+  const [draftMotivo, setDraftMotivo] = useState(motivoParam);
+
+  useEffect(() => {
+    setDraftInicio(inicioParam);
+    setDraftFim(fimParam);
+    setDraftMotivo(motivoParam);
+  }, [inicioParam, fimParam, motivoParam]);
+
   const listQuery = new URLSearchParams({
     limit: String(PAGE_SIZE),
     offset: String((page - 1) * PAGE_SIZE)
@@ -63,6 +82,10 @@ export function AtendimentosPage() {
     for (const [key, value] of new URLSearchParams(detalhamentoQuery)) {
       listQuery.set(key, value);
     }
+  } else {
+    if (inicioParam) listQuery.set('inicio', inicioParam);
+    if (fimParam) listQuery.set('fim', fimParam);
+    if (motivoParam) listQuery.set('motivo', motivoParam);
   }
   const requestPath = `/atendimentos?${listQuery.toString()}`;
   const state = useAuthenticatedResource(requestPath, atendimentoListSchema);
@@ -73,16 +96,32 @@ export function AtendimentosPage() {
   const pageOutOfRange =
     state.status === 'ready' && currentState && resolvedPage !== page;
   const totalPages = Math.min(Math.ceil(total / PAGE_SIZE), MAX_PAGE);
-  const indicador = searchParams.get('indicador');
-  const inicio = searchParams.get('inicio');
-  const fim = searchParams.get('fim');
-  const isDetalhamento = Boolean(indicador && inicio && fim);
 
   useEffect(() => {
     if (state.status === 'ready' && currentState && resolvedPage !== page) {
       navigate(paginationHref(searchParams, resolvedPage), { replace: true });
     }
   }, [currentState, navigate, page, resolvedPage, searchParams, state.status]);
+
+  function handleFilterSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    const next = new URLSearchParams();
+    if (draftInicio) {
+      next.set('inicio', draftInicio);
+      if (draftFim && draftFim >= draftInicio) {
+        next.set('fim', draftFim);
+      }
+    }
+    if (draftMotivo.trim()) next.set('motivo', draftMotivo.trim());
+    navigate(paginationHref(next, 1));
+  }
+
+  function handleClearFilters() {
+    setDraftInicio('');
+    setDraftFim('');
+    setDraftMotivo('');
+    navigate('/atendimentos');
+  }
 
   return (
     <main className="atendimentos-page">
@@ -96,7 +135,7 @@ export function AtendimentosPage() {
           <h1>Atendimentos</h1>
           {isDetalhamento ? (
             <p className="atendimentos-detalhamento-meta">
-              Período {inicio} → {fim}
+              Período {inicioParam} → {fimParam}
               {' · '}
               {indicador}
               {searchParams.get('motivo')
@@ -108,7 +147,7 @@ export function AtendimentosPage() {
         {isDetalhamento ? (
           <Link
             className="back-link"
-            to={`/gestao/dashboard?inicio=${encodeURIComponent(inicio!)}&fim=${encodeURIComponent(fim!)}`}
+            to={`/gestao/dashboard?inicio=${encodeURIComponent(inicioParam)}&fim=${encodeURIComponent(fimParam)}`}
           >
             Voltar ao Dashboard
           </Link>
@@ -116,6 +155,66 @@ export function AtendimentosPage() {
           <Link className="back-link" to="/">Voltar ao início</Link>
         )}
       </header>
+
+      {!isDetalhamento ? (
+        <form className="atendimentos-filters" onSubmit={handleFilterSubmit}>
+          <div className="atendimentos-filters-fields">
+            <label>
+              Data inicial
+              <input
+                name="inicio"
+                onChange={(event) => {
+                  const nextInicio = event.target.value;
+                  setDraftInicio(nextInicio);
+                  if (!nextInicio) {
+                    setDraftFim('');
+                  }
+                }}
+                type="date"
+                value={draftInicio}
+              />
+            </label>
+            <span aria-hidden="true" className="atendimentos-filters-arrow">
+              →
+            </span>
+            <label>
+              Data final (opcional)
+              <input
+                disabled={!draftInicio}
+                min={draftInicio || undefined}
+                name="fim"
+                onChange={(event) => setDraftFim(event.target.value)}
+                type="date"
+                value={draftInicio ? draftFim : ''}
+              />
+            </label>
+            <label>
+              Motivo de Contato
+              <MotivoCombobox
+                id="atendimentos-motivo-filtro"
+                name="motivo"
+                onChange={setDraftMotivo}
+                placeholder="Todos os motivos"
+                value={draftMotivo}
+              />
+            </label>
+          </div>
+          <div className="atendimentos-filters-actions">
+            <button className="primary-action" type="submit">
+              Filtrar
+            </button>
+            {hasActiveFilters ? (
+              <button
+                className="atendimentos-filter-clear"
+                onClick={handleClearFilters}
+                type="button"
+              >
+                Limpar filtros
+              </button>
+            ) : null}
+          </div>
+        </form>
+      ) : null}
 
       {state.status === 'loading' || !currentState || pageOutOfRange ? (
         <p className="atendimentos-state">Carregando Atendimentos...</p>
@@ -126,7 +225,11 @@ export function AtendimentosPage() {
         </p>
       ) : null}
       {state.status === 'ready' && currentState && !pageOutOfRange && total === 0 ? (
-        <p className="atendimentos-state">Nenhum Atendimento recebido.</p>
+        <p className="atendimentos-state">
+          {hasActiveFilters
+            ? 'Nenhum Atendimento encontrado para os filtros selecionados.'
+            : 'Nenhum Atendimento recebido.'}
+        </p>
       ) : null}
       {state.status === 'ready' && currentState && !pageOutOfRange && items.length > 0 ? (
         <div className="atendimentos-list">

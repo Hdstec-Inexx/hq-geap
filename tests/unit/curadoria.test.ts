@@ -119,3 +119,77 @@ test('gate: ferramentas nao atendidas forca resolucao nao atendida e perde 3 pon
     ]
   );
 });
+
+test('filtros da Fila de Curadoria fixam dia civil America/Sao_Paulo e motivo', async () => {
+  const { buildFilaCuradoriaFilters } = await import(
+    '../../apps/api/src/modules/curadoria/repository.js'
+  );
+
+  const diaUnico = buildFilaCuradoriaFilters(
+    { inicio: '2025-01-15', fim: '2025-01-15' },
+    3
+  );
+  assert.match(
+    diaUnico.clauses.join(' and '),
+    /a\.concluido_em at time zone 'America\/Sao_Paulo' >= \$3::date/
+  );
+  assert.match(
+    diaUnico.clauses.join(' and '),
+    /a\.concluido_em at time zone 'America\/Sao_Paulo' < \$4::date \+ interval '1 day'/
+  );
+  assert.deepEqual(diaUnico.values, ['2025-01-15', '2025-01-15']);
+
+  const periodo = buildFilaCuradoriaFilters(
+    { inicio: '2025-01-01', fim: '2025-01-31' },
+    1
+  );
+  assert.deepEqual(periodo.values, ['2025-01-01', '2025-01-31']);
+
+  const comMotivo = buildFilaCuradoriaFilters(
+    {
+      inicio: '2025-01-01',
+      fim: '2025-01-31',
+      motivo: 'Rede credenciada'
+    },
+    1
+  );
+  assert.match(
+    comMotivo.clauses.join(' and '),
+    /coalesce\(a\.motivo_contato, 'Nao informado'\) = \$3/
+  );
+  assert.deepEqual(comMotivo.values, [
+    '2025-01-01',
+    '2025-01-31',
+    'Rede credenciada'
+  ]);
+});
+
+test('listDistinctMotivos retorna motivos distintos e ordenados', async () => {
+  const { createAtendimentosRepository } = await import(
+    '../../apps/api/src/modules/atendimentos/repository.js'
+  );
+
+  let executedSql = '';
+  const mockDb = {
+    async query(sql: string) {
+      executedSql = sql;
+      return {
+        rows: [
+          { motivo: 'Cancelamento' },
+          { motivo: 'Financeiro/Boletos' },
+          { motivo: 'Rede credenciada' }
+        ]
+      };
+    }
+  } as any;
+
+  const repo = createAtendimentosRepository(mockDb);
+  const motivos = await repo.listDistinctMotivos();
+  assert.deepEqual(motivos, [
+    'Cancelamento',
+    'Financeiro/Boletos',
+    'Rede credenciada'
+  ]);
+  assert.match(executedSql, /distinct motivo_contato/i);
+  assert.match(executedSql, /order by motivo_contato/i);
+});

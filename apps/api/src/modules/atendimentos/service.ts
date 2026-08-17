@@ -96,15 +96,10 @@ export function normalizeTranscricao(raw: unknown) {
     if (!resolvedRole) {
       continue;
     }
-    if (typeof message !== 'string') {
-      if (message != null) {
-        continue;
-      }
-    }
-    const text = typeof message === 'string' ? message.trim() : '';
-    if (!text) {
+    if (typeof message !== 'string' && message != null) {
       continue;
     }
+    const text = typeof message === 'string' ? message.trim() : '';
     const time =
       typeof time_in_call_secs === 'number'
         ? time_in_call_secs

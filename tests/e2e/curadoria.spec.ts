@@ -631,6 +631,109 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     expect(await firstTurnFitsWithoutEmptyBox(scroll)).toBe(true);
   });
 
+  test('player na revisão da Curadoria controla áudio real, avança/retorna 30s e busca pela barra de progresso', async ({
+    page
+  }) => {
+    const transcript = [
+      { role: 'agent' as const, message: 'Olá! Sou a Lívia da GEAP.', time_in_call_secs: 0 },
+      { role: 'user' as const, message: 'Preciso da segunda via do boleto.', time_in_call_secs: 15 },
+      { role: 'agent' as const, message: 'Vou consultar o sistema para você.', time_in_call_secs: 35 },
+      { role: 'user' as const, message: 'Muito obrigado pela ajuda.', time_in_call_secs: 55 }
+    ];
+    const atendimentoId = await createAtendimento(
+      'conv-curadoria-player-sync',
+      'concluido',
+      transcript
+    );
+    await persistirAvaliacaoIa(atendimentoId);
+
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('curador@hq.test');
+    await page.getByLabel('Senha').fill('senha-curador');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto(`/curadoria/${atendimentoId}`);
+
+    const player = page.getByTestId('audio-player');
+    await expect(player).toBeVisible();
+    const playBtn = page.getByRole('button', { name: 'Reproduzir áudio' });
+    await expect(playBtn).toBeVisible();
+
+    await playBtn.click();
+    await expect(page.getByRole('button', { name: 'Pausar áudio' })).toBeVisible();
+    await page.getByRole('button', { name: 'Pausar áudio' }).click();
+    await expect(page.getByRole('button', { name: 'Reproduzir áudio' })).toBeVisible();
+
+    const forwardBtn = page.getByRole('button', { name: 'Avançar 30 segundos' });
+    await forwardBtn.click();
+    await expect(page.getByTestId('audio-current-time')).toHaveText('00:30');
+    await expect(page.getByTestId('transcript-turn-1')).toHaveClass(/active/);
+
+    const backBtn = page.getByRole('button', { name: 'Voltar 30 segundos' });
+    await backBtn.click();
+    await expect(page.getByTestId('audio-current-time')).toHaveText('00:00');
+    await expect(page.getByTestId('transcript-turn-0')).toHaveClass(/active/);
+
+    const progressBar = page.getByTestId('audio-progress-bar');
+    await progressBar.fill('35');
+    await expect(page.getByTestId('audio-current-time')).toHaveText('00:35');
+    await expect(page.getByTestId('transcript-turn-2')).toHaveClass(/active/);
+  });
+
+  test('sincronia na revisão: clique no turno faz seek, tool_call aparece vazia e scroll manual pausa auto-scroll', async ({
+    page
+  }) => {
+    const transcript = [
+      { role: 'agent' as const, message: 'Olá, sou a Lívia.', time_in_call_secs: 0 },
+      { role: 'user' as const, message: 'Preciso de atendimento.', time_in_call_secs: 10 },
+      { role: 'agent' as const, message: '', time_in_call_secs: 22 }, // tool_call vazia
+      { role: 'agent' as const, message: 'Localizei seus dados no cadastro.', time_in_call_secs: 32 },
+      { role: 'user' as const, message: 'Excelente.', time_in_call_secs: 42 },
+      ...Array.from({ length: 20 }, (_, i) => ({
+        role: (i % 2 === 0 ? 'agent' : 'user') as 'agent' | 'user',
+        message: `Turno adicional ${i + 5} de acompanhamento na revisão.`,
+        time_in_call_secs: 50 + i * 5
+      }))
+    ];
+    const atendimentoId = await createAtendimento(
+      'conv-curadoria-toolcall-sync',
+      'concluido',
+      transcript
+    );
+    await persistirAvaliacaoIa(atendimentoId);
+
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('curador@hq.test');
+    await page.getByLabel('Senha').fill('senha-curador');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto(`/curadoria/${atendimentoId}`);
+
+    const toolCallBox = page.getByTestId('transcript-tool-call');
+    await expect(toolCallBox).toBeVisible();
+
+    const toolCallTurn = page.getByTestId('transcript-turn-2');
+    await toolCallTurn.click();
+    await expect(page.getByTestId('audio-current-time')).toHaveText('00:22');
+    await expect(toolCallTurn).toHaveClass(/active/);
+
+    const turn3 = page.getByTestId('transcript-turn-3');
+    await turn3.click();
+    await expect(page.getByTestId('audio-current-time')).toHaveText('00:32');
+    await expect(turn3).toHaveClass(/active/);
+
+    const scroll = transcriptScroll(page);
+    await scroll.hover();
+    await page.mouse.wheel(0, 300);
+
+    const resumeBtn = page.getByRole('button', { name: 'Voltar ao momento atual' });
+    await expect(resumeBtn).toBeVisible();
+
+    await resumeBtn.click();
+    await expect(resumeBtn).toBeHidden();
+    await expect(turn3).toHaveClass(/active/);
+  });
+
   test('fila mostra no maximo 50, badge desta pagina e numeros clicaveis', async ({
     page
   }) => {
@@ -757,5 +860,316 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await page.goto('/curadoria?page=999');
     await expect(page).toHaveURL(/[?&]page=2/);
     await expect(page.getByText('1 pendente', { exact: true })).toBeVisible();
+  });
+
+  test('endpoint /atendimentos/motivos expoe motivos distintos registrados', async ({
+    request
+  }) => {
+    const curador = await login(request, 'curador');
+    const response = await request.get(`${apiUrl}/atendimentos/motivos`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    });
+    expect(response.status()).toBe(200);
+    const motivos = (await response.json()) as string[];
+    expect(Array.isArray(motivos)).toBe(true);
+    expect(motivos).toContain('Rede credenciada');
+  });
+
+  test('filtra a Fila de Curadoria por dia unico e por periodo', async ({
+    page
+  }) => {
+    await esvaziarFila();
+    await queryDatabase(`
+      with inserted as (
+        insert into atendimentos (
+          agente_voz_id, elevenlabs_conversation_id, status, transcricao,
+          audio_url, houve_transferencia, concluido_em, duracao_segundos,
+          motivo_contato
+        )
+        select
+          agente.id,
+          t.conv_id,
+          'concluido',
+          '[{"role":"agent","message":"Ola","time_in_call_secs":0}]'::jsonb,
+          'atendimentos/teste.mp3',
+          false,
+          t.concluido::timestamptz,
+          42,
+          'Rede credenciada'
+        from agentes_voz agente
+        cross join (
+          values
+            ('conv-data-10', '2024-01-10T12:00:00Z'),
+            ('conv-data-15', '2024-01-15T12:00:00Z'),
+            ('conv-data-20', '2024-01-20T12:00:00Z')
+        ) as t(conv_id, concluido)
+        where agente.elevenlabs_agent_id = 'agent-livia-curadoria'
+        returning id
+      )
+      insert into avaliacoes (
+        atendimento_id, autor, prompt_id, nota,
+        saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
+        resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
+        encerramento_geap, uso_correto_ferramentas, atendimento_aprovado,
+        nota_qualidade
+      )
+      select inserted.id, 'ia', p.id, 10,
+        true, true, true, true, true, true, true, true, true, 10
+      from inserted
+      cross join (select id from prompts_ia_avaliadora where ativo limit 1) p
+    `);
+
+    await loginUi(page, 'curador');
+    await page.goto('/curadoria');
+    await expect(page.getByText('3 pendentes')).toBeVisible();
+
+    // Filtro de dia único (só Data inicial preenchida)
+    await page.getByLabel('Data inicial').fill('2024-01-15');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page).toHaveURL(/[?&]inicio=2024-01-15/);
+    await expect(page.getByText('1 pendente', { exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'conv-data-15' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'conv-data-10' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'conv-data-20' })).toHaveCount(0);
+
+    // Filtro por período (Data inicial + Data final)
+    await page.getByLabel('Data inicial').fill('2024-01-10');
+    await page.getByLabel('Data final (opcional)').fill('2024-01-15');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page).toHaveURL(/[?&]inicio=2024-01-10/);
+    await expect(page).toHaveURL(/[?&]fim=2024-01-15/);
+    await expect(page.getByText('2 pendentes')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'conv-data-10' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'conv-data-15' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'conv-data-20' })).toHaveCount(0);
+
+    // Limpar filtros restaura lista completa
+    await page.getByRole('button', { name: 'Limpar filtros' }).click();
+    await expect(page).toHaveURL('/curadoria');
+    await expect(page.getByText('3 pendentes')).toBeVisible();
+  });
+
+  test('filtro de dia respeita o dia civil de America/Sao_Paulo', async ({
+    page
+  }) => {
+    await esvaziarFila();
+    // 2024-01-01T01:30:00Z em UTC equivale a 2023-12-31T22:30:00 em America/Sao_Paulo (UTC-3)
+    await queryDatabase(`
+      with inserted as (
+        insert into atendimentos (
+          agente_voz_id, elevenlabs_conversation_id, status, transcricao,
+          audio_url, houve_transferencia, concluido_em, duracao_segundos,
+          motivo_contato
+        )
+        select
+          agente.id,
+          'conv-sp-fuso',
+          'concluido',
+          '[{"role":"agent","message":"Ola","time_in_call_secs":0}]'::jsonb,
+          'atendimentos/teste.mp3',
+          false,
+          '2024-01-01T01:30:00Z'::timestamptz,
+          42,
+          'Rede credenciada'
+        from agentes_voz agente
+        where agente.elevenlabs_agent_id = 'agent-livia-curadoria'
+        returning id
+      )
+      insert into avaliacoes (
+        atendimento_id, autor, prompt_id, nota,
+        saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
+        resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
+        encerramento_geap, uso_correto_ferramentas, atendimento_aprovado,
+        nota_qualidade
+      )
+      select inserted.id, 'ia', p.id, 10,
+        true, true, true, true, true, true, true, true, true, 10
+      from inserted
+      cross join (select id from prompts_ia_avaliadora where ativo limit 1) p
+    `);
+
+    await loginUi(page, 'curador');
+    await page.goto('/curadoria');
+
+    // Filtrando pelo dia civil de SP (2023-12-31) encontra o atendimento
+    await page.getByLabel('Data inicial').fill('2023-12-31');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page.getByRole('link', { name: 'conv-sp-fuso' })).toBeVisible();
+    await expect(page.getByText('1 pendente', { exact: true })).toBeVisible();
+
+    // Filtrando pelo dia civil seguinte em SP (2024-01-01) NÃO encontra
+    await page.getByLabel('Data inicial').fill('2024-01-01');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page.getByRole('link', { name: 'conv-sp-fuso' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Nenhum Atendimento encontrado' })).toBeVisible();
+  });
+
+  test('combobox de motivo sugere motivos distintos e aceita valor fora da lista', async ({
+    page
+  }) => {
+    await esvaziarFila();
+    await queryDatabase(`
+      with inserted as (
+        insert into atendimentos (
+          agente_voz_id, elevenlabs_conversation_id, status, transcricao,
+          audio_url, houve_transferencia, concluido_em, duracao_segundos,
+          motivo_contato
+        )
+        select
+          agente.id,
+          t.conv_id,
+          'concluido',
+          '[{"role":"agent","message":"Ola","time_in_call_secs":0}]'::jsonb,
+          'atendimentos/teste.mp3',
+          false,
+          now(),
+          42,
+          t.motivo
+        from agentes_voz agente
+        cross join (
+          values
+            ('conv-motivo-rede', 'Rede credenciada'),
+            ('conv-motivo-fin', 'Financeiro/Boletos')
+        ) as t(conv_id, motivo)
+        where agente.elevenlabs_agent_id = 'agent-livia-curadoria'
+        returning id
+      )
+      insert into avaliacoes (
+        atendimento_id, autor, prompt_id, nota,
+        saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
+        resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
+        encerramento_geap, uso_correto_ferramentas, atendimento_aprovado,
+        nota_qualidade
+      )
+      select inserted.id, 'ia', p.id, 10,
+        true, true, true, true, true, true, true, true, true, 10
+      from inserted
+      cross join (select id from prompts_ia_avaliadora where ativo limit 1) p
+    `);
+
+    await loginUi(page, 'curador');
+    await page.goto('/curadoria');
+    await expect(page.getByText('2 pendentes')).toBeVisible();
+
+    // Typeahead do combobox sugere motivos distintos
+    const combobox = page.getByRole('combobox', { name: 'Motivo de Contato' });
+    await combobox.fill('Fin');
+    await expect(page.getByRole('option', { name: 'Financeiro/Boletos' })).toBeVisible();
+    await page.getByRole('option', { name: 'Financeiro/Boletos' }).click();
+    await expect(combobox).toHaveValue('Financeiro/Boletos');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+
+    await expect(page).toHaveURL(/[?&]motivo=Financeiro%2FBoletos/);
+    await expect(page.getByRole('link', { name: 'conv-motivo-fin' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'conv-motivo-rede' })).toHaveCount(0);
+
+    // Aceita digitação livre fora da lista
+    await combobox.fill('Motivo Inexistente Na Base');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page.getByRole('heading', { name: 'Nenhum Atendimento encontrado' })).toBeVisible();
+  });
+
+  test('combina filtros de dia, motivo e paginacao preservando parametros na navegacao', async ({
+    page
+  }) => {
+    await esvaziarFila();
+    // Seed 51 com Rede credenciada no dia 2024-01-15 e 2 com outro motivo/dia
+    await queryDatabase(`
+      with inserted as (
+        insert into atendimentos (
+          agente_voz_id, elevenlabs_conversation_id, status, transcricao,
+          audio_url, houve_transferencia, concluido_em, duracao_segundos,
+          motivo_contato
+        )
+        select
+          agente.id,
+          'conv-combo-' || gs::text,
+          'concluido'::status_atendimento,
+          '[{"role":"agent","message":"Ola","time_in_call_secs":0}]'::jsonb,
+          'atendimentos/teste.mp3',
+          false,
+          timestamptz '2024-01-15T10:00:00Z' + (gs * interval '1 minute'),
+          42,
+          'Rede credenciada'
+        from agentes_voz agente
+        cross join generate_series(1, 51) as gs
+        where agente.elevenlabs_agent_id = 'agent-livia-curadoria'
+        union all
+        select
+          agente.id,
+          'conv-outro-dia',
+          'concluido'::status_atendimento,
+          '[{"role":"agent","message":"Ola","time_in_call_secs":0}]'::jsonb,
+          'atendimentos/teste.mp3',
+          false,
+          timestamptz '2024-01-20T10:00:00Z',
+          42,
+          'Rede credenciada'
+        from agentes_voz agente
+        where agente.elevenlabs_agent_id = 'agent-livia-curadoria'
+        union all
+        select
+          agente.id,
+          'conv-outro-motivo',
+          'concluido'::status_atendimento,
+          '[{"role":"agent","message":"Ola","time_in_call_secs":0}]'::jsonb,
+          'atendimentos/teste.mp3',
+          false,
+          timestamptz '2024-01-15T10:00:00Z',
+          42,
+          'Cancelamento'
+        from agentes_voz agente
+        where agente.elevenlabs_agent_id = 'agent-livia-curadoria'
+        returning id, elevenlabs_conversation_id as "conversationId", concluido_em
+      ),
+      avaliadas as (
+        insert into avaliacoes (
+          atendimento_id, autor, prompt_id, nota,
+          saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
+          resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
+          encerramento_geap, uso_correto_ferramentas, atendimento_aprovado,
+          nota_qualidade
+        )
+        select inserted.id, 'ia', p.id, 10,
+          true, true, true, true, true, true, true, true, true, 10
+        from inserted
+        cross join (select id from prompts_ia_avaliadora where ativo limit 1) p
+      )
+      select id from inserted
+    `);
+
+    await loginUi(page, 'curador');
+    await page.goto('/curadoria');
+
+    // Aplica filtros combinados: Dia 2024-01-15 e Motivo Rede credenciada
+    await page.getByLabel('Data inicial').fill('2024-01-15');
+    const combobox = page.getByRole('combobox', { name: 'Motivo de Contato' });
+    await combobox.fill('Rede');
+    await page.getByRole('option', { name: 'Rede credenciada' }).click();
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+
+    // 51 itens batem o filtro -> 50 na página 1, 1 na página 2
+    await expect(page.getByText('50 pendentes')).toBeVisible();
+    const pager = page.getByRole('navigation', {
+      name: 'Paginação da Fila de Curadoria'
+    });
+    await expect(pager.getByRole('link', { name: 'Página 2' })).toBeVisible();
+
+    // Navega para página 2 preservando filtros
+    await pager.getByRole('link', { name: 'Página 2' }).click();
+    await expect(page).toHaveURL(/[?&]inicio=2024-01-15/);
+    await expect(page).toHaveURL(/[?&]motivo=Rede/);
+    await expect(page).toHaveURL(/[?&]page=2/);
+    await expect(page.getByText('1 pendente', { exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'conv-combo-51' })).toBeVisible();
+
+    // Clica para revisar e volta à fila preservando a página 2 e filtros
+    await page.getByRole('link', { name: 'conv-combo-51' }).click();
+    await expect(page.getByRole('heading', { name: 'Revisar Atendimento' })).toBeVisible();
+    await page.getByRole('link', { name: 'Voltar à fila' }).click();
+    await expect(page).toHaveURL(/[?&]page=2/);
+    await expect(page).toHaveURL(/[?&]inicio=2024-01-15/);
+    await expect(page).toHaveURL(/[?&]motivo=Rede/);
+    await expect(page.getByRole('link', { name: 'conv-combo-51' })).toBeVisible();
   });
 });

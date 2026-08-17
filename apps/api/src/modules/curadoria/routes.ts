@@ -28,9 +28,9 @@ const routes: FastifyPluginAsync = async (app) => {
   app.get('/curadoria', readAuth, async (request): Promise<FilaCuradoriaPage> => {
     const query = filaCuradoriaQuerySchema.safeParse(request.query);
     if (!query.success) {
-      throw app.httpErrors.badRequest('Invalid pagination');
+      throw app.httpErrors.badRequest('Invalid Fila de Curadoria query');
     }
-    const page = await repository.listPending(query.data.limit, query.data.offset);
+    const page = await repository.listPending(query.data);
     return {
       items: page.items.map(toFilaCuradoriaItem),
       total: page.total
