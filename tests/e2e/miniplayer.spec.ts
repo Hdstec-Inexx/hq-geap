@@ -189,7 +189,7 @@ test.describe.serial('Miniplayer persistente com animações', () => {
 
     // Rola para baixo além do player principal até a seção de comentários
     await page.locator('.comentarios-panel').scrollIntoViewIfNeeded();
-    await page.evaluate(() => window.scrollBy(0, 400));
+    await page.evaluate(() => window.scrollBy(0, 1000));
     await page.waitForTimeout(300);
 
     // Em touch, o miniplayer aparece compacto imediatamente (sem hover)

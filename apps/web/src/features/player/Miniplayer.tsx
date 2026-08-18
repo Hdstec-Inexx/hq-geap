@@ -1,10 +1,9 @@
 import { useEffect, useState, type CSSProperties, type RefObject } from 'react';
 import {
-  formatPlaybackRate,
   formatPlayerTime,
-  PLAYBACK_RATES,
   shouldShowMiniplayer
 } from './audio-player-logic';
+import { PlaybackSpeedControl } from './PlaybackSpeedControl';
 import type { AudioPlayerController } from './useAudioPlayer';
 
 export interface MiniplayerProps {
@@ -246,32 +245,12 @@ export function Miniplayer({
               </svg>
             </button>
 
-            <div className="miniplayer-speed" data-testid="miniplayer-speed-control">
-              <button
-                type="button"
-                className="miniplayer-btn miniplayer-speed-btn"
-                data-testid="miniplayer-speed-btn"
-                onClick={cyclePlaybackRate}
-                aria-label={`Velocidade de reprodução: ${formatPlaybackRate(playbackRate)}. Clique para alternar.`}
-                title="Ciclar velocidade de reprodução"
-              >
-                {formatPlaybackRate(playbackRate)}
-              </button>
-              <select
-                className="miniplayer-speed-select"
-                data-testid="miniplayer-speed-select"
-                value={playbackRate}
-                onChange={(e) => setPlaybackRate(Number(e.target.value))}
-                aria-label="Selecionar velocidade de reprodução"
-                title="Selecionar velocidade de reprodução"
-              >
-                {PLAYBACK_RATES.map((rate) => (
-                  <option key={rate} value={rate}>
-                    {formatPlaybackRate(rate)}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <PlaybackSpeedControl
+              playbackRate={playbackRate}
+              onCycle={cyclePlaybackRate}
+              onSelect={setPlaybackRate}
+              variant="mini"
+            />
           </div>
         </div>
       </aside>

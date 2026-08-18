@@ -1,9 +1,6 @@
 import type { CSSProperties } from 'react';
-import {
-  formatPlaybackRate,
-  formatPlayerTime,
-  PLAYBACK_RATES
-} from './audio-player-logic';
+import { formatPlayerTime } from './audio-player-logic';
+import { PlaybackSpeedControl } from './PlaybackSpeedControl';
 import type { AudioPlayerController } from './useAudioPlayer';
 
 export interface AudioPlayerProps {
@@ -149,32 +146,12 @@ export function AudioPlayer({ audioUrl, controller }: AudioPlayerProps) {
           </svg>
         </button>
 
-        <div className="audio-player-speed" data-testid="audio-speed-control">
-          <button
-            type="button"
-            className="audio-player-btn audio-speed-btn"
-            data-testid="audio-speed-btn"
-            onClick={cyclePlaybackRate}
-            aria-label={`Velocidade de reprodução: ${formatPlaybackRate(playbackRate)}. Clique para alternar.`}
-            title="Ciclar velocidade de reprodução"
-          >
-            {formatPlaybackRate(playbackRate)}
-          </button>
-          <select
-            className="audio-speed-select"
-            data-testid="audio-speed-select"
-            value={playbackRate}
-            onChange={(e) => setPlaybackRate(Number(e.target.value))}
-            aria-label="Selecionar velocidade de reprodução"
-            title="Selecionar velocidade de reprodução"
-          >
-            {PLAYBACK_RATES.map((rate) => (
-              <option key={rate} value={rate}>
-                {formatPlaybackRate(rate)}
-              </option>
-            ))}
-          </select>
-        </div>
+        <PlaybackSpeedControl
+          playbackRate={playbackRate}
+          onCycle={cyclePlaybackRate}
+          onSelect={setPlaybackRate}
+          variant="main"
+        />
       </div>
     </div>
   );
