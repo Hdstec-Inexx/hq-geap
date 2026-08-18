@@ -168,8 +168,8 @@ test('os tres fluxos persistem audio opcional com chave flat e content-type de M
       item: Record<string, unknown>
     ) => Array<{ json: Record<string, unknown> }>;
     const withoutUpload = prepareContract(
-      (name) => name === 'Contrato normalizado' ? [{ json: normalized }] : [],
-      normalized
+      (name) => name === 'Contrato normalizado' ? [{ json: { ...normalized, has_audio: false } }] : [],
+      { audio_downloaded: false }
     )[0]!.json;
     const withFailedUpload = prepareContract(
       (name) => name === 'Contrato normalizado' ? [{ json: normalized }] : [],
@@ -177,7 +177,7 @@ test('os tres fluxos persistem audio opcional com chave flat e content-type de M
     )[0]!.json;
     const withSuccessfulUpload = prepareContract(
       (name) => name === 'Contrato normalizado' ? [{ json: normalized }] : [],
-      { success: true }
+      { ETag: '"6805f2ac"' }
     )[0]!.json;
 
     assert.equal(withoutUpload.audio_reference, null);
