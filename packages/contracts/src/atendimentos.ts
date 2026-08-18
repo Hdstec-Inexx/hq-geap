@@ -9,15 +9,200 @@ const storageReference = z
   .regex(/^[A-Za-z0-9][A-Za-z0-9._/-]*$/)
   .refine((value) => !value.split('/').includes('..'));
 
-export const transcriptEntrySchema = z.object({
-  role: z.enum(['agent', 'user']),
-  // ElevenLabs envia null em turnos só de tool_call; normalizamos para string vazia.
-  message: z
-    .string()
-    .nullable()
-    .transform((value) => value ?? ''),
-  time_in_call_secs: z.number().nonnegative()
-});
+export function roleFromSpeaker(speaker: unknown): 'agent' | 'user' | null {
+  if (typeof speaker !== 'string') {
+    return null;
+  }
+  const normalized = speaker.trim().toLowerCase();
+  if (
+    normalized === 'ia' ||
+    normalized === 'agent' ||
+    normalized === 'assistente' ||
+    normalized === 'agente'
+  ) {
+    return 'agent';
+  }
+  if (
+    normalized === 'cliente' ||
+    normalized === 'user' ||
+    normalized === 'usuario' ||
+    normalized === 'usuário'
+  ) {
+    return 'user';
+  }
+  return null;
+}
+
+export type TranscriptEntry = {
+  role: 'agent' | 'user';
+  message: string;
+  time_in_call_secs: number;
+};
+
+function resolveToolName(item: Record<string, unknown>): string | null {
+  const name = item.tool_name ?? item.name ?? item.toolName;
+  return typeof name === 'string' && name.trim() ? name.trim() : null;
+}
+
+export function normalizeTranscriptEntry(raw: unknown): TranscriptEntry | null {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+  const entry = raw as Record<string, unknown>;
+  const resolvedRole =
+    entry.role === 'agent' || entry.role === 'user'
+      ? entry.role
+      : (roleFromSpeaker(entry.role) ?? roleFromSpeaker(entry.speaker));
+
+  if (!resolvedRole) {
+    return null;
+  }
+
+  const rawTime =
+    entry.time_in_call_secs !== undefined && entry.time_in_call_secs !== null
+      ? entry.time_in_call_secs
+      : entry.tempo_segundos;
+
+  let time = 0;
+  if (typeof rawTime === 'number') {
+    time = rawTime;
+  } else if (typeof rawTime === 'string') {
+    const trimmed = rawTime.trim();
+    if (trimmed === '') {
+      time = 0;
+    } else {
+      time = Number(trimmed);
+    }
+  } else if (rawTime !== undefined && rawTime !== null) {
+    return null;
+  }
+
+  if (!Number.isFinite(time) || time < 0) {
+    return null;
+  }
+
+  const verbalText = typeof entry.message === 'string' ? entry.message.trim() : '';
+
+  const toolCallLines: string[] = [];
+  if (Array.isArray(entry.tool_calls)) {
+    for (const call of entry.tool_calls) {
+      if (!call || typeof call !== 'object') continue;
+      const callRecord = call as Record<string, unknown>;
+      if (callRecord.tool_has_been_called === false) continue;
+      const toolName = resolveToolName(callRecord);
+      if (toolName) {
+        toolCallLines.push(`[Chamada de Ferramenta: ${toolName}]`);
+      }
+    }
+  }
+
+  const toolResultLines: string[] = [];
+  if (Array.isArray(entry.tool_results)) {
+    for (const result of entry.tool_results) {
+      if (!result || typeof result !== 'object') continue;
+      const resultRecord = result as Record<string, unknown>;
+      let toolName = resolveToolName(resultRecord);
+      if (!toolName && resultRecord.tool_call_id && Array.isArray(entry.tool_calls)) {
+        const matchingCall = entry.tool_calls.find(
+          (callItem) =>
+            callItem &&
+            typeof callItem === 'object' &&
+            (callItem as Record<string, unknown>).tool_call_id === resultRecord.tool_call_id
+        ) as Record<string, unknown> | undefined;
+        if (matchingCall) {
+          toolName = resolveToolName(matchingCall);
+        }
+      }
+      if (toolName) {
+        const isError =
+          resultRecord.is_error === true ||
+          Boolean(resultRecord.error) ||
+          resultRecord.status === 'error' ||
+          resultRecord.status === 'failure' ||
+          resultRecord.status === 'Falha';
+        const status = isError ? 'Falha' : 'Sucesso';
+        toolResultLines.push(`[Resultado da Ferramenta: ${toolName} - ${status}]`);
+      }
+    }
+  }
+
+  const parts: string[] = [];
+  if (verbalText) {
+    parts.push(verbalText);
+  }
+  if (toolCallLines.length > 0) {
+    parts.push(...toolCallLines);
+  }
+  if (toolResultLines.length > 0) {
+    parts.push(...toolResultLines);
+  }
+
+  const message = parts.length > 0 ? parts.join('\n') : '[Sem mensagem verbal]';
+
+  return {
+    role: resolvedRole,
+    message,
+    time_in_call_secs: time
+  };
+}
+
+function asTranscriptEntries(raw: unknown): unknown[] {
+  if (Array.isArray(raw)) {
+    return raw;
+  }
+  if (raw && typeof raw === 'object') {
+    const historico = (raw as { historico?: unknown }).historico;
+    if (Array.isArray(historico)) {
+      return historico;
+    }
+  }
+  return [];
+}
+
+function parseTranscriptPayload(raw: unknown): unknown[] {
+  if (typeof raw === 'string') {
+    try {
+      return asTranscriptEntries(JSON.parse(raw));
+    } catch {
+      return [];
+    }
+  }
+  return asTranscriptEntries(raw);
+}
+
+export function normalizeTranscricao(raw: unknown): TranscriptEntry[] {
+  const entries: TranscriptEntry[] = [];
+  for (const item of parseTranscriptPayload(raw)) {
+    const normalized = normalizeTranscriptEntry(item);
+    if (normalized) {
+      entries.push(normalized);
+    }
+  }
+  return entries;
+}
+
+export const transcriptEntrySchema = z
+  .object({
+    role: z.string().optional(),
+    speaker: z.string().optional(),
+    message: z.string().nullable().optional(),
+    time_in_call_secs: z.union([z.number(), z.string()]).nullable().optional(),
+    tempo_segundos: z.union([z.number(), z.string()]).nullable().optional(),
+    tool_calls: z.array(z.record(z.string(), z.unknown())).nullable().optional(),
+    tool_results: z.array(z.record(z.string(), z.unknown())).nullable().optional()
+  })
+  .passthrough()
+  .transform((entry, ctx) => {
+    const normalized = normalizeTranscriptEntry(entry);
+    if (!normalized) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Entrada de transcrição inválida'
+      });
+      return z.NEVER;
+    }
+    return normalized;
+  });
 
 const toolExecutionsSchema = z
   .object({
