@@ -57,6 +57,8 @@ test('findInconsistentConversationIdsQuery gera SQL que filtra atendimentos conc
   assert.match(query, /transcricao is null/i);
   assert.match(query, /historico/i);
   assert.match(query, /elevenlabs_conversation_id/i);
+  assert.match(query, /duracao_segundos/i);
+  assert.match(query, /tempo_segundos/i);
 });
 
 test('reprocessConversation transforma transcript e atualiza banco de dados de forma transacional', async () => {
