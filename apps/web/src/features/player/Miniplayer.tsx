@@ -184,8 +184,8 @@ export function Miniplayer({
               title="Voltar 30 segundos"
             >
               <svg
-                width="16"
-                height="16"
+                width="13"
+                height="13"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -209,12 +209,12 @@ export function Miniplayer({
               title={isPlaying ? 'Pausar áudio' : 'Reproduzir áudio'}
             >
               {isPlaying ? (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <rect x="6" y="4" width="4" height="16" rx="1" />
                   <rect x="14" y="4" width="4" height="16" rx="1" />
                 </svg>
               ) : (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                   <polygon points="5 3 19 12 5 21 5 3" />
                 </svg>
               )}
@@ -230,8 +230,8 @@ export function Miniplayer({
             >
               <span>+30s</span>
               <svg
-                width="16"
-                height="16"
+                width="13"
+                height="13"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -247,7 +247,6 @@ export function Miniplayer({
 
             <PlaybackSpeedControl
               playbackRate={playbackRate}
-              onCycle={cyclePlaybackRate}
               onSelect={setPlaybackRate}
               variant="mini"
             />
