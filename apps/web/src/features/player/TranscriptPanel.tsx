@@ -167,7 +167,7 @@ export function TranscriptPanel({
           ) : (
             transcricao.map((entry, index) => (
               <TranscriptLine
-                key={`${entry.time_in_call_secs}-${index}`}
+                key={`${extractTurnTime(entry) ?? index}-${index}`}
                 entry={entry}
                 index={index}
                 isActive={index === activeTurnIndex}
