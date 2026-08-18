@@ -21,5 +21,10 @@ if [ "${AUTO_REPROCESS_AUDIOS:-1}" = "1" ] && [ -f /app/scripts/reprocessar-audi
   node /app/scripts/reprocessar-audios.js --loop >/tmp/reprocessar-audios.log 2>&1 &
 fi
 
+if [ "${AUTO_REPROCESS_TRANSCRICOES:-1}" = "1" ] && [ -f /app/scripts/reprocessar-transcricoes.js ]; then
+  echo "Iniciando reprocessamento automático de transcrições pendentes em background..."
+  node /app/scripts/reprocessar-transcricoes.js --loop >/tmp/reprocessar-transcricoes.log 2>&1 &
+fi
+
 echo "Starting HQ GEAP API..."
 exec node /app/apps/api/dist/server.js

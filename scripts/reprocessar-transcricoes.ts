@@ -5,7 +5,7 @@ import { loadEnvironment } from './environment.js';
 import {
   transformToHistoricoTranscricao,
   type HistoricoTranscricao
-} from '../packages/contracts/src/atendimentos.js';
+} from '@hq-geap/contracts/atendimentos';
 
 loadEnvironment();
 
