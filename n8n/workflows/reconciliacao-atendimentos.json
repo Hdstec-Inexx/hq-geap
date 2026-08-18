@@ -91,7 +91,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "select c.conversation_id\nfrom unnest($1::text[]) as c(conversation_id)\nwhere not exists (\n  select 1\n  from atendimentos\n  where elevenlabs_conversation_id = c.conversation_id\n)",
+        "query": "select c.conversation_id\nfrom unnest($1::text[]) as c(conversation_id)\nwhere not exists (\n  select 1\n  from atendimentos\n  where elevenlabs_conversation_id = c.conversation_id\n    and audio_url is not null\n    and audio_url <> ''\n)",
         "options": {
           "queryReplacement": "={{ [$json.conversation_ids] }}"
         }
