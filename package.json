@@ -19,9 +19,12 @@
     "db:seed": "tsx scripts/database.ts seed",
     "db:validate": "tsx scripts/database.ts validate",
     "audio:reprocess": "tsx scripts/reprocessar-audios.ts",
-    "transcricao:reprocess": "tsx scripts/reprocessar-transcricoes.ts"
+    "audio:reprocess:loop": "tsx scripts/reprocessar-audios.ts --loop",
+    "transcricao:reprocess": "tsx scripts/reprocessar-transcricoes.ts",
+    "transcricao:reprocess:loop": "tsx scripts/reprocessar-transcricoes.ts --loop"
   },
   "devDependencies": {
+    "@hq-geap/contracts": "workspace:*",
     "@playwright/test": "^1.54.1",
     "@types/node": "^24.1.0",
     "@types/pg": "^8.15.5",

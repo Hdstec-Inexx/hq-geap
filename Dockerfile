@@ -30,7 +30,8 @@ RUN pnpm --filter @hq-geap/contracts build \
     --skipLibCheck \
     scripts/database.ts \
     scripts/environment.ts \
-    scripts/reprocessar-audios.ts
+    scripts/reprocessar-audios.ts \
+    scripts/reprocessar-transcricoes.ts
 
 FROM base AS api
 ENV NODE_ENV=production
