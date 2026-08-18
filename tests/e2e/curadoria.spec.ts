@@ -1145,7 +1145,7 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await page.getByLabel('Data inicial').fill('2024-01-15');
     const combobox = page.getByRole('combobox', { name: 'Motivo de Contato' });
     await combobox.fill('Rede');
-    await page.getByRole('option', { name: 'Rede credenciada' }).click();
+    await page.getByRole('option', { name: 'Rede credenciada' }).first().click();
     await page.getByRole('button', { name: 'Filtrar' }).click();
 
     // 51 itens batem o filtro -> 50 na página 1, 1 na página 2

@@ -2,8 +2,16 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   clampSeekTime,
+  DEFAULT_PLAYBACK_RATE,
+  formatPlaybackRate,
   formatPlayerTime,
   getActiveTurnIndex,
+  getNextPlaybackRate,
+  getStoredPlaybackRate,
+  parsePlaybackRate,
+  PLAYBACK_RATE_STORAGE_KEY,
+  PLAYBACK_RATES,
+  setStoredPlaybackRate,
   shouldShowMiniplayer
 } from '../../apps/web/src/features/player/audio-player-logic.js';
 
@@ -120,4 +128,111 @@ test('shouldShowMiniplayer requer audioUrl, scroll alem do player e audio nao fi
     }),
     false
   );
+});
+
+test('PLAYBACK_RATES contem a escala classica [0.5, 1, 1.25, 1.5, 2] com default 1', () => {
+  assert.deepEqual(PLAYBACK_RATES, [0.5, 1, 1.25, 1.5, 2]);
+  assert.equal(DEFAULT_PLAYBACK_RATE, 1);
+});
+
+test('formatPlaybackRate formata a taxa com sufixo x e trata valores invalidos', () => {
+  assert.equal(formatPlaybackRate(0.5), '0.5x');
+  assert.equal(formatPlaybackRate(1), '1x');
+  assert.equal(formatPlaybackRate(1.25), '1.25x');
+  assert.equal(formatPlaybackRate(1.5), '1.5x');
+  assert.equal(formatPlaybackRate(2), '2x');
+  assert.equal(formatPlaybackRate(Number.NaN), '1x');
+  assert.equal(formatPlaybackRate(null as unknown as number), '1x');
+  assert.equal(formatPlaybackRate(undefined as unknown as number), '1x');
+});
+
+test('getNextPlaybackRate cicla na ordem [1 -> 1.25 -> 1.5 -> 2 -> 0.5 -> 1]', () => {
+  assert.equal(getNextPlaybackRate(1), 1.25);
+  assert.equal(getNextPlaybackRate(1.25), 1.5);
+  assert.equal(getNextPlaybackRate(1.5), 2);
+  assert.equal(getNextPlaybackRate(2), 0.5);
+  assert.equal(getNextPlaybackRate(0.5), 1);
+
+  // Valores fora da escala ou invalidos recaem com seguranca para o default ou proximo
+  assert.equal(getNextPlaybackRate(0), 1);
+  assert.equal(getNextPlaybackRate(3), 1);
+  assert.equal(getNextPlaybackRate(Number.NaN), 1);
+  assert.equal(getNextPlaybackRate(null as unknown as number), 1);
+});
+
+test('parsePlaybackRate valida escala permitida e recai para DEFAULT_PLAYBACK_RATE em invalidos', () => {
+  assert.equal(parsePlaybackRate(0.5), 0.5);
+  assert.equal(parsePlaybackRate(1), 1);
+  assert.equal(parsePlaybackRate(1.25), 1.25);
+  assert.equal(parsePlaybackRate(1.5), 1.5);
+  assert.equal(parsePlaybackRate(2), 2);
+
+  // Strings numericas validas
+  assert.equal(parsePlaybackRate('0.5'), 0.5);
+  assert.equal(parsePlaybackRate('1'), 1);
+  assert.equal(parsePlaybackRate('1.25'), 1.25);
+  assert.equal(parsePlaybackRate('1.5'), 1.5);
+  assert.equal(parsePlaybackRate('2'), 2);
+
+  // Invalidos
+  assert.equal(parsePlaybackRate(0), 1);
+  assert.equal(parsePlaybackRate(0.75), 1);
+  assert.equal(parsePlaybackRate(3), 1);
+  assert.equal(parsePlaybackRate(-1), 1);
+  assert.equal(parsePlaybackRate('abc'), 1);
+  assert.equal(parsePlaybackRate(null), 1);
+  assert.equal(parsePlaybackRate(undefined), 1);
+  assert.equal(parsePlaybackRate(Number.NaN), 1);
+});
+
+test('getStoredPlaybackRate e setStoredPlaybackRate persistem e restauram no localStorage', () => {
+  const store = new Map<string, string>();
+  const mockStorage = {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      store.set(key, value);
+    },
+    removeItem: (key: string) => {
+      store.delete(key);
+    },
+    clear: () => store.clear(),
+    key: (index: number) => Array.from(store.keys())[index] ?? null,
+    get length() {
+      return store.size;
+    }
+  } as Storage;
+
+  // Sem nada salvo -> default 1
+  assert.equal(getStoredPlaybackRate(mockStorage), 1);
+
+  // Salva 1.5 -> restaura 1.5
+  setStoredPlaybackRate(1.5, mockStorage);
+  assert.equal(store.get(PLAYBACK_RATE_STORAGE_KEY), '1.5');
+  assert.equal(getStoredPlaybackRate(mockStorage), 1.5);
+
+  // Salva 2 -> restaura 2
+  setStoredPlaybackRate(2, mockStorage);
+  assert.equal(store.get(PLAYBACK_RATE_STORAGE_KEY), '2');
+  assert.equal(getStoredPlaybackRate(mockStorage), 2);
+
+  // Valor invalido corrompido no storage -> fallback para default 1
+  store.set(PLAYBACK_RATE_STORAGE_KEY, 'invalid-rate');
+  assert.equal(getStoredPlaybackRate(mockStorage), 1);
+
+  // Storage que lanca excecao (ex: storage desabilitado/privacidade) -> fallback para default 1
+  const failingStorage = {
+    getItem: () => {
+      throw new Error('Access denied');
+    },
+    setItem: () => {
+      throw new Error('Quota exceeded');
+    },
+    removeItem: () => {},
+    clear: () => {},
+    key: () => null,
+    length: 0
+  } as unknown as Storage;
+
+  assert.equal(getStoredPlaybackRate(failingStorage), 1);
+  assert.doesNotThrow(() => setStoredPlaybackRate(1.25, failingStorage));
 });
