@@ -36,7 +36,7 @@
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const conversationId = String($json.conversation_id ?? '').trim();\nif (!conversationId || conversationId.length > 255 || !/^[A-Za-z0-9_-]+$/.test(conversationId)) throw new Error('conversation_id inválido');\nreturn [{ json: { conversation_id: conversationId } }];"
+        "jsCode": "const raw = String($json.conversation_id ?? '').trim();\nconst ids = raw.split(/[\\s,;]+/).map(s => s.trim()).filter(Boolean);\nif (ids.length === 0) throw new Error('Informe ao menos um conversation_id');\nfor (const id of ids) {\n  if (!/^[A-Za-z0-9_-]{1,255}$/.test(id)) throw new Error(`conversation_id inválido: ${id}`);\n}\nreturn ids.map(id => ({ json: { conversation_id: id } }));"
       },
       "id": "7cfab9ad-b63e-4691-a705-38b39439bbf2",
       "name": "Validar conversation_id",
