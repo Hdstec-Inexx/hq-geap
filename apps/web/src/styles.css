@@ -1534,8 +1534,8 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  margin-top: 8px;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .audio-player-btn {
@@ -1550,13 +1550,15 @@ h1 {
 
 .audio-skip-btn {
   gap: 4px;
-  padding: 8px 12px;
+  padding: 6px 10px;
   background: rgb(255 255 255 / 10%);
   border: 1px solid rgb(98 212 182 / 30%);
-  border-radius: 20px;
-  font-size: 0.8rem;
+  border-radius: 16px;
+  font-size: 0.75rem;
   font-weight: 700;
   color: #eff9f5;
+  height: 34px;
+  box-sizing: border-box;
 }
 
 .audio-skip-btn:hover {
@@ -1566,12 +1568,13 @@ h1 {
 }
 
 .audio-play-btn {
-  width: 52px;
-  height: 52px;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
   border-radius: 50%;
   background: #62d4b6;
   color: #123b4a;
-  box-shadow: 0 4px 12px rgb(0 0 0 / 25%);
+  box-shadow: 0 3px 10px rgb(0 0 0 / 25%);
 }
 
 .audio-play-btn:hover {
@@ -1586,19 +1589,20 @@ h1 {
 .audio-player-speed {
   display: inline-flex;
   align-items: center;
-  margin-left: 8px;
 }
 
 .audio-speed-select {
   appearance: none;
   -webkit-appearance: none;
-  background: #0d2b36 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2362d4b6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 10px center;
+  background: #0d2b36 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2362d4b6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 8px center;
   color: #62d4b6;
   border: 1px solid rgb(98 212 182 / 30%);
-  border-radius: 20px;
-  padding: 8px 28px 8px 14px;
-  font-size: 0.8rem;
+  border-radius: 16px;
+  padding: 6px 22px 6px 10px;
+  font-size: 0.75rem;
   font-weight: 700;
+  height: 34px;
+  box-sizing: border-box;
   cursor: pointer;
   outline: none;
   transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
@@ -1777,7 +1781,7 @@ h1 {
 .miniplayer-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
 }
 
 .miniplayer-btn {
@@ -1792,13 +1796,15 @@ h1 {
 
 .miniplayer-skip-btn {
   gap: 3px;
-  padding: 6px 10px;
+  padding: 4px 8px;
   background: rgb(255 255 255 / 10%);
   border: 1px solid rgb(98 212 182 / 30%);
-  border-radius: 16px;
-  font-size: 0.75rem;
+  border-radius: 14px;
+  font-size: 0.72rem;
   font-weight: 700;
   color: #eff9f5;
+  height: 28px;
+  box-sizing: border-box;
 }
 
 .miniplayer-skip-btn:hover {
@@ -1808,8 +1814,9 @@ h1 {
 }
 
 .miniplayer-play-btn {
-  width: 38px;
-  height: 38px;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
   border-radius: 50%;
   background: #62d4b6;
   color: #123b4a;
@@ -1828,19 +1835,20 @@ h1 {
 .miniplayer-speed {
   display: inline-flex;
   align-items: center;
-  margin-left: 4px;
 }
 
 .miniplayer-speed-select {
   appearance: none;
   -webkit-appearance: none;
-  background: #0d2b36 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2362d4b6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 8px center;
+  background: #0d2b36 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='9' viewBox='0 0 24 24' fill='none' stroke='%2362d4b6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 6px center;
   color: #62d4b6;
   border: 1px solid rgb(98 212 182 / 30%);
-  border-radius: 16px;
-  padding: 6px 24px 6px 10px;
-  font-size: 0.75rem;
+  border-radius: 14px;
+  padding: 4px 18px 4px 8px;
+  font-size: 0.72rem;
   font-weight: 700;
+  height: 28px;
+  box-sizing: border-box;
   cursor: pointer;
   outline: none;
   transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
