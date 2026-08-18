@@ -224,3 +224,47 @@ test('reprocessConversation falha e faz rollback se o atendimento nao estiver co
   assert.ok(executedQueries.some((q) => q.text === 'rollback'));
 });
 
+test('runPass executa selecao em lote parametrizada quando nao ha IDs especificos', async () => {
+  const executedBatchQueries: Array<{ text: string; values?: unknown[] }> = [];
+
+  const mockDb = {
+    connect: async () => {},
+    end: async () => {},
+    query: async (text: string, values?: unknown[]) => {
+      executedBatchQueries.push({ text, values });
+      if (text.includes('select elevenlabs_conversation_id')) {
+        return { rowCount: 1, rows: [{ conversationId: 'conv-batch-1' }] };
+      }
+      return { rowCount: 1, rows: [] };
+    }
+  };
+
+  const mockFetch: typeof fetch = async () => {
+    return new Response(
+      JSON.stringify({
+        conversation_id: 'conv-batch-1',
+        status: 'done',
+        transcript: [{ role: 'agent', message: 'Oi', time_in_call_secs: 0 }]
+      }),
+      { status: 200 }
+    );
+  };
+
+  const result = await runPass({
+    limit: 100,
+    dbClient: mockDb as any,
+    fetchFn: mockFetch,
+    apiUrl: 'https://api.elevenlabs.io',
+    apiKey: 'test-key'
+  });
+
+  assert.equal(result.processed, 1);
+  assert.equal(result.success, 1);
+
+  const selectQuery = executedBatchQueries.find((q) => q.text.includes('select elevenlabs_conversation_id'));
+  assert.ok(selectQuery);
+  assert.deepEqual(selectQuery.values, [100]);
+  assert.match(selectQuery.text, /limit \$1/i);
+});
+
+

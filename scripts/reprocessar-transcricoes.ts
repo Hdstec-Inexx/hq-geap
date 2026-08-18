@@ -41,15 +41,14 @@ export interface RunPassOptions extends ReprocessOptions {
   limit?: number;
 }
 
-export function findInconsistentConversationIdsQuery(options?: { force?: boolean; limit?: number }): string {
-  const limit = options?.limit ?? 500;
+export function findInconsistentConversationIdsQuery(options?: { force?: boolean }): string {
   if (options?.force) {
     return `
       select elevenlabs_conversation_id as "conversationId"
       from atendimentos
       where status = 'concluido'
       order by concluido_em desc nulls last
-      limit ${limit}
+      limit $1
     `.trim();
   }
 
@@ -77,7 +76,7 @@ export function findInconsistentConversationIdsQuery(options?: { force?: boolean
         )
       )
     order by concluido_em desc nulls last
-    limit ${limit}
+    limit $1
   `.trim();
 }
 
@@ -167,6 +166,9 @@ export async function reprocessConversation(
   }
 }
 
+export const fetchElevenLabsTranscript = fetchElevenLabsConversation;
+export const reprocessAtendimento = reprocessConversation;
+
 export async function runPass(
   options?: RunPassOptions
 ): Promise<{ processed: number; success: number; failed: number }> {
@@ -187,11 +189,11 @@ export async function runPass(
     if (options?.specificIds && options.specificIds.length > 0) {
       conversationIds = options.specificIds;
     } else {
+      const effectiveLimit = Math.max(1, Math.trunc(Number(options?.limit) || 500));
       const queryText = findInconsistentConversationIdsQuery({
-        force: options?.force,
-        limit: options?.limit
+        force: options?.force
       });
-      const result = await db.query<{ conversationId: string }>(queryText);
+      const result = await db.query<{ conversationId: string }>(queryText, [effectiveLimit]);
       conversationIds = result.rows.map((row) => row.conversationId);
     }
 
