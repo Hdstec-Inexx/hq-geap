@@ -836,6 +836,40 @@ test('normalizeTranscricao preserva timestamps reais de turnos posteriores e nao
   ]);
 });
 
+test('normalizeTranscricao resolve tool_name por tool_call_id entre turnos distintos', () => {
+  const raw = [
+    {
+      role: 'agent',
+      message: null,
+      time_in_call_secs: 10,
+      tool_calls: [
+        { tool_name: 'consultar_limite', tool_call_id: 'call-async-1', tool_has_been_called: true }
+      ]
+    },
+    {
+      role: 'agent',
+      message: null,
+      time_in_call_secs: 15,
+      tool_results: [
+        { tool_call_id: 'call-async-1', is_error: false }
+      ]
+    }
+  ];
+  const normalized = normalizeTranscricao(raw);
+  assert.deepEqual(normalized, [
+    {
+      role: 'agent',
+      message: '[Chamada de Ferramenta: consultar_limite]',
+      time_in_call_secs: 10
+    },
+    {
+      role: 'agent',
+      message: '[Resultado da Ferramenta: consultar_limite - Sucesso]',
+      time_in_call_secs: 15
+    }
+  ]);
+});
+
 test('query do Detalhamento rejeita indicador tme', () => {
   const result = atendimentosQuerySchema.safeParse({
     inicio: '2025-01-01',

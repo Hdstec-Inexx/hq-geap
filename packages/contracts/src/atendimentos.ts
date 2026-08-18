@@ -44,7 +44,10 @@ function resolveToolName(item: Record<string, unknown>): string | null {
   return typeof name === 'string' && name.trim() ? name.trim() : null;
 }
 
-export function normalizeTranscriptEntry(raw: unknown): TranscriptEntry | null {
+export function normalizeTranscriptEntry(
+  raw: unknown,
+  toolNamesById?: Map<string, string>
+): TranscriptEntry | null {
   if (!raw || typeof raw !== 'object') {
     return null;
   }
@@ -102,12 +105,17 @@ export function normalizeTranscriptEntry(raw: unknown): TranscriptEntry | null {
       if (!result || typeof result !== 'object') continue;
       const resultRecord = result as Record<string, unknown>;
       let toolName = resolveToolName(resultRecord);
-      if (!toolName && resultRecord.tool_call_id && Array.isArray(entry.tool_calls)) {
+      const callId =
+        typeof resultRecord.tool_call_id === 'string' ? resultRecord.tool_call_id : null;
+      if (!toolName && callId && toolNamesById?.has(callId)) {
+        toolName = toolNamesById.get(callId) ?? null;
+      }
+      if (!toolName && callId && Array.isArray(entry.tool_calls)) {
         const matchingCall = entry.tool_calls.find(
           (callItem) =>
             callItem &&
             typeof callItem === 'object' &&
-            (callItem as Record<string, unknown>).tool_call_id === resultRecord.tool_call_id
+            (callItem as Record<string, unknown>).tool_call_id === callId
         ) as Record<string, unknown> | undefined;
         if (matchingCall) {
           toolName = resolveToolName(matchingCall);
@@ -171,9 +179,28 @@ function parseTranscriptPayload(raw: unknown): unknown[] {
 }
 
 export function normalizeTranscricao(raw: unknown): TranscriptEntry[] {
+  const items = parseTranscriptPayload(raw);
+  const toolNamesById = new Map<string, string>();
+  for (const item of items) {
+    if (!item || typeof item !== 'object') continue;
+    const calls = (item as Record<string, unknown>).tool_calls;
+    if (Array.isArray(calls)) {
+      for (const call of calls) {
+        if (!call || typeof call !== 'object') continue;
+        const callRecord = call as Record<string, unknown>;
+        const callId =
+          typeof callRecord.tool_call_id === 'string' ? callRecord.tool_call_id : null;
+        const toolName = resolveToolName(callRecord);
+        if (callId && toolName) {
+          toolNamesById.set(callId, toolName);
+        }
+      }
+    }
+  }
+
   const entries: TranscriptEntry[] = [];
-  for (const item of parseTranscriptPayload(raw)) {
-    const normalized = normalizeTranscriptEntry(item);
+  for (const item of items) {
+    const normalized = normalizeTranscriptEntry(item, toolNamesById);
     if (normalized) {
       entries.push(normalized);
     }
