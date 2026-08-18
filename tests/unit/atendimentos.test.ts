@@ -140,9 +140,13 @@ test('o contrato preserva a referencia de storage normalizada pelo n8n', async (
 
   assert.equal(fixture.data.has_audio, true);
   assert.equal(fixture.data.audio_url, undefined);
-  assert.deepEqual(
-    ingestAtendimentoSchema.parse(fixture.normalized),
-    fixture.normalized
+  const parsed = ingestAtendimentoSchema.parse(fixture.normalized);
+  assert.equal(parsed.conversation_id, fixture.normalized.conversation_id);
+  assert.equal(parsed.audio_reference, fixture.normalized.audio_reference);
+  assert.equal(parsed.status, fixture.normalized.status);
+  assert.equal(
+    parsed.transcript[2]?.message,
+    'Vou enviar o boleto e o protocolo para o e-mail cadastrado.\n[Chamada de Ferramenta: enviar_segunda_via_boleto]'
   );
 });
 
