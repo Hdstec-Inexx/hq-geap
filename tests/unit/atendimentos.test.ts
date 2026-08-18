@@ -6,8 +6,11 @@ import test from 'node:test';
 import {
   atendimentoListSchema,
   atendimentosQuerySchema,
+  formatTime,
   ingestAtendimentoSchema,
-  transcriptEntrySchema
+  normalizeTranscricao,
+  transcriptEntrySchema,
+  transformToHistoricoTranscricao
 } from '../../packages/contracts/src/atendimentos.js';
 import { toAtendimentoDetail } from '../../apps/api/src/modules/atendimentos/service.js';
 import type { AtendimentoRow } from '../../apps/api/src/modules/atendimentos/repository.js';
@@ -139,9 +142,13 @@ test('o contrato preserva a referencia de storage normalizada pelo n8n', async (
 
   assert.equal(fixture.data.has_audio, true);
   assert.equal(fixture.data.audio_url, undefined);
-  assert.deepEqual(
-    ingestAtendimentoSchema.parse(fixture.normalized),
-    fixture.normalized
+  const parsed = ingestAtendimentoSchema.parse(fixture.normalized);
+  assert.equal(parsed.conversation_id, fixture.normalized.conversation_id);
+  assert.equal(parsed.audio_reference, fixture.normalized.audio_reference);
+  assert.equal(parsed.status, fixture.normalized.status);
+  assert.equal(
+    parsed.transcript[2]?.message,
+    'Vou enviar o boleto e o protocolo para o e-mail cadastrado.\n[Chamada de Ferramenta: enviar_segunda_via_boleto]'
   );
 });
 
@@ -465,15 +472,188 @@ test('workflow sem tool_results nao conta sucesso na Taxa de Promessas', async (
   assert.deepEqual(generated.tool_executions, { total: 1, successful: 0 });
 });
 
-test('contrato aceita message null de tool call da ElevenLabs', () => {
+test('transcriptEntrySchema aceita time_in_call_secs e tempo_segundos (numericos e strings)', () => {
+  assert.deepEqual(
+    transcriptEntrySchema.parse({
+      role: 'agent',
+      message: 'Olá',
+      time_in_call_secs: 12
+    }),
+    { role: 'agent', message: 'Olá', time_in_call_secs: 12 }
+  );
+  assert.deepEqual(
+    transcriptEntrySchema.parse({
+      role: 'user',
+      message: 'Oi',
+      time_in_call_secs: '18.5'
+    }),
+    { role: 'user', message: 'Oi', time_in_call_secs: 18.5 }
+  );
+  assert.deepEqual(
+    transcriptEntrySchema.parse({
+      speaker: 'IA',
+      message: 'Como posso ajudar?',
+      tempo_segundos: 20
+    }),
+    { role: 'agent', message: 'Como posso ajudar?', time_in_call_secs: 20 }
+  );
+  assert.deepEqual(
+    transcriptEntrySchema.parse({
+      speaker: 'Cliente',
+      message: 'Segunda via',
+      tempo_segundos: '25'
+    }),
+    { role: 'user', message: 'Segunda via', time_in_call_secs: 25 }
+  );
+});
+
+test('transcriptEntrySchema mapeia role e speaker de forma consistente', () => {
+  assert.equal(
+    transcriptEntrySchema.parse({ speaker: 'IA', message: 'teste', tempo_segundos: 0 }).role,
+    'agent'
+  );
+  assert.equal(
+    transcriptEntrySchema.parse({ speaker: 'assistente', message: 'teste', time_in_call_secs: 0 }).role,
+    'agent'
+  );
+  assert.equal(
+    transcriptEntrySchema.parse({ speaker: 'agente', message: 'teste', time_in_call_secs: 0 }).role,
+    'agent'
+  );
+  assert.equal(
+    transcriptEntrySchema.parse({ speaker: 'Cliente', message: 'teste', tempo_segundos: 0 }).role,
+    'user'
+  );
+  assert.equal(
+    transcriptEntrySchema.parse({ speaker: 'user', message: 'teste', time_in_call_secs: 0 }).role,
+    'user'
+  );
+  assert.equal(
+    transcriptEntrySchema.parse({ speaker: 'usuario', message: 'teste', time_in_call_secs: 0 }).role,
+    'user'
+  );
+  assert.equal(
+    transcriptEntrySchema.parse({ speaker: 'usuário', message: 'teste', time_in_call_secs: 0 }).role,
+    'user'
+  );
+});
+
+test('transcriptEntrySchema formata tool_calls e ignora tool_has_been_called false', () => {
+  const result = transcriptEntrySchema.parse({
+    role: 'agent',
+    message: null,
+    time_in_call_secs: 10,
+    tool_calls: [
+      { tool_name: 'consultar_cadastro', tool_has_been_called: true },
+      { tool_name: 'transfer_to_number', tool_has_been_called: false }
+    ]
+  });
+  assert.deepEqual(result, {
+    role: 'agent',
+    message: '[Chamada de Ferramenta: consultar_cadastro]',
+    time_in_call_secs: 10
+  });
+});
+
+test('transcriptEntrySchema formata tool_results e mapeia tool_name por tool_call_id', () => {
+  const resultOk = transcriptEntrySchema.parse({
+    role: 'agent',
+    message: null,
+    time_in_call_secs: 12,
+    tool_calls: [
+      { tool_name: 'enviar_boleto', tool_call_id: 'call-1', tool_has_been_called: true }
+    ],
+    tool_results: [
+      { tool_call_id: 'call-1', is_error: false }
+    ]
+  });
+  assert.deepEqual(resultOk, {
+    role: 'agent',
+    message: '[Chamada de Ferramenta: enviar_boleto]\n[Resultado da Ferramenta: enviar_boleto - Sucesso]',
+    time_in_call_secs: 12
+  });
+
+  const resultFail = transcriptEntrySchema.parse({
+    role: 'agent',
+    message: null,
+    time_in_call_secs: 14,
+    tool_results: [
+      { tool_name: 'consultar_dados', is_error: true }
+    ]
+  });
+  assert.deepEqual(resultFail, {
+    role: 'agent',
+    message: '[Resultado da Ferramenta: consultar_dados - Falha]',
+    time_in_call_secs: 14
+  });
+});
+
+test('transcriptEntrySchema aplica fallback [Sem mensagem verbal] quando turno e vazio', () => {
   assert.deepEqual(
     transcriptEntrySchema.parse({
       role: 'agent',
       message: null,
       time_in_call_secs: 12
     }),
-    { role: 'agent', message: '', time_in_call_secs: 12 }
+    { role: 'agent', message: '[Sem mensagem verbal]', time_in_call_secs: 12 }
   );
+  assert.deepEqual(
+    transcriptEntrySchema.parse({
+      role: 'agent',
+      message: '   ',
+      time_in_call_secs: 15
+    }),
+    { role: 'agent', message: '[Sem mensagem verbal]', time_in_call_secs: 15 }
+  );
+});
+
+test('transcriptEntrySchema concatena texto verbal com tool_calls e tool_results', () => {
+  const combined = transcriptEntrySchema.parse({
+    role: 'agent',
+    message: 'Aguarde um momento.',
+    time_in_call_secs: 5,
+    tool_calls: [
+      { tool_name: 'consultar_cadastro', tool_has_been_called: true }
+    ],
+    tool_results: [
+      { tool_name: 'consultar_cadastro', is_error: false }
+    ]
+  });
+  assert.deepEqual(combined, {
+    role: 'agent',
+    message: 'Aguarde um momento.\n[Chamada de Ferramenta: consultar_cadastro]\n[Resultado da Ferramenta: consultar_cadastro - Sucesso]',
+    time_in_call_secs: 5
+  });
+});
+
+test('transcriptEntrySchema rejeita role desconhecido e timestamps invalidos', () => {
+  assert.equal(
+    transcriptEntrySchema.safeParse({
+      role: 'system',
+      message: 'sistema',
+      time_in_call_secs: 0
+    }).success,
+    false
+  );
+  assert.equal(
+    transcriptEntrySchema.safeParse({
+      role: 'agent',
+      message: 'teste',
+      time_in_call_secs: -5
+    }).success,
+    false
+  );
+  assert.equal(
+    transcriptEntrySchema.safeParse({
+      role: 'agent',
+      message: 'teste',
+      time_in_call_secs: 'invalido'
+    }).success,
+    false
+  );
+});
+
+test('ingestAtendimentoSchema aceita transcricao com time_in_call_secs e message null', () => {
   assert.equal(
     ingestAtendimentoSchema.safeParse({
       conversation_id: 'conv-1',
@@ -514,7 +694,7 @@ test('detalhe do Atendimento preserva tool call com message null na transcricao'
       },
       {
         role: 'agent',
-        message: '',
+        message: '[Sem mensagem verbal]',
         time_in_call_secs: 12
       },
       {
@@ -531,7 +711,7 @@ test('detalhe do Atendimento ignora audioUrl invalida em vez de 500', () => {
   assert.equal(detail.audioUrl, null);
 });
 
-test('detalhe tolera raw_transcript gravado direto no Postgres pelo n8n', () => {
+test('normalizeTranscricao tolera raw_transcript gravado direto no Postgres pelo n8n sem fallback por indice', () => {
   const rawTranscript = [
     {
       role: 'agent',
@@ -579,9 +759,9 @@ test('detalhe tolera raw_transcript gravado direto no Postgres pelo n8n', () => 
     })),
     [
       { role: 'agent', message: 'Olá', time_in_call_secs: 0 },
-      { role: 'agent', message: '', time_in_call_secs: 12 },
+      { role: 'agent', message: '[Chamada de Ferramenta: transfer_to_number]', time_in_call_secs: 12 },
       { role: 'user', message: 'Preciso do boleto', time_in_call_secs: 18 },
-      { role: 'agent', message: 'turno sem timestamp', time_in_call_secs: 3 }
+      { role: 'agent', message: 'turno sem timestamp', time_in_call_secs: 0 }
     ]
   );
 
@@ -592,44 +772,51 @@ test('detalhe tolera raw_transcript gravado direto no Postgres pelo n8n', () => 
   assert.equal(fromString.transcricao.length, 4);
 });
 
-test('detalhe exibe historico com speaker IA/Cliente gravado pelo n8n', () => {
+test('normalizeTranscricao normaliza historico do n8n com speaker IA/Cliente e tempo_segundos reais', () => {
   const historico = {
     historico: [
       {
         message: 'Olá sou a Livia da GEAP, Como posso te ajudar hoje?',
-        speaker: 'IA'
+        speaker: 'IA',
+        tempo_segundos: 0
       },
       {
         message: 'Oi, Lívia. Eu tô querendo um ortopedista perto de casa.',
-        speaker: 'Cliente'
+        speaker: 'Cliente',
+        tempo_segundos: 5
       },
-      { message: '', speaker: 'IA' },
+      { message: '', speaker: 'IA', tempo_segundos: '12' },
       {
         message: 'A GEAP agradece o seu contato. Tenha um ótimo dia!',
-        speaker: 'IA'
+        speaker: 'IA',
+        tempo_segundos: 20
       }
     ]
   };
 
   const detail = toAtendimentoDetail(detailRow({ transcricao: historico }), null);
   assert.deepEqual(
-    detail.transcricao.map(({ role, message }) => ({ role, message })),
+    detail.transcricao.map(({ role, message, time_in_call_secs }) => ({ role, message, time_in_call_secs })),
     [
       {
         role: 'agent',
-        message: 'Olá sou a Livia da GEAP, Como posso te ajudar hoje?'
+        message: 'Olá sou a Livia da GEAP, Como posso te ajudar hoje?',
+        time_in_call_secs: 0
       },
       {
         role: 'user',
-        message: 'Oi, Lívia. Eu tô querendo um ortopedista perto de casa.'
+        message: 'Oi, Lívia. Eu tô querendo um ortopedista perto de casa.',
+        time_in_call_secs: 5
       },
       {
         role: 'agent',
-        message: ''
+        message: '[Sem mensagem verbal]',
+        time_in_call_secs: 12
       },
       {
         role: 'agent',
-        message: 'A GEAP agradece o seu contato. Tenha um ótimo dia!'
+        message: 'A GEAP agradece o seu contato. Tenha um ótimo dia!',
+        time_in_call_secs: 20
       }
     ]
   );
@@ -639,6 +826,54 @@ test('detalhe exibe historico com speaker IA/Cliente gravado pelo n8n', () => {
     null
   );
   assert.equal(fromString.transcricao.length, 4);
+});
+
+test('normalizeTranscricao preserva timestamps reais de turnos posteriores e nao inventa timestamps por indice', () => {
+  const raw = [
+    { role: 'agent', message: 'Início', time_in_call_secs: 0 },
+    { role: 'user', message: 'Fala aos 40s', time_in_call_secs: 40 },
+    { role: 'agent', message: 'Resposta aos 120s', tempo_segundos: 120 }
+  ];
+  const normalized = normalizeTranscricao(raw);
+  assert.deepEqual(normalized, [
+    { role: 'agent', message: 'Início', time_in_call_secs: 0 },
+    { role: 'user', message: 'Fala aos 40s', time_in_call_secs: 40 },
+    { role: 'agent', message: 'Resposta aos 120s', time_in_call_secs: 120 }
+  ]);
+});
+
+test('normalizeTranscricao resolve tool_name por tool_call_id entre turnos distintos', () => {
+  const raw = [
+    {
+      role: 'agent',
+      message: null,
+      time_in_call_secs: 10,
+      tool_calls: [
+        { tool_name: 'consultar_limite', tool_call_id: 'call-async-1', tool_has_been_called: true }
+      ]
+    },
+    {
+      role: 'agent',
+      message: null,
+      time_in_call_secs: 15,
+      tool_results: [
+        { tool_call_id: 'call-async-1', is_error: false }
+      ]
+    }
+  ];
+  const normalized = normalizeTranscricao(raw);
+  assert.deepEqual(normalized, [
+    {
+      role: 'agent',
+      message: '[Chamada de Ferramenta: consultar_limite]',
+      time_in_call_secs: 10
+    },
+    {
+      role: 'agent',
+      message: '[Resultado da Ferramenta: consultar_limite - Sucesso]',
+      time_in_call_secs: 15
+    }
+  ]);
 });
 
 test('query do Detalhamento rejeita indicador tme', () => {
@@ -786,3 +1021,128 @@ test('filtros SQL do Detalhamento espelham populacoes positivas do Dashboard', a
   );
   assert.equal(generalMotivo.values[0], 'Financeiro/Boletos');
 });
+
+test('formatTime formata segundos em mm:ss e hh:mm:ss', () => {
+  assert.equal(formatTime(0), '00:00');
+  assert.equal(formatTime(5), '00:05');
+  assert.equal(formatTime(45), '00:45');
+  assert.equal(formatTime(60), '01:00');
+  assert.equal(formatTime(75), '01:15');
+  assert.equal(formatTime(600), '10:00');
+  assert.equal(formatTime(3600), '1:00:00');
+  assert.equal(formatTime(3665), '1:01:05');
+  assert.equal(formatTime(null), '00:00');
+  assert.equal(formatTime(undefined), '00:00');
+  assert.equal(formatTime(-10), '00:00');
+  assert.equal(formatTime(Number.NaN), '00:00');
+});
+
+test('transformToHistoricoTranscricao transforma transcript bruto da ElevenLabs em historico estruturado', () => {
+  const rawTranscript = [
+    {
+      role: 'agent',
+      message: 'Olá, sou a Lívia da GEAP.',
+      time_in_call_secs: 0
+    },
+    {
+      role: 'user',
+      message: 'Preciso de ajuda com boleto.',
+      time_in_call_secs: 5
+    },
+    {
+      role: 'agent',
+      message: null,
+      time_in_call_secs: 12,
+      tool_calls: [
+        { tool_name: 'consultar_cadastro', tool_call_id: 'call-1', tool_has_been_called: true },
+        { tool_name: 'transfer_to_number', tool_call_id: 'call-2', tool_has_been_called: false }
+      ]
+    },
+    {
+      role: 'agent',
+      message: null,
+      time_in_call_secs: 15,
+      tool_results: [
+        { tool_call_id: 'call-1', is_error: false }
+      ]
+    },
+    {
+      role: 'agent',
+      message: 'Aqui está seu boleto.',
+      time_in_call_secs: 75,
+      tool_results: [
+        { tool_name: 'enviar_email', is_error: true }
+      ]
+    },
+    {
+      role: 'agent',
+      message: '   ',
+      time_in_call_secs: 80
+    }
+  ];
+
+  const result = transformToHistoricoTranscricao(rawTranscript);
+
+  assert.deepEqual(result, {
+    historico: [
+      {
+        speaker: 'IA',
+        message: 'Olá, sou a Lívia da GEAP.',
+        tempo_segundos: 0,
+        tempo_formatado: '00:00'
+      },
+      {
+        speaker: 'Cliente',
+        message: 'Preciso de ajuda com boleto.',
+        tempo_segundos: 5,
+        tempo_formatado: '00:05'
+      },
+      {
+        speaker: 'IA',
+        message: '[Chamada de Ferramenta: consultar_cadastro]',
+        tempo_segundos: 12,
+        tempo_formatado: '00:12'
+      },
+      {
+        speaker: 'IA',
+        message: '[Resultado da Ferramenta: consultar_cadastro - Sucesso]',
+        tempo_segundos: 15,
+        tempo_formatado: '00:15'
+      },
+      {
+        speaker: 'IA',
+        message: 'Aqui está seu boleto.\n[Resultado da Ferramenta: enviar_email - Falha]',
+        tempo_segundos: 75,
+        tempo_formatado: '01:15'
+      },
+      {
+        speaker: 'IA',
+        message: '[Sem mensagem verbal]',
+        tempo_segundos: 80,
+        tempo_formatado: '01:20'
+      }
+    ]
+  });
+});
+
+test('transformToHistoricoTranscricao aceita payload completo da conversa ElevenLabs ou string JSON', () => {
+  const fullConversation = {
+    conversation_id: 'conv-test-123',
+    status: 'done',
+    transcript: [
+      { role: 'agent', message: 'Bom dia.', time_in_call_secs: 0 },
+      { role: 'user', message: 'Bom dia.', time_in_call_secs: 3 }
+    ]
+  };
+
+  const fromObject = transformToHistoricoTranscricao(fullConversation);
+  assert.equal(fromObject.historico.length, 2);
+  assert.equal(fromObject.historico[0]?.speaker, 'IA');
+  assert.equal(fromObject.historico[0]?.tempo_formatado, '00:00');
+  assert.equal(fromObject.historico[1]?.speaker, 'Cliente');
+  assert.equal(fromObject.historico[1]?.tempo_formatado, '00:03');
+
+  const fromJsonString = transformToHistoricoTranscricao(JSON.stringify(fullConversation));
+  assert.deepEqual(fromJsonString, fromObject);
+});
+

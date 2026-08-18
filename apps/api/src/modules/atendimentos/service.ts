@@ -1,11 +1,14 @@
 import {
   atendimentoDetailSchema,
   atendimentoSummarySchema,
+  normalizeTranscricao,
   type AtendimentoDetail,
   type AtendimentoSummary
 } from '@hq-geap/contracts/atendimentos';
 import { z } from 'zod';
 import type { AtendimentoRow, AtendimentoSummaryRow } from './repository.js';
+
+export { normalizeTranscricao };
 
 function toIsoDateTime(value: Date | string | null | undefined): string | null {
   if (value == null) {
@@ -23,100 +26,6 @@ function safeAudioUrl(audioUrl: string | null): string | null {
     return null;
   }
   return z.url().safeParse(audioUrl).success ? audioUrl : null;
-}
-
-function asTranscriptEntries(raw: unknown): unknown[] {
-  if (Array.isArray(raw)) {
-    return raw;
-  }
-  if (raw && typeof raw === 'object') {
-    const historico = (raw as { historico?: unknown }).historico;
-    if (Array.isArray(historico)) {
-      return historico;
-    }
-  }
-  return [];
-}
-
-function parseTranscriptPayload(raw: unknown): unknown[] {
-  if (typeof raw === 'string') {
-    try {
-      return asTranscriptEntries(JSON.parse(raw));
-    } catch {
-      return [];
-    }
-  }
-  return asTranscriptEntries(raw);
-}
-
-function roleFromSpeaker(speaker: unknown): 'agent' | 'user' | null {
-  if (typeof speaker !== 'string') {
-    return null;
-  }
-  const normalized = speaker.trim().toLowerCase();
-  if (
-    normalized === 'ia' ||
-    normalized === 'agent' ||
-    normalized === 'assistente' ||
-    normalized === 'agente'
-  ) {
-    return 'agent';
-  }
-  if (
-    normalized === 'cliente' ||
-    normalized === 'user' ||
-    normalized === 'usuario' ||
-    normalized === 'usuário'
-  ) {
-    return 'user';
-  }
-  return null;
-}
-
-/** Normaliza transcrição suja (ElevenLabs raw ou historico IA/Cliente do n8n). */
-export function normalizeTranscricao(raw: unknown) {
-  const entries: Array<{
-    role: 'agent' | 'user';
-    message: string;
-    time_in_call_secs: number;
-  }> = [];
-
-  for (const [index, entry] of parseTranscriptPayload(raw).entries()) {
-    if (!entry || typeof entry !== 'object') {
-      continue;
-    }
-    const { role, speaker, message, time_in_call_secs } = entry as {
-      role?: unknown;
-      speaker?: unknown;
-      message?: unknown;
-      time_in_call_secs?: unknown;
-    };
-    const resolvedRole =
-      role === 'agent' || role === 'user' ? role : roleFromSpeaker(speaker);
-    if (!resolvedRole) {
-      continue;
-    }
-    if (typeof message !== 'string' && message != null) {
-      continue;
-    }
-    const text = typeof message === 'string' ? message.trim() : '';
-    const time =
-      typeof time_in_call_secs === 'number'
-        ? time_in_call_secs
-        : typeof time_in_call_secs === 'string'
-          ? Number(time_in_call_secs)
-          : index;
-    if (!Number.isFinite(time) || time < 0) {
-      continue;
-    }
-    entries.push({
-      role: resolvedRole,
-      message: text,
-      time_in_call_secs: time
-    });
-  }
-
-  return entries;
 }
 
 function summaryValues(row: AtendimentoSummaryRow) {

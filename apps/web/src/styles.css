@@ -1391,18 +1391,6 @@ h1 {
   font-weight: 500;
 }
 
-.transcript-line.transcript-empty {
-  min-height: 48px;
-}
-
-.transcript-empty-box {
-  height: 16px;
-  margin-top: 6px;
-  border: 1px dashed rgb(18 59 74 / 20%);
-  border-radius: 3px;
-  background: rgb(255 255 255 / 20%);
-}
-
 .transcript-line span {
   color: #52717a;
   font-size: 0.72rem;
@@ -1412,6 +1400,8 @@ h1 {
 .transcript-line p {
   margin: 8px 0 0;
   line-height: 1.55;
+  white-space: pre-line;
+  word-break: break-word;
 }
 
 .transcript-floating-actions {
@@ -1591,6 +1581,49 @@ h1 {
 
 .audio-play-btn:active {
   transform: scale(0.96);
+}
+
+.audio-player-speed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+.audio-speed-btn {
+  padding: 8px 12px;
+  background: rgb(255 255 255 / 10%);
+  border: 1px solid rgb(98 212 182 / 30%);
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #62d4b6;
+  min-width: 44px;
+}
+
+.audio-speed-btn:hover {
+  background: rgb(98 212 182 / 20%);
+  border-color: #62d4b6;
+  transform: translateY(-1px);
+}
+
+.audio-speed-select {
+  background: #0d2b36;
+  color: #eff9f5;
+  border: 1px solid rgb(98 212 182 / 30%);
+  border-radius: 16px;
+  padding: 6px 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.audio-speed-select:hover,
+.audio-speed-select:focus {
+  border-color: #62d4b6;
+  background: #123b4a;
 }
 
 .audio-unavailable {
@@ -1805,6 +1838,49 @@ h1 {
 
 .miniplayer-play-btn:active {
   transform: scale(0.96);
+}
+
+.miniplayer-speed {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+}
+
+.miniplayer-speed-btn {
+  padding: 6px 10px;
+  background: rgb(255 255 255 / 10%);
+  border: 1px solid rgb(98 212 182 / 30%);
+  border-radius: 16px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #62d4b6;
+  min-width: 38px;
+}
+
+.miniplayer-speed-btn:hover {
+  background: rgb(98 212 182 / 20%);
+  border-color: #62d4b6;
+  transform: translateY(-1px);
+}
+
+.miniplayer-speed-select {
+  background: #0d2b36;
+  color: #eff9f5;
+  border: 1px solid rgb(98 212 182 / 30%);
+  border-radius: 14px;
+  padding: 4px 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.miniplayer-speed-select:hover,
+.miniplayer-speed-select:focus {
+  border-color: #62d4b6;
+  background: #123b4a;
 }
 
 @media (max-width: 680px) {

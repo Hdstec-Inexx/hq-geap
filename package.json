@@ -11,14 +11,15 @@
     "build": "corepack pnpm --recursive build",
     "typecheck": "tsc -p tsconfig.json && corepack pnpm --recursive typecheck",
     "test": "corepack pnpm test:unit && playwright test",
-    "test:unit": "tsx --test tests/unit/*.test.ts",
+    "test:unit": "corepack pnpm --filter @hq-geap/contracts build && tsx --test tests/unit/*.test.ts",
     "test:e2e": "playwright test",
     "db:up": "docker compose up -d --wait db minio minio-init",
     "db:down": "docker compose down",
     "db:migrate": "tsx scripts/database.ts migrate",
     "db:seed": "tsx scripts/database.ts seed",
     "db:validate": "tsx scripts/database.ts validate",
-    "audio:reprocess": "tsx scripts/reprocessar-audios.ts"
+    "audio:reprocess": "tsx scripts/reprocessar-audios.ts",
+    "transcricao:reprocess": "tsx scripts/reprocessar-transcricoes.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.1",

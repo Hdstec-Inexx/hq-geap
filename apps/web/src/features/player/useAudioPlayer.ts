@@ -1,10 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject, SyntheticEvent } from 'react';
-import { clampSeekTime } from './audio-player-logic';
+import {
+  clampSeekTime,
+  getNextPlaybackRate,
+  getStoredPlaybackRate,
+  parsePlaybackRate,
+  setStoredPlaybackRate,
+  type PlaybackRate
+} from './audio-player-logic';
 
 export interface UseAudioPlayerOptions {
   audioUrl?: string | null;
   durationSeconds?: number | null;
+  initialPlaybackRate?: PlaybackRate;
+  storage?: Storage;
 }
 
 export interface AudioPlayerController {
@@ -13,6 +22,9 @@ export interface AudioPlayerController {
   currentTime: number;
   duration: number;
   hasEnded: boolean;
+  playbackRate: PlaybackRate;
+  setPlaybackRate: (rate: number | PlaybackRate) => void;
+  cyclePlaybackRate: () => void;
   togglePlay: () => void;
   seek: (time: number) => void;
   skip: (delta: number) => void;
@@ -26,13 +38,21 @@ export interface AudioPlayerController {
 
 export function useAudioPlayer({
   audioUrl,
-  durationSeconds
+  durationSeconds,
+  initialPlaybackRate,
+  storage
 }: UseAudioPlayerOptions): AudioPlayerController {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState<number>(() => durationSeconds ?? 0);
   const [hasEnded, setHasEnded] = useState(false);
+  const [playbackRate, setPlaybackRateState] = useState<PlaybackRate>(() => {
+    if (initialPlaybackRate !== undefined) {
+      return parsePlaybackRate(initialPlaybackRate);
+    }
+    return getStoredPlaybackRate(storage);
+  });
 
   useEffect(() => {
     return () => {
@@ -55,6 +75,31 @@ export function useAudioPlayer({
     setCurrentTime(0);
     setHasEnded(false);
   }, [audioUrl]);
+
+  // Keep audio element's playbackRate in sync whenever audio element or rate changes
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      audio.playbackRate = playbackRate;
+    }
+  }, [audioUrl, playbackRate]);
+
+  const setPlaybackRate = useCallback(
+    (rate: number | PlaybackRate) => {
+      const validRate = parsePlaybackRate(rate);
+      setPlaybackRateState(validRate);
+      if (audioRef.current) {
+        audioRef.current.playbackRate = validRate;
+      }
+      setStoredPlaybackRate(validRate, storage);
+    },
+    [storage]
+  );
+
+  const cyclePlaybackRate = useCallback(() => {
+    const nextRate = getNextPlaybackRate(playbackRate);
+    setPlaybackRate(nextRate);
+  }, [playbackRate, setPlaybackRate]);
 
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
@@ -105,12 +150,16 @@ export function useAudioPlayer({
     setCurrentTime(e.currentTarget.currentTime);
   }, []);
 
-  const handleLoadedMetadata = useCallback((e: SyntheticEvent<HTMLAudioElement>) => {
-    const audio = e.currentTarget;
-    if (audio.duration && !Number.isNaN(audio.duration) && Number.isFinite(audio.duration)) {
-      setDuration(audio.duration);
-    }
-  }, []);
+  const handleLoadedMetadata = useCallback(
+    (e: SyntheticEvent<HTMLAudioElement>) => {
+      const audio = e.currentTarget;
+      audio.playbackRate = playbackRate;
+      if (audio.duration && !Number.isNaN(audio.duration) && Number.isFinite(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    },
+    [playbackRate]
+  );
 
   const handleDurationChange = useCallback((e: SyntheticEvent<HTMLAudioElement>) => {
     const audio = e.currentTarget;
@@ -139,6 +188,9 @@ export function useAudioPlayer({
     currentTime,
     duration,
     hasEnded,
+    playbackRate,
+    setPlaybackRate,
+    cyclePlaybackRate,
     togglePlay,
     seek,
     skip,

@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { formatPlayerTime } from './audio-player-logic';
+import { PlaybackSpeedControl } from './PlaybackSpeedControl';
 import type { AudioPlayerController } from './useAudioPlayer';
 
 export interface AudioPlayerProps {
@@ -17,6 +18,9 @@ export function AudioPlayer({ audioUrl, controller }: AudioPlayerProps) {
     isPlaying,
     currentTime,
     duration,
+    playbackRate,
+    setPlaybackRate,
+    cyclePlaybackRate,
     togglePlay,
     seek,
     skip,
@@ -141,6 +145,13 @@ export function AudioPlayer({ audioUrl, controller }: AudioPlayerProps) {
             <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
           </svg>
         </button>
+
+        <PlaybackSpeedControl
+          playbackRate={playbackRate}
+          onCycle={cyclePlaybackRate}
+          onSelect={setPlaybackRate}
+          variant="main"
+        />
       </div>
     </div>
   );

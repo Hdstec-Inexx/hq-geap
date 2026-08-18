@@ -27,7 +27,12 @@ export default defineConfig({
         HOST: '127.0.0.1',
         JWT_SECRET: 'test-only-secret-with-at-least-32-chars',
         INGESTION_API_KEY: 'test-ingestion-key-with-at-least-32-chars',
-        PORT: '3000'
+        PORT: '3000',
+        STORAGE_PROVIDER: 'minio',
+        STORAGE_BUCKET: 'hq-geap',
+        STORAGE_ENDPOINT: 'http://127.0.0.1:9000',
+        STORAGE_ACCESS_KEY: 'minioadmin',
+        STORAGE_SECRET_KEY: 'minioadmin'
       },
       reuseExistingServer: false,
       timeout: 120_000
