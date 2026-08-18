@@ -6,9 +6,11 @@ import test from 'node:test';
 import {
   atendimentoListSchema,
   atendimentosQuerySchema,
+  formatTime,
   ingestAtendimentoSchema,
   normalizeTranscricao,
-  transcriptEntrySchema
+  transcriptEntrySchema,
+  transformToHistoricoTranscricao
 } from '../../packages/contracts/src/atendimentos.js';
 import { toAtendimentoDetail } from '../../apps/api/src/modules/atendimentos/service.js';
 import type { AtendimentoRow } from '../../apps/api/src/modules/atendimentos/repository.js';
@@ -1015,3 +1017,128 @@ test('filtros SQL do Detalhamento espelham populacoes positivas do Dashboard', a
   );
   assert.equal(generalMotivo.values[0], 'Financeiro/Boletos');
 });
+
+test('formatTime formata segundos em mm:ss e hh:mm:ss', () => {
+  assert.equal(formatTime(0), '00:00');
+  assert.equal(formatTime(5), '00:05');
+  assert.equal(formatTime(45), '00:45');
+  assert.equal(formatTime(60), '01:00');
+  assert.equal(formatTime(75), '01:15');
+  assert.equal(formatTime(600), '10:00');
+  assert.equal(formatTime(3600), '1:00:00');
+  assert.equal(formatTime(3665), '1:01:05');
+  assert.equal(formatTime(null), '00:00');
+  assert.equal(formatTime(undefined), '00:00');
+  assert.equal(formatTime(-10), '00:00');
+  assert.equal(formatTime(Number.NaN), '00:00');
+});
+
+test('transformToHistoricoTranscricao transforma transcript bruto da ElevenLabs em historico estruturado', () => {
+  const rawTranscript = [
+    {
+      role: 'agent',
+      message: 'Olá, sou a Lívia da GEAP.',
+      time_in_call_secs: 0
+    },
+    {
+      role: 'user',
+      message: 'Preciso de ajuda com boleto.',
+      time_in_call_secs: 5
+    },
+    {
+      role: 'agent',
+      message: null,
+      time_in_call_secs: 12,
+      tool_calls: [
+        { tool_name: 'consultar_cadastro', tool_call_id: 'call-1', tool_has_been_called: true },
+        { tool_name: 'transfer_to_number', tool_call_id: 'call-2', tool_has_been_called: false }
+      ]
+    },
+    {
+      role: 'agent',
+      message: null,
+      time_in_call_secs: 15,
+      tool_results: [
+        { tool_call_id: 'call-1', is_error: false }
+      ]
+    },
+    {
+      role: 'agent',
+      message: 'Aqui está seu boleto.',
+      time_in_call_secs: 75,
+      tool_results: [
+        { tool_name: 'enviar_email', is_error: true }
+      ]
+    },
+    {
+      role: 'agent',
+      message: '   ',
+      time_in_call_secs: 80
+    }
+  ];
+
+  const result = transformToHistoricoTranscricao(rawTranscript);
+
+  assert.deepEqual(result, {
+    historico: [
+      {
+        speaker: 'IA',
+        message: 'Olá, sou a Lívia da GEAP.',
+        tempo_segundos: 0,
+        tempo_formatado: '00:00'
+      },
+      {
+        speaker: 'Cliente',
+        message: 'Preciso de ajuda com boleto.',
+        tempo_segundos: 5,
+        tempo_formatado: '00:05'
+      },
+      {
+        speaker: 'IA',
+        message: '[Chamada de Ferramenta: consultar_cadastro]',
+        tempo_segundos: 12,
+        tempo_formatado: '00:12'
+      },
+      {
+        speaker: 'IA',
+        message: '[Resultado da Ferramenta: consultar_cadastro - Sucesso]',
+        tempo_segundos: 15,
+        tempo_formatado: '00:15'
+      },
+      {
+        speaker: 'IA',
+        message: 'Aqui está seu boleto.\n[Resultado da Ferramenta: enviar_email - Falha]',
+        tempo_segundos: 75,
+        tempo_formatado: '01:15'
+      },
+      {
+        speaker: 'IA',
+        message: '[Sem mensagem verbal]',
+        tempo_segundos: 80,
+        tempo_formatado: '01:20'
+      }
+    ]
+  });
+});
+
+test('transformToHistoricoTranscricao aceita payload completo da conversa ElevenLabs ou string JSON', () => {
+  const fullConversation = {
+    conversation_id: 'conv-test-123',
+    status: 'done',
+    transcript: [
+      { role: 'agent', message: 'Bom dia.', time_in_call_secs: 0 },
+      { role: 'user', message: 'Bom dia.', time_in_call_secs: 3 }
+    ]
+  };
+
+  const fromObject = transformToHistoricoTranscricao(fullConversation);
+  assert.equal(fromObject.historico.length, 2);
+  assert.equal(fromObject.historico[0]?.speaker, 'IA');
+  assert.equal(fromObject.historico[0]?.tempo_formatado, '00:00');
+  assert.equal(fromObject.historico[1]?.speaker, 'Cliente');
+  assert.equal(fromObject.historico[1]?.tempo_formatado, '00:03');
+
+  const fromJsonString = transformToHistoricoTranscricao(JSON.stringify(fullConversation));
+  assert.deepEqual(fromJsonString, fromObject);
+});
+

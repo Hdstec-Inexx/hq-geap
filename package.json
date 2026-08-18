@@ -18,7 +18,8 @@
     "db:migrate": "tsx scripts/database.ts migrate",
     "db:seed": "tsx scripts/database.ts seed",
     "db:validate": "tsx scripts/database.ts validate",
-    "audio:reprocess": "tsx scripts/reprocessar-audios.ts"
+    "audio:reprocess": "tsx scripts/reprocessar-audios.ts",
+    "transcricao:reprocess": "tsx scripts/reprocessar-transcricoes.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.1",

@@ -39,6 +39,31 @@ export type TranscriptEntry = {
   time_in_call_secs: number;
 };
 
+export type HistoricoTurn = {
+  speaker: 'IA' | 'Cliente';
+  message: string;
+  tempo_segundos: number;
+  tempo_formatado: string;
+};
+
+export type HistoricoTranscricao = {
+  historico: HistoricoTurn[];
+};
+
+export function formatTime(seconds: number | null | undefined): string {
+  if (seconds == null || Number.isNaN(seconds) || seconds < 0) {
+    return '00:00';
+  }
+  const totalSecs = Math.floor(seconds);
+  const hrs = Math.floor(totalSecs / 3600);
+  const mins = Math.floor((totalSecs % 3600) / 60);
+  const secs = totalSecs % 60;
+  if (hrs > 0) {
+    return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
 function resolveToolName(item: Record<string, unknown>): string | null {
   const name = item.tool_name ?? item.name ?? item.toolName;
   return typeof name === 'string' && name.trim() ? name.trim() : null;
@@ -159,7 +184,18 @@ function asTranscriptEntries(raw: unknown): unknown[] {
     return raw;
   }
   if (raw && typeof raw === 'object') {
-    const historico = (raw as { historico?: unknown }).historico;
+    const record = raw as Record<string, unknown>;
+    if (Array.isArray(record.transcript)) {
+      return record.transcript;
+    }
+    if (
+      record.data &&
+      typeof record.data === 'object' &&
+      Array.isArray((record.data as Record<string, unknown>).transcript)
+    ) {
+      return (record.data as Record<string, unknown>).transcript as unknown[];
+    }
+    const historico = record.historico;
     if (Array.isArray(historico)) {
       return historico;
     }
@@ -206,6 +242,17 @@ export function normalizeTranscricao(raw: unknown): TranscriptEntry[] {
     }
   }
   return entries;
+}
+
+export function transformToHistoricoTranscricao(raw: unknown): HistoricoTranscricao {
+  const normalizedEntries = normalizeTranscricao(raw);
+  const historico: HistoricoTurn[] = normalizedEntries.map((entry) => ({
+    speaker: entry.role === 'agent' ? 'IA' : 'Cliente',
+    message: entry.message,
+    tempo_segundos: entry.time_in_call_secs,
+    tempo_formatado: formatTime(entry.time_in_call_secs)
+  }));
+  return { historico };
 }
 
 export const transcriptEntrySchema = z
