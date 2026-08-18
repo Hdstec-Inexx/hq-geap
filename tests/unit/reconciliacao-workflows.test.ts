@@ -440,3 +440,106 @@ test('reconciliacao e reprocessar não materializam TME nem SLA no contrato', as
     assert.match(code, /tme_seconds/);
   }
 });
+
+test('os tres workflows sincronizam transcricao com tool_calls, tool_results e tempo_segundos', async () => {
+  const [webhook, reconciliacao, reprocessamento] = await Promise.all([
+    loadWorkflow(webhookPath),
+    loadWorkflow(reconciliacaoPath),
+    loadWorkflow(reprocessamentoPath)
+  ]);
+
+  const rawTranscript = [
+    {
+      role: 'agent',
+      message: 'Olá, sou a Lívia da GEAP.',
+      time_in_call_secs: 0
+    },
+    {
+      speaker: 'Cliente',
+      message: 'Preciso da segunda via do boleto.',
+      tempo_segundos: '6'
+    },
+    {
+      role: 'agent',
+      message: 'Vou consultar o sistema.',
+      time_in_call_secs: 12,
+      tool_calls: [
+        { tool_name: 'consultar_boleto', tool_call_id: 'tool-c1', tool_has_been_called: true },
+        { tool_name: 'transfer_to_number', tool_call_id: 'tool-c2', tool_has_been_called: false }
+      ],
+      tool_results: [
+        { tool_call_id: 'tool-c1', tool_name: 'consultar_boleto', is_error: false }
+      ]
+    },
+    {
+      speaker: 'IA',
+      message: null,
+      time_in_call_secs: 20,
+      tool_calls: [
+        { tool_name: 'enviar_email', tool_call_id: 'tool-c3', tool_has_been_called: true }
+      ]
+    }
+  ];
+
+  for (const workflow of [webhook, reconciliacao, reprocessamento]) {
+    const code = node(workflow, 'Contrato normalizado')?.parameters.jsCode ?? '';
+    const normalizar = new Function('$json', '$env', code) as (
+      input: unknown,
+      environment: unknown
+    ) => Array<{ json: Record<string, unknown> }>;
+
+    const rawData = {
+      conversation_id: 'conv-tools-sync-001',
+      agent_id: 'agent-livia-test',
+      status: 'done',
+      transcript: rawTranscript,
+      metadata: {
+        start_time_unix_secs: 1785330000,
+        call_duration_secs: 60,
+        cost_fiat: 0.1
+      },
+      analysis: { data_collection_results: {} },
+      has_audio: false
+    };
+
+    const input = workflow === webhook
+      ? { event: { type: 'post_call_transcription', event_timestamp: 1785330060, data: rawData } }
+      : rawData;
+
+    const result = normalizar(input, { ELEVENLABS_TRANSFER_TOOL_NAME: 'transfer_to_number' })[0]!.json;
+    const transcript = result.transcript as Array<Record<string, unknown>>;
+
+    assert.equal(transcript.length, 4);
+
+    // Turno 0
+    assert.deepEqual(transcript[0], {
+      role: 'agent',
+      message: 'Olá, sou a Lívia da GEAP.',
+      time_in_call_secs: 0,
+      tempo_segundos: 0
+    });
+
+    // Turno 1 (speaker Cliente mapeado para role user, tempo string convertido)
+    assert.deepEqual(transcript[1], {
+      role: 'user',
+      message: 'Preciso da segunda via do boleto.',
+      time_in_call_secs: 6,
+      tempo_segundos: 6
+    });
+
+    // Turno 2 (preserva tool_calls e tool_results)
+    assert.equal(transcript[2]?.role, 'agent');
+    assert.equal(transcript[2]?.message, 'Vou consultar o sistema.');
+    assert.equal(transcript[2]?.time_in_call_secs, 12);
+    assert.equal(transcript[2]?.tempo_segundos, 12);
+    assert.deepEqual(transcript[2]?.tool_calls, rawTranscript[2]?.tool_calls);
+    assert.deepEqual(transcript[2]?.tool_results, rawTranscript[2]?.tool_results);
+
+    // Turno 3 (message null convertida para string vazia, preserva tool_calls)
+    assert.equal(transcript[3]?.role, 'agent');
+    assert.equal(transcript[3]?.message, '');
+    assert.equal(transcript[3]?.time_in_call_secs, 20);
+    assert.equal(transcript[3]?.tempo_segundos, 20);
+    assert.deepEqual(transcript[3]?.tool_calls, rawTranscript[3]?.tool_calls);
+  }
+});

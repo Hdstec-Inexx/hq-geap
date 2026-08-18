@@ -339,7 +339,11 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       await expect(response.json()).resolves.toMatchObject({
         audioUrl: expect.stringContaining(atendimento.audio_reference),
         custo: atendimento.cost,
-        transcricao: atendimento.transcript
+        transcricao: [
+          { role: 'agent', message: 'Olá, eu sou a Lívia. Como posso ajudar?', time_in_call_secs: 0 },
+          { role: 'user', message: 'Preciso da segunda via do boleto.', time_in_call_secs: 8 },
+          { role: 'agent', message: expect.stringContaining('Vou enviar o boleto'), time_in_call_secs: 19 }
+        ]
       });
     }
 
