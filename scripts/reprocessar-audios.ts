@@ -53,7 +53,7 @@ const minioClient = getMinioClient();
 
 async function getGcsClient() {
   if (storageProvider !== 'gcs') return null;
-  const { Storage } = resolveModule<typeof import('@google-cloud/storage')>('@google-cloud/storage');
+  const { Storage } = resolveModule<{ Storage: new () => { bucket: (name: string) => { file: (key: string) => { save: (buf: Buffer, opts: Record<string, unknown>) => Promise<void> } } } }>('@google-cloud/storage');
   return new Storage();
 }
 
