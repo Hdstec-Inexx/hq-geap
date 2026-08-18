@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { useEffect, useState, type CSSProperties, type RefObject } from 'react';
 import {
   formatPlayerTime,
   shouldShowMiniplayer
 } from './audio-player-logic';
+import { PlaybackSpeedControl } from './PlaybackSpeedControl';
 import type { AudioPlayerController } from './useAudioPlayer';
 
 export interface MiniplayerProps {
@@ -105,6 +106,9 @@ export function Miniplayer({
     isPlaying,
     currentTime,
     duration,
+    playbackRate,
+    setPlaybackRate,
+    cyclePlaybackRate,
     togglePlay,
     seek,
     skip
@@ -240,6 +244,13 @@ export function Miniplayer({
                 <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
               </svg>
             </button>
+
+            <PlaybackSpeedControl
+              playbackRate={playbackRate}
+              onCycle={cyclePlaybackRate}
+              onSelect={setPlaybackRate}
+              variant="mini"
+            />
           </div>
         </div>
       </aside>

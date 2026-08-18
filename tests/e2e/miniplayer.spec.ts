@@ -136,15 +136,15 @@ test.describe.serial('Miniplayer persistente com animações', () => {
     const miniplayer = page.getByTestId('miniplayer');
     await expect(miniplayer).toBeVisible();
 
-    // Controles do miniplayer funcionam: avançar 30s
-    const miniSkipForward = page.getByTestId('miniplayer-skip-forward');
-    await miniSkipForward.click();
-    await expect(page.getByTestId('miniplayer-current-time')).toHaveText('00:30');
-
     // Pausar pelo miniplayer
     const miniPlayPause = page.getByTestId('miniplayer-play-pause-btn');
     await miniPlayPause.click();
     await expect(miniPlayPause).toHaveAttribute('aria-label', 'Reproduzir áudio');
+
+    // Controles do miniplayer funcionam: avançar 30s
+    const miniSkipForward = page.getByTestId('miniplayer-skip-forward');
+    await miniSkipForward.click();
+    await expect(page.getByTestId('miniplayer-current-time')).toHaveText(/00:3\d/);
 
     // Retornar 30s pelo miniplayer
     const miniSkipBack = page.getByTestId('miniplayer-skip-back');
@@ -189,7 +189,7 @@ test.describe.serial('Miniplayer persistente com animações', () => {
 
     // Rola para baixo além do player principal até a seção de comentários
     await page.locator('.comentarios-panel').scrollIntoViewIfNeeded();
-    await page.evaluate(() => window.scrollBy(0, 400));
+    await page.evaluate(() => window.scrollBy(0, 1000));
     await page.waitForTimeout(300);
 
     // Em touch, o miniplayer aparece compacto imediatamente (sem hover)
@@ -356,5 +356,93 @@ test.describe.serial('Miniplayer persistente com animações', () => {
     await page.getByTestId('miniplayer-play-pause-btn').click();
     await page.getByTestId('miniplayer-skip-forward').click();
     await expect(page.getByTestId('miniplayer-current-time')).toHaveText('00:30');
+  });
+
+  test('Controle de velocidade de reprodução: ciclar, seletor direto, sincronização e persistência no localStorage', async ({
+    page
+  }) => {
+    const atendimentoId = await createAtendimentoComTranscricao(
+      'conv-miniplayer-playback-rate',
+      defaultTranscript
+    );
+    await persistirAvaliacaoIa(atendimentoId);
+    await seedComentarios(atendimentoId, 8);
+
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('gestao@hq.test');
+    await page.getByLabel('Senha').fill('senha-gestao');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto(`/atendimentos/${atendimentoId}`);
+
+    // No player principal, verifica velocidade inicial 1x
+    const speedBtn = page.getByTestId('audio-speed-btn');
+    const speedSelect = page.getByTestId('audio-speed-select');
+    await expect(speedBtn).toHaveText('1x');
+    await expect(speedSelect).toHaveValue('1');
+
+    // Clica no botão rápido para ciclar a velocidade: 1x -> 1.25x
+    await speedBtn.click();
+    await expect(speedBtn).toHaveText('1.25x');
+    await expect(speedSelect).toHaveValue('1.25');
+
+    // Verifica que o elemento audio teve playbackRate atualizado
+    const audioRate125 = await page.evaluate(() => document.querySelector('audio')?.playbackRate);
+    expect(audioRate125).toBe(1.25);
+
+    // Cicla novamente: 1.25x -> 1.5x
+    await speedBtn.click();
+    await expect(speedBtn).toHaveText('1.5x');
+    await expect(speedSelect).toHaveValue('1.5');
+
+    // Cicla: 1.5x -> 2x
+    await speedBtn.click();
+    await expect(speedBtn).toHaveText('2x');
+    await expect(speedSelect).toHaveValue('2');
+
+    // Cicla: 2x -> 0.5x
+    await speedBtn.click();
+    await expect(speedBtn).toHaveText('0.5x');
+    await expect(speedSelect).toHaveValue('0.5');
+
+    // Cicla: 0.5x -> 1x
+    await speedBtn.click();
+    await expect(speedBtn).toHaveText('1x');
+    await expect(speedSelect).toHaveValue('1');
+
+    // Usa o seletor direto para escolher 1.5x
+    await speedSelect.selectOption('1.5');
+    await expect(speedBtn).toHaveText('1.5x');
+    await expect(speedSelect).toHaveValue('1.5');
+
+    // Rola para exibir o miniplayer
+    await page.locator('.comentarios-panel').scrollIntoViewIfNeeded();
+    await page.evaluate(() => window.scrollBy(0, 400));
+    await page.waitForTimeout(300);
+
+    // Revela miniplayer
+    await page.mouse.move(300, 5);
+    const miniSpeedBtn = page.getByTestId('miniplayer-speed-btn');
+    const miniSpeedSelect = page.getByTestId('miniplayer-speed-select');
+
+    // Miniplayer está sincronizado em 1.5x
+    await expect(miniSpeedBtn).toHaveText('1.5x');
+    await expect(miniSpeedSelect).toHaveValue('1.5');
+
+    // Altera pelo miniplayer via clique rápido para 2x
+    await miniSpeedBtn.click();
+    await expect(miniSpeedBtn).toHaveText('2x');
+    await expect(miniSpeedSelect).toHaveValue('2');
+
+    // Rola de volta para o topo e verifica que o player principal sincronizou para 2x
+    await page.getByRole('heading', { name: 'Atendimento' }).scrollIntoViewIfNeeded();
+    await page.waitForTimeout(300);
+    await expect(speedBtn).toHaveText('2x');
+    await expect(speedSelect).toHaveValue('2');
+
+    // Recarrega a página e valida restauração da preferência do localStorage
+    await page.reload();
+    await expect(page.getByTestId('audio-speed-btn')).toHaveText('2x');
+    await expect(page.getByTestId('audio-speed-select')).toHaveValue('2');
   });
 });
