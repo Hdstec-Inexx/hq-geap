@@ -11,7 +11,7 @@
     "build": "corepack pnpm --recursive build",
     "typecheck": "tsc -p tsconfig.json && corepack pnpm --recursive typecheck",
     "test": "corepack pnpm test:unit && playwright test",
-    "test:unit": "tsx --test tests/unit/*.test.ts",
+    "test:unit": "corepack pnpm --filter @hq-geap/contracts build && tsx --test tests/unit/*.test.ts",
     "test:e2e": "playwright test",
     "db:up": "docker compose up -d --wait db minio minio-init",
     "db:down": "docker compose down",
