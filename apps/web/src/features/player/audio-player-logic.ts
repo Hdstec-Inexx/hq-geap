@@ -81,11 +81,41 @@ export function clampSeekTime(time: number, duration: number): number {
   return Math.max(0, Math.min(duration, time));
 }
 
+export function extractTurnTime(
+  turn:
+    | { time_in_call_secs?: number | string | null; tempo_segundos?: number | string | null }
+    | null
+    | undefined
+): number | null {
+  if (!turn || typeof turn !== 'object') {
+    return null;
+  }
+  const raw =
+    turn.time_in_call_secs !== undefined && turn.time_in_call_secs !== null
+      ? turn.time_in_call_secs
+      : turn.tempo_segundos;
+
+  if (typeof raw === 'number') {
+    return Number.isFinite(raw) && raw >= 0 ? raw : null;
+  }
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (trimmed === '') return 0;
+    const num = Number(trimmed);
+    return Number.isFinite(num) && num >= 0 ? num : null;
+  }
+  return null;
+}
+
 export function getActiveTurnIndex(
-  transcricao: Array<{ time_in_call_secs: number }>,
+  transcricao: Array<
+    | { time_in_call_secs?: number | string | null; tempo_segundos?: number | string | null }
+    | null
+    | undefined
+  >,
   currentTime: number
 ): number {
-  if (!transcricao || transcricao.length === 0) {
+  if (!transcricao || transcricao.length === 0 || currentTime < 0) {
     return -1;
   }
 
@@ -93,8 +123,8 @@ export function getActiveTurnIndex(
   let maxTime = -1;
 
   for (let i = 0; i < transcricao.length; i++) {
-    const turnTime = transcricao[i]?.time_in_call_secs ?? 0;
-    if (turnTime <= currentTime) {
+    const turnTime = extractTurnTime(transcricao[i]);
+    if (turnTime !== null && turnTime <= currentTime) {
       if (turnTime >= maxTime) {
         maxTime = turnTime;
         activeIndex = i;

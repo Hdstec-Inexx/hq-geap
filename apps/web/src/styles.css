@@ -1391,18 +1391,6 @@ h1 {
   font-weight: 500;
 }
 
-.transcript-line.transcript-empty {
-  min-height: 48px;
-}
-
-.transcript-empty-box {
-  height: 16px;
-  margin-top: 6px;
-  border: 1px dashed rgb(18 59 74 / 20%);
-  border-radius: 3px;
-  background: rgb(255 255 255 / 20%);
-}
-
 .transcript-line span {
   color: #52717a;
   font-size: 0.72rem;
@@ -1412,6 +1400,8 @@ h1 {
 .transcript-line p {
   margin: 8px 0 0;
   line-height: 1.55;
+  white-space: pre-line;
+  word-break: break-word;
 }
 
 .transcript-floating-actions {
