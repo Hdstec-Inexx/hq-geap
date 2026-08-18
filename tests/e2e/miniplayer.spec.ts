@@ -362,7 +362,7 @@ test.describe.serial('Miniplayer persistente com animações', () => {
     await expect(page.getByTestId('miniplayer-current-time')).toHaveText('00:30');
   });
 
-  test('Controle de velocidade de reprodução: ciclar, seletor direto, sincronização e persistência no localStorage', async ({
+  test('Controle de velocidade de reprodução: seletor direto, sincronização e persistência no localStorage', async ({
     page
   }) => {
     const atendimentoId = await createAtendimentoComTranscricao(
@@ -380,43 +380,32 @@ test.describe.serial('Miniplayer persistente com animações', () => {
     await page.goto(`/atendimentos/${atendimentoId}`);
 
     // No player principal, verifica velocidade inicial 1x
-    const speedBtn = page.getByTestId('audio-speed-btn');
     const speedSelect = page.getByTestId('audio-speed-select');
-    await expect(speedBtn).toHaveText('1x');
+    await expect(speedSelect).toBeVisible();
     await expect(speedSelect).toHaveValue('1');
 
-    // Clica no botão rápido para ciclar a velocidade: 1x -> 1.25x
-    await speedBtn.click();
-    await expect(speedBtn).toHaveText('1.25x');
+    // Altera a velocidade para 1.25x
+    await speedSelect.selectOption('1.25');
     await expect(speedSelect).toHaveValue('1.25');
 
     // Verifica que o elemento audio teve playbackRate atualizado
     const audioRate125 = await page.evaluate(() => document.querySelector('audio')?.playbackRate);
     expect(audioRate125).toBe(1.25);
 
-    // Cicla novamente: 1.25x -> 1.5x
-    await speedBtn.click();
-    await expect(speedBtn).toHaveText('1.5x');
+    // Altera para 1.5x
+    await speedSelect.selectOption('1.5');
     await expect(speedSelect).toHaveValue('1.5');
 
-    // Cicla: 1.5x -> 2x
-    await speedBtn.click();
-    await expect(speedBtn).toHaveText('2x');
+    // Altera para 2x
+    await speedSelect.selectOption('2');
     await expect(speedSelect).toHaveValue('2');
 
-    // Cicla: 2x -> 0.5x
-    await speedBtn.click();
-    await expect(speedBtn).toHaveText('0.5x');
+    // Altera para 0.5x
+    await speedSelect.selectOption('0.5');
     await expect(speedSelect).toHaveValue('0.5');
 
-    // Cicla: 0.5x -> 1x
-    await speedBtn.click();
-    await expect(speedBtn).toHaveText('1x');
-    await expect(speedSelect).toHaveValue('1');
-
-    // Usa o seletor direto para escolher 1.5x
+    // Volta para 1.5x
     await speedSelect.selectOption('1.5');
-    await expect(speedBtn).toHaveText('1.5x');
     await expect(speedSelect).toHaveValue('1.5');
 
     // Rola para exibir o miniplayer
@@ -428,27 +417,23 @@ test.describe.serial('Miniplayer persistente com animações', () => {
     const trigger = page.getByTestId('miniplayer-trigger');
     await expect(trigger).toBeAttached();
     await trigger.hover();
-    const miniSpeedBtn = page.getByTestId('miniplayer-speed-btn');
     const miniSpeedSelect = page.getByTestId('miniplayer-speed-select');
 
     // Miniplayer está sincronizado em 1.5x
-    await expect(miniSpeedBtn).toHaveText('1.5x');
+    await expect(miniSpeedSelect).toBeVisible();
     await expect(miniSpeedSelect).toHaveValue('1.5');
 
-    // Altera pelo miniplayer via clique rápido para 2x
-    await miniSpeedBtn.click();
-    await expect(miniSpeedBtn).toHaveText('2x');
+    // Altera pelo miniplayer para 2x
+    await miniSpeedSelect.selectOption('2');
     await expect(miniSpeedSelect).toHaveValue('2');
 
     // Rola de volta para o topo e verifica que o player principal sincronizou para 2x
     await page.getByRole('heading', { name: 'Atendimento' }).scrollIntoViewIfNeeded();
     await page.waitForTimeout(300);
-    await expect(speedBtn).toHaveText('2x');
     await expect(speedSelect).toHaveValue('2');
 
     // Recarrega a página e valida restauração da preferência do localStorage
     await page.reload();
-    await expect(page.getByTestId('audio-speed-btn')).toHaveText('2x');
     await expect(page.getByTestId('audio-speed-select')).toHaveValue('2');
   });
 });

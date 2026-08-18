@@ -1586,44 +1586,29 @@ h1 {
 .audio-player-speed {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   margin-left: 8px;
 }
 
-.audio-speed-btn {
-  padding: 8px 12px;
-  background: rgb(255 255 255 / 10%);
+.audio-speed-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: #0d2b36 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2362d4b6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 10px center;
+  color: #62d4b6;
   border: 1px solid rgb(98 212 182 / 30%);
   border-radius: 20px;
+  padding: 8px 28px 8px 14px;
   font-size: 0.8rem;
   font-weight: 700;
-  color: #62d4b6;
-  min-width: 44px;
-}
-
-.audio-speed-btn:hover {
-  background: rgb(98 212 182 / 20%);
-  border-color: #62d4b6;
-  transform: translateY(-1px);
-}
-
-.audio-speed-select {
-  background: #0d2b36;
-  color: #eff9f5;
-  border: 1px solid rgb(98 212 182 / 30%);
-  border-radius: 16px;
-  padding: 6px 8px;
-  font-size: 0.8rem;
-  font-weight: 600;
   cursor: pointer;
   outline: none;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
 }
 
 .audio-speed-select:hover,
 .audio-speed-select:focus {
   border-color: #62d4b6;
-  background: #123b4a;
+  background-color: #123b4a;
+  transform: translateY(-1px);
 }
 
 .audio-unavailable {
@@ -1843,44 +1828,29 @@ h1 {
 .miniplayer-speed {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   margin-left: 4px;
 }
 
-.miniplayer-speed-btn {
-  padding: 6px 10px;
-  background: rgb(255 255 255 / 10%);
+.miniplayer-speed-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: #0d2b36 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2362d4b6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 8px center;
+  color: #62d4b6;
   border: 1px solid rgb(98 212 182 / 30%);
   border-radius: 16px;
+  padding: 6px 24px 6px 10px;
   font-size: 0.75rem;
   font-weight: 700;
-  color: #62d4b6;
-  min-width: 38px;
-}
-
-.miniplayer-speed-btn:hover {
-  background: rgb(98 212 182 / 20%);
-  border-color: #62d4b6;
-  transform: translateY(-1px);
-}
-
-.miniplayer-speed-select {
-  background: #0d2b36;
-  color: #eff9f5;
-  border: 1px solid rgb(98 212 182 / 30%);
-  border-radius: 14px;
-  padding: 4px 6px;
-  font-size: 0.75rem;
-  font-weight: 600;
   cursor: pointer;
   outline: none;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
 }
 
 .miniplayer-speed-select:hover,
 .miniplayer-speed-select:focus {
   border-color: #62d4b6;
-  background: #123b4a;
+  background-color: #123b4a;
+  transform: translateY(-1px);
 }
 
 @media (max-width: 680px) {
