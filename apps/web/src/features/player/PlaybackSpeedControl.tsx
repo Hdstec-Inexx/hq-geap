@@ -18,14 +18,16 @@ export function PlaybackSpeedControl({
   variant = 'main'
 }: PlaybackSpeedControlProps) {
   const isMini = variant === 'mini';
-  const prefix = isMini ? 'miniplayer' : 'audio-player';
+  const containerClass = isMini ? 'miniplayer-speed' : 'audio-player-speed';
+  const btnClass = isMini ? 'miniplayer-btn miniplayer-speed-btn' : 'audio-player-btn audio-speed-btn';
+  const selectClass = isMini ? 'miniplayer-speed-select' : 'audio-speed-select';
   const testIdPrefix = isMini ? 'miniplayer' : 'audio';
 
   return (
-    <div className={`${prefix}-speed`} data-testid={`${testIdPrefix}-speed-control`}>
+    <div className={containerClass} data-testid={`${testIdPrefix}-speed-control`}>
       <button
         type="button"
-        className={`${isMini ? 'miniplayer-btn' : 'audio-player-btn'} ${prefix}-speed-btn`}
+        className={btnClass}
         data-testid={`${testIdPrefix}-speed-btn`}
         onClick={onCycle}
         aria-label={`Velocidade de reprodução: ${formatPlaybackRate(playbackRate)}. Clique para alternar.`}
@@ -34,7 +36,7 @@ export function PlaybackSpeedControl({
         {formatPlaybackRate(playbackRate)}
       </button>
       <select
-        className={`${prefix}-speed-select`}
+        className={selectClass}
         data-testid={`${testIdPrefix}-speed-select`}
         value={playbackRate}
         onChange={(e) => onSelect(Number(e.target.value))}

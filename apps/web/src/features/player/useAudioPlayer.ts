@@ -106,7 +106,6 @@ export function useAudioPlayer({
     if (!audio) return;
     if (audio.paused) {
       setHasEnded(false);
-      audio.playbackRate = playbackRate;
       const playPromise = audio.play();
       if (playPromise !== undefined) {
         playPromise.catch(() => {
@@ -116,7 +115,7 @@ export function useAudioPlayer({
     } else {
       audio.pause();
     }
-  }, [playbackRate]);
+  }, []);
 
   const seek = useCallback(
     (targetTime: number) => {
