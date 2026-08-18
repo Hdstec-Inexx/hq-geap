@@ -29,7 +29,8 @@ RUN pnpm --filter @hq-geap/contracts build \
     --esModuleInterop \
     --skipLibCheck \
     scripts/database.ts \
-    scripts/environment.ts
+    scripts/environment.ts \
+    scripts/reprocessar-audios.ts
 
 FROM base AS api
 ENV NODE_ENV=production
