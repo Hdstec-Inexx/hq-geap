@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { formatPlayerTime, getActiveTurnIndex } from './audio-player-logic';
+import { extractTurnTime, formatPlayerTime, getActiveTurnIndex } from './audio-player-logic';
 
 export interface TranscriptEntry {
   role: 'agent' | 'user';
   message: string;
-  time_in_call_secs: number;
+  time_in_call_secs?: number;
+  tempo_segundos?: number;
 }
 
 export interface TranscriptPanelProps {
@@ -33,39 +34,35 @@ const TranscriptLine = React.memo(function TranscriptLine({
   onSeek,
   setRef
 }: TranscriptLineProps) {
-  const isEmpty = !entry.message || entry.message.trim() === '';
+  const messageText =
+    entry.message && entry.message.trim() !== ''
+      ? entry.message
+      : '[Sem mensagem verbal]';
   const speaker = entry.role === 'agent' ? agenteNome : 'Cliente';
-  const formattedTime = formatPlayerTime(entry.time_in_call_secs);
+  const turnTime = extractTurnTime(entry) ?? 0;
+  const formattedTime = formatPlayerTime(turnTime);
 
   return (
     <article
       ref={setRef}
-      className={`transcript-line transcript-${entry.role} ${isActive ? 'active' : ''} ${isEmpty ? 'transcript-empty' : ''}`}
-      onClick={() => onSeek(entry.time_in_call_secs)}
+      className={`transcript-line transcript-${entry.role} ${isActive ? 'active' : ''}`}
+      onClick={() => onSeek(turnTime)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          onSeek(entry.time_in_call_secs);
+          onSeek(turnTime);
         }
       }}
       tabIndex={0}
       role="button"
-      aria-label={`${speaker} aos ${formattedTime}: ${isEmpty ? 'execução de ferramenta' : entry.message}`}
+      aria-label={`${speaker} aos ${formattedTime}: ${messageText}`}
       data-testid={`transcript-turn-${index}`}
-      data-time={entry.time_in_call_secs}
+      data-time={turnTime}
     >
       <span>
         {speaker} · {formattedTime}
       </span>
-      {isEmpty ? (
-        <div
-          className="transcript-empty-box"
-          data-testid="transcript-tool-call"
-          aria-hidden="true"
-        />
-      ) : (
-        <p>{entry.message}</p>
-      )}
+      <p>{messageText}</p>
     </article>
   );
 });
@@ -170,7 +167,7 @@ export function TranscriptPanel({
           ) : (
             transcricao.map((entry, index) => (
               <TranscriptLine
-                key={`${entry.time_in_call_secs}-${index}`}
+                key={`${extractTurnTime(entry) ?? index}-${index}`}
                 entry={entry}
                 index={index}
                 isActive={index === activeTurnIndex}

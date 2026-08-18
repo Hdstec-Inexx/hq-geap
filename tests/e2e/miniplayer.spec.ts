@@ -230,7 +230,9 @@ test.describe.serial('Miniplayer persistente com animações', () => {
     await page.waitForTimeout(300);
 
     // Hover no topo para abrir o miniplayer
-    await page.mouse.move(300, 5);
+    const trigger = page.getByTestId('miniplayer-trigger');
+    await expect(trigger).toBeAttached();
+    await trigger.hover();
     const miniplayer = page.getByTestId('miniplayer');
     await expect(miniplayer).toBeVisible();
 
@@ -347,7 +349,9 @@ test.describe.serial('Miniplayer persistente com animações', () => {
     await page.waitForTimeout(300);
 
     // Revela miniplayer por hover no topo
-    await page.mouse.move(300, 5);
+    const trigger = page.getByTestId('miniplayer-trigger');
+    await expect(trigger).toBeAttached();
+    await trigger.hover();
     const miniplayer = page.getByTestId('miniplayer');
     await expect(miniplayer).toBeVisible();
     await expect(page.getByTestId('miniplayer-current-time')).toBeVisible();
@@ -421,7 +425,9 @@ test.describe.serial('Miniplayer persistente com animações', () => {
     await page.waitForTimeout(300);
 
     // Revela miniplayer
-    await page.mouse.move(300, 5);
+    const trigger = page.getByTestId('miniplayer-trigger');
+    await expect(trigger).toBeAttached();
+    await trigger.hover();
     const miniSpeedBtn = page.getByTestId('miniplayer-speed-btn');
     const miniSpeedSelect = page.getByTestId('miniplayer-speed-select');
 

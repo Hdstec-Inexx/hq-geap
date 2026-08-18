@@ -89,6 +89,34 @@ test('getActiveTurnIndex tolera turnos nao ordenados cronologicamente', () => {
   assert.equal(getActiveTurnIndex(unsorted, 30), 0); // 25s
 });
 
+test('getActiveTurnIndex aceita tempo_segundos e strings numericas', () => {
+  const mixed = [
+    { role: 'agent' as const, message: 'Inicio', tempo_segundos: 0 },
+    { role: 'user' as const, message: 'Pergunta', tempo_segundos: '12.5' as unknown as number },
+    { role: 'agent' as const, message: 'Resposta', time_in_call_secs: 24 }
+  ];
+
+  assert.equal(getActiveTurnIndex(mixed, 0), 0);
+  assert.equal(getActiveTurnIndex(mixed, 12), 0);
+  assert.equal(getActiveTurnIndex(mixed, 12.5), 1);
+  assert.equal(getActiveTurnIndex(mixed, 20), 1);
+  assert.equal(getActiveTurnIndex(mixed, 24), 2);
+  assert.equal(getActiveTurnIndex(mixed, 30), 2);
+});
+
+test('getActiveTurnIndex tolera itens nulos, undefined ou time negativo', () => {
+  const malformed = [
+    null as unknown as { time_in_call_secs: number },
+    { role: 'agent' as const, message: 'Primeiro', time_in_call_secs: 0 },
+    undefined as unknown as { time_in_call_secs: number },
+    { role: 'user' as const, message: 'Segundo', tempo_segundos: -5 as unknown as number },
+    { role: 'user' as const, message: 'Terceiro', time_in_call_secs: 10 }
+  ];
+
+  assert.equal(getActiveTurnIndex(malformed, 5), 1);
+  assert.equal(getActiveTurnIndex(malformed, 15), 4);
+});
+
 test('shouldShowMiniplayer requer audioUrl, scroll alem do player e audio nao finalizado', () => {
   assert.equal(
     shouldShowMiniplayer({

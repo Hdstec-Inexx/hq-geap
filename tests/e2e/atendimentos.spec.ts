@@ -523,13 +523,18 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await expect(page.getByTestId('transcript-turn-2')).toHaveClass(/active/);
   });
 
-  test('sincronia no detalhe: clique no turno faz seek, tool_call aparece vazia e scroll manual pausa auto-scroll', async ({
+  test('sincronia no detalhe: clique no turno faz seek, ferramentas sao exibidas legivelmente sem caixas vazias e scroll manual pausa auto-scroll', async ({
     page
   }) => {
     const transcript = [
       { role: 'agent' as const, message: 'Olá, sou a Lívia.', time_in_call_secs: 0 },
       { role: 'user' as const, message: 'Preciso de atendimento.', time_in_call_secs: 10 },
-      { role: 'agent' as const, message: '', time_in_call_secs: 22 }, // tool_call vazia
+      {
+        role: 'agent' as const,
+        message:
+          '[Chamada de Ferramenta: consultar_cadastro]\n[Resultado da Ferramenta: consultar_cadastro - Sucesso]',
+        time_in_call_secs: 22
+      },
       { role: 'agent' as const, message: 'Localizei seus dados no cadastro.', time_in_call_secs: 32 },
       { role: 'user' as const, message: 'Excelente.', time_in_call_secs: 42 },
       ...Array.from({ length: 20 }, (_, i) => ({
@@ -550,19 +555,29 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await expect(page).toHaveURL('/');
     await page.goto(`/atendimentos/${atendimentoId}`);
 
-    const toolCallBox = page.getByTestId('transcript-tool-call');
-    await expect(toolCallBox).toBeVisible();
+    // Não deve renderizar caixas pontilhadas vazias
+    await expect(page.locator('.transcript-empty-box')).toHaveCount(0);
+    await expect(page.getByTestId('transcript-tool-call')).toHaveCount(0);
 
+    // Mensagens descritivas de ferramentas são exibidas legivelmente
+    await expect(page.getByText('[Chamada de Ferramenta: consultar_cadastro]')).toBeVisible();
+    await expect(
+      page.getByText('[Resultado da Ferramenta: consultar_cadastro - Sucesso]')
+    ).toBeVisible();
+
+    // Clique no turno de ferramenta move o player para o segundo exato
     const toolCallTurn = page.getByTestId('transcript-turn-2');
     await toolCallTurn.click();
     await expect(page.getByTestId('audio-current-time')).toHaveText('00:22');
     await expect(toolCallTurn).toHaveClass(/active/);
 
+    // Clique em outro turno move o player para o segundo exato
     const turn3 = page.getByTestId('transcript-turn-3');
     await turn3.click();
     await expect(page.getByTestId('audio-current-time')).toHaveText('00:32');
     await expect(turn3).toHaveClass(/active/);
 
+    // Scroll manual pausa o auto-scroll e exibe o botão "Voltar ao momento atual"
     const scroll = transcriptScroll(page);
     await scroll.hover();
     await page.mouse.wheel(0, 300);
@@ -570,6 +585,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     const resumeBtn = page.getByRole('button', { name: 'Voltar ao momento atual' });
     await expect(resumeBtn).toBeVisible();
 
+    // Clicar em "Voltar ao momento atual" retoma o scroll e esconde o botão
     await resumeBtn.click();
     await expect(resumeBtn).toBeHidden();
     await expect(turn3).toHaveClass(/active/);
