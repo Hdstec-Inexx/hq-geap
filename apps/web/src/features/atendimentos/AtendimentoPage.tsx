@@ -7,7 +7,13 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { AvaliacaoCuradorPanel } from '../avaliacoes/AvaliacaoCuradorPanel';
 import { AvaliacaoIaPanel } from '../avaliacoes/AvaliacaoIaPanel';
 import { ComentariosPanel } from '../comentarios/ComentariosPanel';
-import { AudioPlayer, Miniplayer, TranscriptPanel, useAudioPlayer } from '../player';
+import {
+  AudioDownloadButton,
+  AudioPlayer,
+  Miniplayer,
+  TranscriptPanel,
+  useAudioPlayer
+} from '../player';
 import { formatDuration, useAuthenticatedResource } from './api';
 
 const currency = new Intl.NumberFormat('pt-BR', {
@@ -39,7 +45,13 @@ function AtendimentoMedia({ atendimento }: { atendimento: AtendimentoDetail }) {
           headerContent={<p className="panel-label">Transcrição</p>}
         />
         <aside ref={mainPlayerRef} className="audio-panel">
-          <p className="panel-label">Áudio</p>
+          <div className="audio-panel-header">
+            <p className="panel-label">Áudio</p>
+            <AudioDownloadButton
+              audioUrl={atendimento.audioUrl}
+              conversationId={atendimento.conversationId}
+            />
+          </div>
           <h2>Ouça o contato completo</h2>
           <AudioPlayer audioUrl={atendimento.audioUrl} controller={player} />
         </aside>

@@ -1,6 +1,12 @@
-import type { Perfil, UserRole } from '@hq-geap/contracts/auth';
+import {
+  canDownloadAudio,
+  type Perfil,
+  type UserRole
+} from '@hq-geap/contracts/auth';
 import { createContext, useContext, type ReactNode } from 'react';
 import { getPerfil } from './session';
+
+export { canDownloadAudio };
 
 const PerfilContext = createContext<Perfil | null | undefined>(undefined);
 

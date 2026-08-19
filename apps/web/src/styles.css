@@ -1508,6 +1508,44 @@ h1 {
   background: #123b4a;
 }
 
+.audio-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.audio-download-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 10%);
+  border: 1px solid rgb(98 212 182 / 30%);
+  color: #eff9f5;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.audio-download-btn:hover {
+  background: rgb(98 212 182 / 20%);
+  border-color: #62d4b6;
+  color: #62d4b6;
+  transform: translateY(-1px);
+}
+
+.audio-download-btn:active {
+  transform: scale(0.96);
+}
+
+.audio-download-btn:focus-visible {
+  outline: 2px solid #62d4b6;
+  outline-offset: 2px;
+}
+
 .audio-panel .panel-label {
   color: #62d4b6;
 }

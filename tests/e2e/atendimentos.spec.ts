@@ -3,6 +3,7 @@ import pg from 'pg';
 import aprovada from '../fixtures/avaliacoes/avaliacao-aprovada.json' with { type: 'json' };
 import fixture from '../fixtures/elevenlabs/atendimento-concluido.json' with { type: 'json' };
 import { authUsers } from '../support/auth-fixtures.js';
+import { ensureMinioTestAudio } from '../support/audio-fixture.js';
 import {
   firstTurnFitsWithoutEmptyBox,
   longTranscript,
@@ -52,6 +53,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       values ('Lívia', 'agent-livia-test')
       on conflict (elevenlabs_agent_id) do nothing
     `);
+    await ensureMinioTestAudio(['atendimentos/teste.mp3'], 60);
   });
 
   test('rejeita credencial de ingestao invalida sem persistir estado', async ({
@@ -955,5 +957,120 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await expect(page.getByRole('heading', { name: 'Avaliação da IA' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toBeVisible();
     await expect(page.locator('.avaliacoes-lado-a-lado > .avaliacao-panel')).toHaveCount(2);
+  });
+
+  test('botão de download de áudio com controle de acesso para Admin e Gestão, bloqueado para Curador e indisponível sem áudio', async ({
+    page
+  }) => {
+    const conversationIdWithAudio = 'conv-download-audio-auth-001';
+    const atendimentoComAudioId = await createAtendimentoComTranscricao(
+      conversationIdWithAudio,
+      [
+        { role: 'agent', message: 'Olá, sou a Lívia da GEAP.', time_in_call_secs: 0 },
+        { role: 'user', message: 'Preciso do meu arquivo de áudio.', time_in_call_secs: 10 }
+      ]
+    );
+
+    // Também cria avaliação da IA para que o atendimento apareça na curadoria
+    await queryDatabase(`
+      select * from persistir_avaliacao_ia(
+        $1,
+        (select id from prompts_ia_avaliadora where ativo),
+        $2::jsonb,
+        $3::jsonb,
+        $4,
+        $5,
+        $6
+      )
+    `, [
+      atendimentoComAudioId,
+      JSON.stringify(aprovada.checklist),
+      JSON.stringify(aprovada.falhas_identificadas),
+      aprovada.resumo_atendimento,
+      aprovada.atendimento_aprovado,
+      aprovada.nota_qualidade
+    ]);
+
+    // Cria atendimento sem áudio
+    const conversationIdSemAudio = 'conv-download-no-audio-001';
+    const resultSemAudio = await queryDatabase<{ id: string }>(`
+      insert into atendimentos (
+        agente_voz_id, elevenlabs_conversation_id, status, transcricao,
+        audio_url, houve_transferencia, concluido_em, duracao_segundos,
+        motivo_contato
+      )
+      select id, $1, 'concluido'::status_atendimento,
+        '[{"role":"agent","message":"Olá sem áudio","time_in_call_secs":0}]'::jsonb,
+        null, false, now(), 30, 'Financeiro'
+      from agentes_voz
+      where elevenlabs_agent_id = 'agent-livia-test'
+      returning id
+    `, [conversationIdSemAudio]);
+    const atendimentoSemAudioId = resultSemAudio.rows[0]!.id;
+
+    // 1. Admin acessa detalhe do atendimento com áudio: vê botão e faz download com nome sugerido
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('admin@hq.test');
+    await page.getByLabel('Senha').fill('senha-admin');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto(`/atendimentos/${atendimentoComAudioId}`);
+
+    const downloadBtnAdmin = page.getByTestId('audio-download-btn');
+    await expect(downloadBtnAdmin).toBeVisible();
+    await expect(downloadBtnAdmin).toHaveAttribute('aria-label', 'Baixar áudio');
+    await expect(downloadBtnAdmin).toHaveAttribute('title', 'Baixar áudio');
+
+    const downloadPromiseAdmin = page.waitForEvent('download');
+    await downloadBtnAdmin.click();
+    const downloadAdmin = await downloadPromiseAdmin;
+    expect(downloadAdmin.suggestedFilename()).toBe(`atendimento-${conversationIdWithAudio}.mp3`);
+
+    // 1b. Admin acessa atendimento sem áudio: botão de download NÃO é exibido
+    await page.goto(`/atendimentos/${atendimentoSemAudioId}`);
+    await expect(page.getByTestId('audio-download-btn')).toHaveCount(0);
+
+    // 1c. Admin acessa revisão de curadoria: vê botão de download e dispara download
+    await page.goto(`/curadoria/${atendimentoComAudioId}`);
+    const downloadBtnAdminCuradoria = page.getByTestId('audio-download-btn');
+    await expect(downloadBtnAdminCuradoria).toBeVisible();
+    const downloadPromiseCuradoria = page.waitForEvent('download');
+    await downloadBtnAdminCuradoria.click();
+    const downloadCuradoria = await downloadPromiseCuradoria;
+    expect(downloadCuradoria.suggestedFilename()).toBe(`atendimento-${conversationIdWithAudio}.mp3`);
+
+    // 2. Gestão acessa detalhe do atendimento e revisão de curadoria: vê botão de download e dispara download
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('gestao@hq.test');
+    await page.getByLabel('Senha').fill('senha-gestao');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto(`/atendimentos/${atendimentoComAudioId}`);
+
+    const downloadBtnGestao = page.getByTestId('audio-download-btn');
+    await expect(downloadBtnGestao).toBeVisible();
+    const downloadPromiseGestao = page.waitForEvent('download');
+    await downloadBtnGestao.click();
+    const downloadGestao = await downloadPromiseGestao;
+    expect(downloadGestao.suggestedFilename()).toBe(`atendimento-${conversationIdWithAudio}.mp3`);
+
+    await page.goto(`/curadoria/${atendimentoComAudioId}`);
+    const downloadBtnGestaoCuradoria = page.getByTestId('audio-download-btn');
+    await expect(downloadBtnGestaoCuradoria).toBeVisible();
+
+    // 3. Curador acessa detalhe do atendimento e revisão de curadoria: player visível, botão de download OCULTO
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('curador@hq.test');
+    await page.getByLabel('Senha').fill('senha-curador');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto(`/atendimentos/${atendimentoComAudioId}`);
+
+    await expect(page.getByTestId('audio-player')).toBeVisible();
+    await expect(page.getByTestId('audio-download-btn')).toHaveCount(0);
+
+    await page.goto(`/curadoria/${atendimentoComAudioId}`);
+    await expect(page.getByTestId('audio-player')).toBeVisible();
+    await expect(page.getByTestId('audio-download-btn')).toHaveCount(0);
   });
 });

@@ -30,3 +30,9 @@ export type SessionIdentity = z.infer<typeof sessionIdentitySchema>;
 export type Perfil = z.infer<typeof perfilSchema>;
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 export type LoginResponse = z.infer<typeof loginResponseSchema>;
+
+/** Admin and Gestão may download audio files; Curador is restricted. */
+export function canDownloadAudio(role: UserRole | null | undefined): boolean {
+  return role === 'admin' || role === 'gestao';
+}
+
