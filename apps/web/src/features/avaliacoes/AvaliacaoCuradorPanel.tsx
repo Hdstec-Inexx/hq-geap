@@ -23,6 +23,14 @@ export function AvaliacaoCuradorPanel({
     avaliacaoCuradorResponseSchema
   );
 
+  if (state.status === 'error') {
+    return (
+      <section className="avaliacao-panel avaliacao-state">
+        Não foi possível carregar a Avaliação do Curador.
+      </section>
+    );
+  }
+
   if (state.status !== 'ready' || state.data === null) {
     return null;
   }

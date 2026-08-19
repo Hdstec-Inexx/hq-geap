@@ -79,7 +79,7 @@ test('styles.css expande a Avaliacao da IA para 100% da largura quando for o uni
   );
   assert.match(
     css,
-    /\.avaliacoes-lado-a-lado\s*\.avaliacao-panel\s*\{[^}]*transition:\s*all/i,
+    /\.avaliacoes-lado-a-lado\s*\.avaliacao-panel\s*\{[^}]*transition:\s*opacity/i,
     'painel de avaliação deve ter transição suave para expansão'
   );
   assert.match(
