@@ -6,8 +6,9 @@ import {
 import type { EstadoCriterio } from '@hq-geap/contracts/avaliacoes';
 import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { filaHref, pageFromSearch } from './pagination';
+import { curadoriasRealizadasHref, filaHref, pageFromSearch } from './pagination';
 import { apiUrl, getSession } from '../auth/session';
+
 import { canWriteAsCurador, usePerfil } from '../auth/perfil-context';
 import { formatDuration, useAuthenticatedResource } from '../atendimentos/api';
 import { ComentariosPanel } from '../comentarios/ComentariosPanel';
@@ -268,6 +269,29 @@ function ReviewForm({
   );
 }
 
+function getBackLinkInfo(searchParams: URLSearchParams): { to: string; label: string } {
+  const from = searchParams.get('from');
+  const cleanParams = new URLSearchParams(searchParams);
+  cleanParams.delete('from');
+
+  if (from === '/minhas-curadorias' || from === 'minhas-curadorias') {
+    return {
+      to: curadoriasRealizadasHref('/minhas-curadorias', cleanParams),
+      label: 'Voltar a Minhas Curadorias'
+    };
+  }
+  if (from === '/curadorias-realizadas' || from === 'curadorias-realizadas') {
+    return {
+      to: curadoriasRealizadasHref('/curadorias-realizadas', cleanParams),
+      label: 'Voltar a Curadorias Realizadas'
+    };
+  }
+  return {
+    to: filaHref(cleanParams),
+    label: 'Voltar à fila'
+  };
+}
+
 function ReviewContent({
   detail,
   searchParams,
@@ -279,6 +303,7 @@ function ReviewContent({
 }) {
   const atendimento = detail.atendimento;
   const canWrite = canWriteAsCurador(usePerfil()?.role);
+  const backLink = getBackLinkInfo(searchParams);
   return (
     <main className="atendimentos-page curadoria-review-page">
       <header className="atendimentos-heading">
@@ -287,8 +312,9 @@ function ReviewContent({
           <h1>Revisar Atendimento</h1>
           <p className="atendimento-id">{atendimento.conversationId}</p>
         </div>
-        <Link className="back-link" to={filaHref(searchParams)}>Voltar à fila</Link>
+        <Link className="back-link" to={backLink.to}>{backLink.label}</Link>
       </header>
+
 
       <section className="atendimento-facts" aria-label="Dados do Atendimento">
         <div><span>Motivo de Contato</span><strong>{atendimento.motivoContato ?? 'Não informado'}</strong></div>
@@ -429,7 +455,8 @@ export function CuradoriaReviewPage() {
     <ReviewContent
       detail={state.data}
       searchParams={searchParams}
-      onSaved={() => navigate(filaHref(searchParams))}
+      onSaved={() => navigate(getBackLinkInfo(searchParams).to)}
     />
+
   );
 }

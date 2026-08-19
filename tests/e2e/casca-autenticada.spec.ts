@@ -24,25 +24,29 @@ const areasPorPapel: Record<AuthRole, string[]> = {
   curador: [
     'Consultar Atendimentos',
     'Monitoramento ao Vivo',
-    'Abrir Fila de Curadoria'
+    'Abrir Fila de Curadoria',
+    'Minhas Curadorias'
   ],
   gestao: [
     'Abrir Dashboard da Gestão',
     'Consultar Atendimentos',
     'Monitoramento ao Vivo',
-    'Consultar Fila de Curadoria'
+    'Consultar Fila de Curadoria',
+    'Curadorias Realizadas'
   ],
   admin: [
     'Abrir Dashboard da Gestão',
     'Consultar Atendimentos',
     'Monitoramento ao Vivo',
     'Abrir Fila de Curadoria',
+    'Curadorias Realizadas',
     'Trabalhar fila de manutenção',
     'Administrar usuários',
     'Configurar IA Avaliadora',
     'Consultar Régua de Avaliação'
   ]
 };
+
 
 const todosOsDestinos = [
   ...new Set(Object.values(areasPorPapel).flat())

@@ -9,14 +9,15 @@ export {
   resolvePage as resolveFilaPage
 } from '../pagination.js';
 
-export function filaHref(
+export function curadoriasRealizadasHref(
+  basePath: string,
   searchParamsOrPage: URLSearchParams | number,
   page?: number
 ): string {
   if (typeof searchParamsOrPage === 'number') {
     return searchParamsOrPage <= 1
-      ? '/curadoria'
-      : `/curadoria?page=${searchParamsOrPage}`;
+      ? basePath
+      : `${basePath}?page=${searchParamsOrPage}`;
   }
   const next = new URLSearchParams(searchParamsOrPage);
   const targetPage = page !== undefined ? page : pageFromSearch(searchParamsOrPage);
@@ -26,20 +27,38 @@ export function filaHref(
     next.set('page', String(targetPage));
   }
   const query = next.toString();
-  return query ? `/curadoria?${query}` : '/curadoria';
+  return query ? `${basePath}?${query}` : basePath;
+}
+
+export function filaHref(
+  searchParamsOrPage: URLSearchParams | number,
+  page?: number
+): string {
+  return curadoriasRealizadasHref('/curadoria', searchParamsOrPage, page);
 }
 
 export function reviewHref(
   atendimentoId: string,
-  searchParamsOrPage: URLSearchParams | number
+  searchParamsOrPage: URLSearchParams | number,
+  fromPath?: string
 ): string {
   if (typeof searchParamsOrPage === 'number') {
-    return searchParamsOrPage <= 1
-      ? `/curadoria/${atendimentoId}`
-      : `/curadoria/${atendimentoId}?page=${searchParamsOrPage}`;
+    const next = new URLSearchParams();
+    if (searchParamsOrPage > 1) next.set('page', String(searchParamsOrPage));
+    if (fromPath) next.set('from', fromPath);
+    const query = next.toString();
+    return query
+      ? `/curadoria/${atendimentoId}?${query}`
+      : `/curadoria/${atendimentoId}`;
   }
-  const query = searchParamsOrPage.toString();
+  const next = new URLSearchParams(searchParamsOrPage);
+  if (fromPath) {
+    next.set('from', fromPath);
+  }
+  const query = next.toString();
   return query
     ? `/curadoria/${atendimentoId}?${query}`
     : `/curadoria/${atendimentoId}`;
 }
+
+

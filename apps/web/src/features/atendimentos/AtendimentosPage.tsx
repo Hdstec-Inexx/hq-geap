@@ -1,6 +1,7 @@
 import {
   atendimentoListSchema
 } from '@hq-geap/contracts/atendimentos';
+import { curadoresListSchema } from '@hq-geap/contracts/curadoria';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { formatDuration, useAuthenticatedResource } from './api';
@@ -60,19 +61,31 @@ export function AtendimentosPage() {
   const inicioParam = searchParams.get('inicio') ?? '';
   const fimParam = searchParams.get('fim') ?? '';
   const motivoParam = searchParams.get('motivo') ?? '';
+  const curadoriaStatusParam = searchParams.get('curadoriaStatus') ?? '';
+  const curadorIdParam = searchParams.get('curadorId') ?? '';
   const indicador = searchParams.get('indicador');
   const isDetalhamento = Boolean(indicador && inicioParam && fimParam);
-  const hasActiveFilters = Boolean(!isDetalhamento && (inicioParam || fimParam || motivoParam));
+  const hasActiveFilters = Boolean(
+    !isDetalhamento &&
+      (inicioParam || fimParam || motivoParam || curadoriaStatusParam || curadorIdParam)
+  );
 
   const [draftInicio, setDraftInicio] = useState(inicioParam);
   const [draftFim, setDraftFim] = useState(fimParam);
   const [draftMotivo, setDraftMotivo] = useState(motivoParam);
+  const [draftCuradoriaStatus, setDraftCuradoriaStatus] = useState(curadoriaStatusParam);
+  const [draftCuradorId, setDraftCuradorId] = useState(curadorIdParam);
+
+  const curadoresState = useAuthenticatedResource('/curadores', curadoresListSchema);
+  const curadores = curadoresState.status === 'ready' ? curadoresState.data : [];
 
   useEffect(() => {
     setDraftInicio(inicioParam);
     setDraftFim(fimParam);
     setDraftMotivo(motivoParam);
-  }, [inicioParam, fimParam, motivoParam]);
+    setDraftCuradoriaStatus(curadoriaStatusParam);
+    setDraftCuradorId(curadorIdParam);
+  }, [inicioParam, fimParam, motivoParam, curadoriaStatusParam, curadorIdParam]);
 
   const listQuery = new URLSearchParams({
     limit: String(PAGE_SIZE),
@@ -86,6 +99,8 @@ export function AtendimentosPage() {
     if (inicioParam) listQuery.set('inicio', inicioParam);
     if (fimParam) listQuery.set('fim', fimParam);
     if (motivoParam) listQuery.set('motivo', motivoParam);
+    if (curadoriaStatusParam) listQuery.set('curadoriaStatus', curadoriaStatusParam);
+    if (curadorIdParam) listQuery.set('curadorId', curadorIdParam);
   }
   const requestPath = `/atendimentos?${listQuery.toString()}`;
   const state = useAuthenticatedResource(requestPath, atendimentoListSchema);
@@ -113,6 +128,8 @@ export function AtendimentosPage() {
       }
     }
     if (draftMotivo.trim()) next.set('motivo', draftMotivo.trim());
+    if (draftCuradoriaStatus) next.set('curadoriaStatus', draftCuradoriaStatus);
+    if (draftCuradorId) next.set('curadorId', draftCuradorId);
     navigate(paginationHref(next, 1));
   }
 
@@ -120,6 +137,8 @@ export function AtendimentosPage() {
     setDraftInicio('');
     setDraftFim('');
     setDraftMotivo('');
+    setDraftCuradoriaStatus('');
+    setDraftCuradorId('');
     navigate('/atendimentos');
   }
 
@@ -198,6 +217,35 @@ export function AtendimentosPage() {
                 value={draftMotivo}
               />
             </label>
+            <label>
+              Status da Curadoria
+              <select
+                id="atendimentos-curadoria-status-filtro"
+                name="curadoriaStatus"
+                onChange={(event) => setDraftCuradoriaStatus(event.target.value)}
+                value={draftCuradoriaStatus}
+              >
+                <option value="">Todos</option>
+                <option value="realizada">Realizada</option>
+                <option value="pendente">Pendente</option>
+              </select>
+            </label>
+            <label>
+              Curador
+              <select
+                id="atendimentos-curador-filtro"
+                name="curadorId"
+                onChange={(event) => setDraftCuradorId(event.target.value)}
+                value={draftCuradorId}
+              >
+                <option value="">Todos os curadores</option>
+                {curadores.map((curador) => (
+                  <option key={curador.id} value={curador.id}>
+                    {curador.nome}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
           <div className="atendimentos-filters-actions">
             <button className="primary-action" type="submit">
@@ -238,9 +286,20 @@ export function AtendimentosPage() {
             return (
               <article className="atendimento-row" key={atendimento.id}>
                 <div className="atendimento-row-main">
-                  <span className={`atendimento-status ${atendimento.status}`}>
-                    {atendimento.status === 'concluido' ? 'Concluído' : 'Em andamento'}
-                  </span>
+                  <div className="atendimento-badges">
+                    <span className={`atendimento-status ${atendimento.status}`}>
+                      {atendimento.status === 'concluido' ? 'Concluído' : 'Em andamento'}
+                    </span>
+                    {atendimento.curadoria?.realizada ? (
+                      <span className="atendimento-curadoria-badge realizada">
+                        Curadoria: {atendimento.curadoria.curadorNome ?? 'Realizada'}
+                      </span>
+                    ) : atendimento.status === 'concluido' ? (
+                      <span className="atendimento-curadoria-badge pendente">
+                        Curadoria pendente
+                      </span>
+                    ) : null}
+                  </div>
                   <Link to={atendimentoHref(atendimento.id, searchParams)}>
                     {atendimento.motivoContato ?? 'Motivo não informado'}
                   </Link>
