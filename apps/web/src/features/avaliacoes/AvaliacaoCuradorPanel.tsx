@@ -23,26 +23,8 @@ export function AvaliacaoCuradorPanel({
     avaliacaoCuradorResponseSchema
   );
 
-  if (state.status === 'loading') {
-    return (
-      <section className="avaliacao-panel avaliacao-state">
-        Carregando Avaliação do Curador...
-      </section>
-    );
-  }
-  if (state.status === 'error') {
-    return (
-      <section className="avaliacao-panel avaliacao-state">
-        Não foi possível carregar a Avaliação do Curador.
-      </section>
-    );
-  }
-  if (state.data === null) {
-    return (
-      <section className="avaliacao-panel avaliacao-state">
-        Avaliação do Curador ainda não disponível.
-      </section>
-    );
+  if (state.status !== 'ready' || state.data === null) {
+    return null;
   }
 
   const avaliacao = state.data;

@@ -646,4 +646,70 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await page.getByRole('button', { name: 'Limpar filtros' }).click();
     await expect(page).toHaveURL('/atendimentos');
   });
+
+  async function createAvaliacaoIa(atendimentoId: string) {
+    const result = await queryDatabase<{ avaliacao_id: string }>(`
+      select avaliacao_id from persistir_avaliacao_ia(
+        $1,
+        (select id from prompts_ia_avaliadora where ativo),
+        $2::jsonb,
+        $3::jsonb,
+        $4,
+        $5,
+        $6
+      )
+    `, [
+      atendimentoId,
+      JSON.stringify(aprovada.checklist),
+      JSON.stringify(aprovada.falhas_identificadas),
+      aprovada.resumo_atendimento,
+      aprovada.atendimento_aprovado,
+      aprovada.nota_qualidade
+    ]);
+    return result.rows[0]?.avaliacao_id;
+  }
+
+  test('exibição condicional da Avaliação do Curador: oculta quando inexistente e exibe lado a lado quando concluída', async ({
+    page
+  }) => {
+    const semCuradoriaId = await createAtendimentoComTranscricao(
+      'conv-atend-sem-curadoria',
+      shortTranscript
+    );
+    await createAvaliacaoIa(semCuradoriaId);
+
+    const comCuradoriaId = await createAtendimentoComTranscricao(
+      'conv-atend-com-curadoria',
+      shortTranscript
+    );
+    const avaliacaoIaId = await createAvaliacaoIa(comCuradoriaId);
+    await queryDatabase(`
+      insert into avaliacoes_curador (
+        atendimento_id, avaliacao_ia_id, autor_usuario_id, autor_usuario_nome,
+        nota, falhas_identificadas, nota_avaliacao_ia, resumo_atendimento
+      )
+      select
+        $1, $2, u.id, u.nome, 9.0, '[]'::jsonb, 9.5, 'Resumo do curador'
+      from usuarios u where u.email = 'curador@hq.test'
+    `, [comCuradoriaId, avaliacaoIaId]);
+
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('gestao@hq.test');
+    await page.getByLabel('Senha').fill('senha-gestao');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+
+    // 1. Atendimento sem curadoria: renderiza apenas IA, sem placeholder nem card vazio de Curador
+    await page.goto(`/atendimentos/${semCuradoriaId}`);
+    await expect(page.getByRole('heading', { name: 'Avaliação da IA' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toHaveCount(0);
+    await expect(page.getByText('Avaliação do Curador ainda não disponível')).toHaveCount(0);
+    await expect(page.locator('.avaliacoes-lado-a-lado > .avaliacao-panel')).toHaveCount(1);
+
+    // 2. Atendimento com curadoria: renderiza IA e Curador lado a lado
+    await page.goto(`/atendimentos/${comCuradoriaId}`);
+    await expect(page.getByRole('heading', { name: 'Avaliação da IA' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toBeVisible();
+    await expect(page.locator('.avaliacoes-lado-a-lado > .avaliacao-panel')).toHaveCount(2);
+  });
 });
