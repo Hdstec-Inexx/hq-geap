@@ -38,6 +38,17 @@ export function buildDetalhamentoFilters(
     clauses.push(`coalesce(a.motivo_contato, 'Nao informado') = ${motivo}`);
   }
 
+  if (query.curadoriaStatus === 'realizada') {
+    clauses.push('cur.id is not null');
+  } else if (query.curadoriaStatus === 'pendente') {
+    clauses.push("a.status = 'concluido' and cur.id is null");
+  }
+
+  if (query.curadorId) {
+    const curadorId = param(query.curadorId);
+    clauses.push(`cur.autor_usuario_id = ${curadorId}::uuid`);
+  }
+
   switch (query.indicador) {
     case undefined:
       break;
