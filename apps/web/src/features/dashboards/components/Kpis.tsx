@@ -76,7 +76,7 @@ function DualKpiCard({
   curadorValue: string;
 }) {
   return (
-    <article className="dashboard-kpi-nota">
+    <article className="dashboard-kpi-dual">
       <span>{label}</span>
       <strong>
         <Link aria-label={iaAriaLabel} to={iaHref}>

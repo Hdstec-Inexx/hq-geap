@@ -2979,7 +2979,8 @@ h1 {
   white-space: nowrap;
 }
 
-.dashboard-kpi-nota strong a {
+.dashboard-kpi-nota strong a,
+.dashboard-kpi-dual strong a {
   color: inherit;
   text-decoration: underline;
   text-decoration-skip-ink: none;
