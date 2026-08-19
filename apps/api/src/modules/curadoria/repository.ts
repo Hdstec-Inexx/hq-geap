@@ -14,6 +14,21 @@ export type FilaCuradoriaRow = {
   notaIa: string;
 };
 
+export type CuradoriaRealizadaRow = {
+  id: string;
+  conversationId: string;
+  agenteVozNome: string;
+  concluidoEm: Date;
+  duracaoSegundos: number | null;
+  motivoContato: string | null;
+  notaIa: string;
+  curadorId: string;
+  curadorNome: string;
+  notaCurador: string;
+  realizadaEm: Date;
+};
+
+
 export type AvaliacaoCuradorRow = {
   id: string;
   atendimentoId: string;
@@ -122,6 +137,13 @@ export type FilaCuradoriaFilters = {
   motivo?: string;
 };
 
+export type CuradoriasRealizadasFilters = {
+  inicio?: string;
+  fim?: string;
+  motivo?: string;
+  curadorId?: string;
+};
+
 export function buildFilaCuradoriaFilters(
   filters: FilaCuradoriaFilters,
   startIndex = 1
@@ -154,6 +176,25 @@ export function buildFilaCuradoriaFilters(
 
   return { clauses, values };
 }
+
+export function buildCuradoriasRealizadasFilters(
+  filters: CuradoriasRealizadasFilters,
+  startIndex = 1
+) {
+  const base = buildFilaCuradoriaFilters(filters, startIndex);
+  const clauses = [...base.clauses];
+  const values = [...base.values];
+
+  if (filters.curadorId) {
+    values.push(filters.curadorId);
+    const placeholder = `$${startIndex + base.values.length}`;
+    clauses.push(`cur.autor_usuario_id = ${placeholder}::uuid`);
+  }
+
+  return { clauses, values };
+}
+
+
 
 export function createCuradoriaRepository(db: pg.Pool) {
   return {
@@ -200,6 +241,67 @@ export function createCuradoriaRepository(db: pg.Pool) {
         total: Number(count.rows[0]?.total ?? 0)
       };
     },
+
+    async listRealizadas(
+      query: {
+        limit: number;
+        offset: number;
+        inicio?: string;
+        fim?: string;
+        motivo?: string;
+        curadorId?: string;
+      }
+    ): Promise<{ items: CuradoriaRealizadaRow[]; total: number }> {
+      const selectFilters = buildCuradoriasRealizadasFilters(query, 3);
+      const countFilters = buildCuradoriasRealizadasFilters(query, 1);
+
+      const whereClauseSelect =
+        selectFilters.clauses.length > 0
+          ? `and ${selectFilters.clauses.join(' and ')}`
+          : '';
+      const whereClauseCount =
+        countFilters.clauses.length > 0
+          ? `and ${countFilters.clauses.join(' and ')}`
+          : '';
+
+      const [count, result] = await Promise.all([
+        db.query<{ total: string }>(`
+          select count(*)::text as total
+          from atendimentos a
+          join avaliacoes ia on ia.atendimento_id = a.id and ia.autor = 'ia'
+          join avaliacoes_curador_mais_recentes cur on cur.atendimento_id = a.id
+          where a.status = 'concluido'
+          ${whereClauseCount}
+        `, countFilters.values),
+        db.query<CuradoriaRealizadaRow>(`
+          select
+            a.id,
+            a.elevenlabs_conversation_id as "conversationId",
+            agente.nome as "agenteVozNome",
+            a.concluido_em as "concluidoEm",
+            a.duracao_segundos as "duracaoSegundos",
+            a.motivo_contato as "motivoContato",
+            ia.nota as "notaIa",
+            cur.autor_usuario_id as "curadorId",
+            cur.autor_usuario_nome as "curadorNome",
+            cur.nota as "notaCurador",
+            cur.criado_em as "realizadaEm"
+          from atendimentos a
+          join agentes_voz agente on agente.id = a.agente_voz_id
+          join avaliacoes ia on ia.atendimento_id = a.id and ia.autor = 'ia'
+          join avaliacoes_curador_mais_recentes cur on cur.atendimento_id = a.id
+          where a.status = 'concluido'
+          ${whereClauseSelect}
+          order by cur.criado_em desc, a.id desc
+          limit $1 offset $2
+        `, [query.limit, query.offset, ...selectFilters.values])
+      ]);
+      return {
+        items: result.rows,
+        total: Number(count.rows[0]?.total ?? 0)
+      };
+    },
+
 
     async findDetail(atendimentoId: string): Promise<CuradoriaAtendimentoRow | null> {
       const atendimento = await db.query<Omit<AtendimentoRow, 'transcricao' | 'audioReference'> & {
