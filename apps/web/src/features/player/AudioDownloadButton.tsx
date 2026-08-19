@@ -1,4 +1,3 @@
-import type { UserRole } from '@hq-geap/contracts/auth';
 import { usePerfil } from '../auth/perfil-context';
 import {
   getAudioDownloadFilename,
@@ -9,18 +8,15 @@ import {
 export interface AudioDownloadButtonProps {
   audioUrl: string | null;
   conversationId: string;
-  role?: UserRole | null;
 }
 
 export function AudioDownloadButton({
   audioUrl,
-  conversationId,
-  role
+  conversationId
 }: AudioDownloadButtonProps) {
   const perfil = usePerfil();
-  const effectiveRole = role !== undefined ? role : perfil?.role;
 
-  if (!shouldShowAudioDownloadButton({ role: effectiveRole, audioUrl }) || !audioUrl) {
+  if (!shouldShowAudioDownloadButton({ role: perfil?.role, audioUrl }) || !audioUrl) {
     return null;
   }
 

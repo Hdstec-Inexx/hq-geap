@@ -194,7 +194,9 @@ export async function triggerAudioDownload(
     const blob = await response.blob();
     const objectUrl = URL.createObjectURL(blob);
     triggerAnchorDownload(objectUrl, filename);
-    URL.revokeObjectURL(objectUrl);
+    setTimeout(() => {
+      URL.revokeObjectURL(objectUrl);
+    }, 1000);
   } catch {
     triggerAnchorDownload(audioUrl, filename);
   }
