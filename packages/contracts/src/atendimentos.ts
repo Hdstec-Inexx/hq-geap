@@ -368,6 +368,8 @@ export const detalhamentoIndicadorSchema = z.enum([
   'sla',
   'nota_media_ia',
   'nota_media_curador',
+  'avaliados_ia',
+  'avaliados_curador',
   'promessas',
   'tempo_resolucao',
   'motivo',

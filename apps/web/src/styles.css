@@ -1256,10 +1256,14 @@ h1 {
 }
 
 .avaliacao-heading h2 {
-  margin: 10px 0 0;
+  margin: 0;
   font-family: Georgia, "Times New Roman", serif;
   font-size: clamp(2rem, 5vw, 3.3rem);
   font-weight: 400;
+}
+
+.avaliacao-heading .panel-label + h2 {
+  margin-top: 10px;
 }
 
 .avaliacao-score {
@@ -1352,6 +1356,31 @@ h1 {
 .avaliacao-notes p,
 .avaliacao-notes ul {
   line-height: 1.6;
+}
+
+.avaliacao-resumo-scroll {
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: #9bbcb2 transparent;
+}
+
+.avaliacao-resumo-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.avaliacao-resumo-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.avaliacao-resumo-scroll::-webkit-scrollbar-thumb {
+  background: #9bbcb2;
+  border-radius: 3px;
+}
+
+.avaliacao-resumo-scroll::-webkit-scrollbar-thumb:hover {
+  background: #16816f;
 }
 
 .monitoramento-live-panel {
@@ -3008,12 +3037,33 @@ h1 {
   font-size: clamp(1.7rem, 3vw, 2.7rem);
   font-weight: 400;
   letter-spacing: -0.04em;
+  white-space: nowrap;
 }
 
-.dashboard-kpi-nota strong a {
+.dashboard-kpi-nota strong a,
+.dashboard-kpi-dual strong a {
   color: inherit;
   text-decoration: underline;
-  text-underline-offset: 3px;
+  text-decoration-skip-ink: none;
+  text-underline-offset: 4px;
+}
+
+.dashboard-kpi-separator {
+  display: inline-block;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-weight: 300;
+  font-size: 0.78em;
+  vertical-align: 0.08em;
+  letter-spacing: normal;
+  padding: 0 0.12em;
+}
+
+.dashboard-kpi-symbol {
+  display: inline-block;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  vertical-align: 0.02em;
+  line-height: 1;
+  letter-spacing: normal;
 }
 
 .concordancia-summary a {
@@ -3102,8 +3152,10 @@ h1 {
   display: grid;
   gap: 12px;
   margin: 0;
-  padding: 0;
+  padding: 0 6px 0 0;
   list-style: none;
+  max-height: 190px;
+  overflow-y: auto;
 }
 
 .motivos-legend li {

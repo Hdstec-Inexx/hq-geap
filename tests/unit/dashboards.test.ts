@@ -8,6 +8,7 @@ import {
 } from '../../packages/contracts/src/dashboards.js';
 import type { DashboardRepository } from '../../apps/api/src/modules/dashboards/repository.js';
 import { getDashboard } from '../../apps/api/src/modules/dashboards/service.js';
+import { detalhamentoListPath } from '../../apps/web/src/features/dashboards/detalhamento.js';
 
 test('rejeita periodos maiores que um ano', () => {
   const result = dashboardPeriodSchema.safeParse({
@@ -30,11 +31,15 @@ test('contrato de KPIs expoe o strip operacional acordado', () => {
     slaMeta: 80,
     notaMediaIa: 7.5,
     notaMediaCurador: 7,
+    avaliadosIa: 10,
+    avaliadosCurador: 4,
     taxaPromessasCumpridas: 100,
     tempoMedioAteResolucao: 60
   });
 
   assert.deepEqual(Object.keys(parsed).sort(), [
+    'avaliadosCurador',
+    'avaliadosIa',
     'notaMediaCurador',
     'notaMediaIa',
     'sla',
@@ -71,6 +76,8 @@ test('consulta as partes do dashboard sem ocupar varias conexoes simultaneamente
         dentroSla: '1',
         notaMediaIa: '7',
         notaMediaCurador: '6.5',
+        avaliadosIa: '2',
+        avaliadosCurador: '1',
         toolsTotal: '3',
         toolsSuccessful: '2',
         tempoMedioAteResolucao: '60'
@@ -102,6 +109,8 @@ test('consulta as partes do dashboard sem ocupar varias conexoes simultaneamente
     slaMeta: 80,
     notaMediaIa: 7,
     notaMediaCurador: 6.5,
+    avaliadosIa: 2,
+    avaliadosCurador: 1,
     taxaPromessasCumpridas: 66.7,
     tempoMedioAteResolucao: 60
   });
@@ -116,6 +125,8 @@ test('KPIs nulos quando nao ha amostra para media ou taxa', async () => {
       dentroSla: '0',
       notaMediaIa: null,
       notaMediaCurador: null,
+      avaliadosIa: '0',
+      avaliadosCurador: '0',
       toolsTotal: '0',
       toolsSuccessful: '0',
       tempoMedioAteResolucao: null
@@ -145,6 +156,8 @@ test('KPIs nulos quando nao ha amostra para media ou taxa', async () => {
     slaMeta: 80,
     notaMediaIa: null,
     notaMediaCurador: null,
+    avaliadosIa: 0,
+    avaliadosCurador: 0,
     taxaPromessasCumpridas: null,
     tempoMedioAteResolucao: null
   });
@@ -159,6 +172,8 @@ test('SLA usa volume do periodo como denominador (volume 2, dentroSla 1 → 50%)
       dentroSla: '1',
       notaMediaIa: '7',
       notaMediaCurador: '6.5',
+      avaliadosIa: '2',
+      avaliadosCurador: '1',
       toolsTotal: '3',
       toolsSuccessful: '2',
       tempoMedioAteResolucao: '60'
@@ -186,4 +201,26 @@ test('SLA usa volume do periodo como denominador (volume 2, dentroSla 1 → 50%)
   assert.equal('tmeSegundos' in dashboard.kpis, false);
   assert.equal(dashboard.kpis.sla, 50);
   assert.equal(dashboard.kpis.slaMeta, 80);
+});
+
+test('detalhamentoListPath monta URLs para avaliados_ia e avaliados_curador', () => {
+  const iaUrl = detalhamentoListPath({
+    inicio: '2025-01-01',
+    fim: '2025-01-31',
+    indicador: 'avaliados_ia'
+  });
+  assert.equal(
+    iaUrl,
+    '/atendimentos?inicio=2025-01-01&fim=2025-01-31&indicador=avaliados_ia'
+  );
+
+  const curadorUrl = detalhamentoListPath({
+    inicio: '2025-01-01',
+    fim: '2025-01-31',
+    indicador: 'avaliados_curador'
+  });
+  assert.equal(
+    curadorUrl,
+    '/atendimentos?inicio=2025-01-01&fim=2025-01-31&indicador=avaliados_curador'
+  );
 });
