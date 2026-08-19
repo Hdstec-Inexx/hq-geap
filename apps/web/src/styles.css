@@ -3083,22 +3083,38 @@ h1 {
   white-space: nowrap;
 }
 
+.dashboard-kpi-dual strong {
+  display: flex;
+  align-items: baseline;
+  white-space: nowrap;
+  font-size: clamp(1.25rem, 2.1vw, 1.85rem);
+  letter-spacing: -0.03em;
+}
+
 .dashboard-kpi-nota strong a,
 .dashboard-kpi-dual strong a {
   color: inherit;
   text-decoration: underline;
   text-decoration-skip-ink: none;
-  text-underline-offset: 4px;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+
+.dashboard-kpi-dual strong a:hover {
+  color: #16816f;
 }
 
 .dashboard-kpi-separator {
   display: inline-block;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-weight: 300;
-  font-size: 0.78em;
-  vertical-align: 0.08em;
+  font-size: 0.72em;
+  color: var(--dashboard-muted);
+  vertical-align: 0.05em;
   letter-spacing: normal;
-  padding: 0 0.12em;
+  padding: 0 0.18em;
+  user-select: none;
+  white-space: nowrap;
 }
 
 .dashboard-kpi-symbol {
@@ -3158,8 +3174,8 @@ h1 {
 
 .motivos-chart-layout {
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr);
-  gap: 28px;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 24px;
   align-items: center;
 }
 
@@ -3170,9 +3186,9 @@ h1 {
 }
 
 .motivos-chart-frame {
-  width: 180px;
-  height: 180px;
-  min-height: 180px;
+  width: 160px;
+  height: 160px;
+  min-height: 160px;
 }
 
 .criterios-chart-frame {
@@ -3193,26 +3209,73 @@ h1 {
 
 .motivos-legend {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   margin: 0;
-  padding: 0 6px 0 0;
+  padding: 0 8px 0 0;
   list-style: none;
   max-height: 190px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #9bbcb2 transparent;
+}
+
+.motivos-legend::-webkit-scrollbar {
+  width: 4px;
+}
+
+.motivos-legend::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.motivos-legend::-webkit-scrollbar-thumb {
+  background: #9bbcb2;
+  border-radius: 4px;
+}
+
+.motivos-legend::-webkit-scrollbar-thumb:hover {
+  background: #16816f;
 }
 
 .motivos-legend li {
   display: grid;
-  grid-template-columns: 12px minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
-  font-size: 0.87rem;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: 8px 10px;
+  align-items: baseline;
+  font-size: 0.85rem;
+  line-height: 1.35;
 }
 
 .motivos-swatch {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 2px;
+  align-self: center;
+  transform: translateY(1px);
+}
+
+.motivos-legend a {
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.15s ease;
+}
+
+.motivos-legend a:hover {
+  text-decoration-color: currentColor;
+}
+
+.motivos-legend li strong {
+  white-space: nowrap;
+  font-family: Consolas, monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--dashboard-ink);
+  text-align: right;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 @media (max-width: 720px) {

@@ -83,7 +83,7 @@ function DualKpiCard({
           {iaValue}
         </Link>
         <span className="dashboard-kpi-separator" aria-hidden="true">
-          {' × '}
+          ×
         </span>
         <Link aria-label={curadorAriaLabel} to={curadorHref}>
           {curadorValue}
