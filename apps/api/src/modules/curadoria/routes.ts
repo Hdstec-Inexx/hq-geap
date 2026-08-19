@@ -1,9 +1,11 @@
 import {
+  curadoriasRealizadasQuerySchema,
   filaCuradoriaQuerySchema,
   salvarConferenciaSchema,
   type AvaliacaoCurador,
   type CuradorItem,
   type CuradoriaDetail,
+  type CuradoriasRealizadasPage,
   type FilaCuradoriaPage
 } from '@hq-geap/contracts/curadoria';
 import type { FastifyPluginAsync } from 'fastify';
@@ -12,6 +14,7 @@ import {
   calcularConferencia,
   toAvaliacaoCurador,
   toCuradoriaDetail,
+  toCuradoriaRealizadaItem,
   toFilaCuradoriaItem
 } from './service.js';
 
@@ -29,6 +32,28 @@ const routes: FastifyPluginAsync = async (app) => {
   app.get('/curadores', readAuth, async (): Promise<CuradorItem[]> => {
     return repository.listCuradores();
   });
+
+  app.get('/curadorias-realizadas', readAuth, async (request): Promise<CuradoriasRealizadasPage> => {
+    const query = curadoriasRealizadasQuerySchema.safeParse(request.query);
+    if (!query.success) {
+      throw app.httpErrors.badRequest('Invalid Curadorias Realizadas query');
+    }
+    const curadorId =
+      request.authUser?.role === 'curador'
+        ? request.authUser.id
+        : query.data.curadorId;
+
+    const page = await repository.listRealizadas({
+      ...query.data,
+      curadorId
+    });
+    return {
+      items: page.items.map(toCuradoriaRealizadaItem),
+      total: page.total
+    };
+  });
+
+
 
   app.get('/curadoria', readAuth, async (request): Promise<FilaCuradoriaPage> => {
     const query = filaCuradoriaQuerySchema.safeParse(request.query);

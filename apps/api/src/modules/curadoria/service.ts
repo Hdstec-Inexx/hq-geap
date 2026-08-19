@@ -2,9 +2,11 @@ import type { EstadoCriterio } from '@hq-geap/contracts/avaliacoes';
 import {
   avaliacaoCuradorSchema,
   curadoriaDetailSchema,
+  curadoriaRealizadaItemSchema,
   filaCuradoriaItemSchema,
   type AvaliacaoCurador,
   type CuradoriaDetail,
+  type CuradoriaRealizadaItem,
   type FilaCuradoriaItem
 } from '@hq-geap/contracts/curadoria';
 import { toAtendimentoDetail } from '../atendimentos/service.js';
@@ -13,8 +15,10 @@ import { toAvaliacaoIa } from '../avaliacoes/service.js';
 import type {
   AvaliacaoCuradorRow,
   CuradoriaAtendimentoRow,
+  CuradoriaRealizadaRow,
   FilaCuradoriaRow
 } from './repository.js';
+
 
 export type CriterioConferencia = {
   criterioId: string;
@@ -91,6 +95,19 @@ export function toFilaCuradoriaItem(row: FilaCuradoriaRow): FilaCuradoriaItem {
     notaIa: Number(row.notaIa)
   });
 }
+
+export function toCuradoriaRealizadaItem(
+  row: CuradoriaRealizadaRow
+): CuradoriaRealizadaItem {
+  return curadoriaRealizadaItemSchema.parse({
+    ...row,
+    concluidoEm: row.concluidoEm.toISOString(),
+    notaIa: Number(row.notaIa),
+    notaCurador: Number(row.notaCurador),
+    realizadaEm: row.realizadaEm.toISOString()
+  });
+}
+
 
 export function toAvaliacaoCurador(row: AvaliacaoCuradorRow): AvaliacaoCurador {
   const nota = Number(row.nota);

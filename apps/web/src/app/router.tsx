@@ -11,7 +11,9 @@ import { AtendimentoPage } from '../features/atendimentos/AtendimentoPage';
 import { AtendimentosPage } from '../features/atendimentos/AtendimentosPage';
 import {
   CuradoriaReviewRoute,
-  FilaCuradoriaRoute
+  CuradoriasRealizadasRoute,
+  FilaCuradoriaRoute,
+  MinhasCuradoriasRoute
 } from '../features/curadoria/routes';
 import { DashboardRoute } from '../features/dashboards/routes';
 import {
@@ -44,6 +46,12 @@ export const router = createBrowserRouter([
                 element: MonitoramentoLiveRoute
               },
               {
+                element: <RequireRole roles={['curador']} />,
+                children: [
+                  { path: '/minhas-curadorias', element: MinhasCuradoriasRoute }
+                ]
+              },
+              {
                 element: <RequireRole roles={['admin']} />,
                 children: [
                   { path: '/admin', element: <HomePage /> },
@@ -64,7 +72,11 @@ export const router = createBrowserRouter([
                 children: [
                   { path: '/dashboard', element: DashboardRoute },
                   { path: '/gestao', element: <HomePage /> },
-                  { path: '/gestao/dashboard', element: DashboardRoute }
+                  { path: '/gestao/dashboard', element: DashboardRoute },
+                  {
+                    path: '/curadorias-realizadas',
+                    element: CuradoriasRealizadasRoute
+                  }
                 ]
               },
               {
@@ -84,3 +96,4 @@ export const router = createBrowserRouter([
     ]
   }
 ]);
+
