@@ -84,6 +84,15 @@ Anotação sobre um Atendimento, usada como insumo para ajustes e melhorias do A
 **Fila de Curadoria**:
 A lista de Atendimentos concluídos e já avaliados pela IA, da qual o Curador escolhe livremente quais revisar (modelo pull, sem gatilho automático).
 
+**Minhas Curadorias**:
+A lista de Atendimentos concluídos que já receberam conferência humana. Permite ao Curador consultar suas próprias revisões (e aos perfis de Gestão e Admin, auditar o histórico de conferências realizadas sob o nome "Curadorias Realizadas").
+
+**Curadoria no Atendimento**:
+Atributo de visualização e filtro na listagem de Atendimentos que indica se a conferência humana já foi realizada e identifica o Curador responsável pela avaliação mais recente.
+
+**Avaliados (IA × Curador)**:
+Indicador do dashboard que quantifica o volume de Atendimentos concluídos avaliados pela IA e conferidos por Curadores no período filtrado.
+
 **Monitoramento ao Vivo**:
 A observação em tempo real — somente texto, sem áudio — de Atendimentos ainda **abertos na ElevenLabs** (`initiated` / `in-progress`, sem sinais de término, com duração ainda acompanhando o relógio e início recente), via WebSocket. A lista não filtra por dia civil; conversas zombie (status aberto preso na fonte, inclusive no mesmo dia), IDs que só aparecem no filtro aberto (ausentes na listagem geral, mesmo que o monitor ainda responda `history_complete`) e Atendimentos já `concluido` no HQ ficam de fora. Estritamente observacional: nenhuma intervenção no Atendimento.
 _Avoid_: Supervisão (implica intervenção, que não existe no MVP)
