@@ -1226,10 +1226,14 @@ h1 {
 }
 
 .avaliacao-heading h2 {
-  margin: 10px 0 0;
+  margin: 0;
   font-family: Georgia, "Times New Roman", serif;
   font-size: clamp(2rem, 5vw, 3.3rem);
   font-weight: 400;
+}
+
+.avaliacao-heading .panel-label + h2 {
+  margin-top: 10px;
 }
 
 .avaliacao-score {
@@ -1322,6 +1326,31 @@ h1 {
 .avaliacao-notes p,
 .avaliacao-notes ul {
   line-height: 1.6;
+}
+
+.avaliacao-resumo-scroll {
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: #9bbcb2 transparent;
+}
+
+.avaliacao-resumo-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.avaliacao-resumo-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.avaliacao-resumo-scroll::-webkit-scrollbar-thumb {
+  background: #9bbcb2;
+  border-radius: 3px;
+}
+
+.avaliacao-resumo-scroll::-webkit-scrollbar-thumb:hover {
+  background: #16816f;
 }
 
 .monitoramento-live-panel {
