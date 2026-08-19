@@ -1,3 +1,10 @@
+import {
+  canDownloadAudio,
+  type UserRole
+} from '@hq-geap/contracts/auth';
+
+export { canDownloadAudio };
+
 export const PLAYBACK_RATES = [0.5, 1, 1.25, 1.5, 2] as const;
 export type PlaybackRate = (typeof PLAYBACK_RATES)[number];
 export const DEFAULT_PLAYBACK_RATE: PlaybackRate = 1;
@@ -151,3 +158,45 @@ export function shouldShowMiniplayer(params: {
   }
   return true;
 }
+
+export function shouldShowAudioDownloadButton(params: {
+  role: UserRole | null | undefined;
+  audioUrl: string | null | undefined;
+}): boolean {
+  return (
+    canDownloadAudio(params.role) &&
+    Boolean(params.audioUrl && params.audioUrl.trim().length > 0)
+  );
+}
+
+export function getAudioDownloadFilename(conversationId: string): string {
+  return `atendimento-${conversationId}.mp3`;
+}
+
+function triggerAnchorDownload(href: string, filename: string): void {
+  const link = document.createElement('a');
+  link.href = href;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+export async function triggerAudioDownload(
+  audioUrl: string,
+  filename: string
+): Promise<void> {
+  try {
+    const response = await fetch(audioUrl);
+    if (!response.ok) {
+      throw new Error(`Download failed with status ${response.status}`);
+    }
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    triggerAnchorDownload(objectUrl, filename);
+    URL.revokeObjectURL(objectUrl);
+  } catch {
+    triggerAnchorDownload(audioUrl, filename);
+  }
+}
+

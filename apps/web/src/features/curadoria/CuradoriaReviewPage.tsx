@@ -11,7 +11,13 @@ import { apiUrl, getSession } from '../auth/session';
 import { canWriteAsCurador, usePerfil } from '../auth/perfil-context';
 import { formatDuration, useAuthenticatedResource } from '../atendimentos/api';
 import { ComentariosPanel } from '../comentarios/ComentariosPanel';
-import { AudioPlayer, Miniplayer, TranscriptPanel, useAudioPlayer } from '../player';
+import {
+  AudioDownloadButton,
+  AudioPlayer,
+  Miniplayer,
+  TranscriptPanel,
+  useAudioPlayer
+} from '../player';
 
 const stateLabels: Record<EstadoCriterio, string> = {
   atendido: 'Atendido',
@@ -49,7 +55,13 @@ function CuradoriaMedia({ detail }: { detail: CuradoriaDetail }) {
           headerContent={<h2>Transcrição</h2>}
         />
         <aside ref={mainPlayerRef} className="audio-panel">
-          <p className="panel-label">Áudio</p>
+          <div className="audio-panel-header">
+            <p className="panel-label">Áudio</p>
+            <AudioDownloadButton
+              audioUrl={atendimento.audioUrl}
+              conversationId={atendimento.conversationId}
+            />
+          </div>
           <h2>Ouça antes de decidir</h2>
           <AudioPlayer audioUrl={atendimento.audioUrl} controller={player} />
         </aside>
