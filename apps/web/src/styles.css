@@ -1229,6 +1229,11 @@ h1 {
 
 .avaliacoes-lado-a-lado .avaliacao-panel {
   margin-top: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.avaliacoes-lado-a-lado > .avaliacao-panel:only-child {
+  grid-column: 1 / -1;
 }
 
 @media (max-width: 960px) {
