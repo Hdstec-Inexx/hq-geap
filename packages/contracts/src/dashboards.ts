@@ -35,6 +35,8 @@ export const dashboardKpisSchema = z.object({
   slaMeta: z.literal(SLA_META_PERCENTUAL),
   notaMediaIa: z.number().min(0).max(10).nullable(),
   notaMediaCurador: z.number().min(0).max(10).nullable(),
+  avaliadosIa: z.number().int().nonnegative(),
+  avaliadosCurador: z.number().int().nonnegative(),
   taxaPromessasCumpridas: percentageSchema,
   tempoMedioAteResolucao: z.number().nonnegative().nullable()
 });
