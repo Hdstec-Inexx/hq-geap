@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import test from 'node:test';
 import {
   atendimentoListSchema,
+  atendimentoSummarySchema,
   atendimentosQuerySchema,
   formatTime,
   ingestAtendimentoSchema,
@@ -12,8 +13,8 @@ import {
   transcriptEntrySchema,
   transformToHistoricoTranscricao
 } from '../../packages/contracts/src/atendimentos.js';
-import { toAtendimentoDetail } from '../../apps/api/src/modules/atendimentos/service.js';
-import type { AtendimentoRow } from '../../apps/api/src/modules/atendimentos/repository.js';
+import { toAtendimentoDetail, toAtendimentoSummary } from '../../apps/api/src/modules/atendimentos/service.js';
+import type { AtendimentoRow, AtendimentoSummaryRow } from '../../apps/api/src/modules/atendimentos/repository.js';
 
 function detailRow(
   overrides: Partial<AtendimentoRow> = {}
@@ -33,6 +34,10 @@ function detailRow(
     custo: '0.1842',
     eventTimestamp: '1785330252',
     audioReference: 'atendimentos/conv-tool-null-message.mp3',
+    curadorId: null,
+    curadorNome: null,
+    curadoriaNota: null,
+    curadoriaRealizadaEm: null,
     transcricao: [
       {
         role: 'agent',
@@ -1145,4 +1150,110 @@ test('transformToHistoricoTranscricao aceita payload completo da conversa Eleven
   const fromJsonString = transformToHistoricoTranscricao(JSON.stringify(fullConversation));
   assert.deepEqual(fromJsonString, fromObject);
 });
+
+test('query da lista aceita curadoriaStatus e curadorId validos', () => {
+  const queryTodos = atendimentosQuerySchema.parse({
+    curadoriaStatus: 'todos'
+  });
+  assert.equal(queryTodos.curadoriaStatus, 'todos');
+
+  const queryRealizada = atendimentosQuerySchema.parse({
+    curadoriaStatus: 'realizada',
+    curadorId: '11111111-1111-4111-8111-111111111111'
+  });
+  assert.equal(queryRealizada.curadoriaStatus, 'realizada');
+  assert.equal(queryRealizada.curadorId, '11111111-1111-4111-8111-111111111111');
+
+  const queryPendente = atendimentosQuerySchema.parse({
+    curadoriaStatus: 'pendente'
+  });
+  assert.equal(queryPendente.curadoriaStatus, 'pendente');
+
+  const invalidStatus = atendimentosQuerySchema.safeParse({
+    curadoriaStatus: 'invalido'
+  });
+  assert.equal(invalidStatus.success, false);
+
+  const invalidCuradorId = atendimentosQuerySchema.safeParse({
+    curadorId: 'nao-e-uuid'
+  });
+  assert.equal(invalidCuradorId.success, false);
+});
+
+test('toAtendimentoSummary mapeia curadoria realizada e pendente corretamente', () => {
+  const rowSemCuradoria: AtendimentoSummaryRow = {
+    id: '21f908bd-3728-4bfd-8035-3abd750b74d7',
+    conversationId: 'conv-1',
+    agenteVozId: '11111111-1111-4111-8111-111111111111',
+    agenteVozNome: 'Lívia',
+    agentId: 'agent-livia-test',
+    status: 'concluido',
+    iniciadoEm: new Date('2026-08-03T10:00:00.000Z'),
+    concluidoEm: new Date('2026-08-03T10:05:00.000Z'),
+    duracaoSegundos: 300,
+    motivoContato: 'Financeiro/Boletos',
+    houveTransferencia: false,
+    custo: '0.15',
+    eventTimestamp: '1785330252',
+    curadorId: null,
+    curadorNome: null,
+    curadoriaNota: null,
+    curadoriaRealizadaEm: null
+  };
+
+  const summarySemCuradoria = toAtendimentoSummary(rowSemCuradoria);
+  assert.deepEqual(summarySemCuradoria.curadoria, {
+    realizada: false,
+    curadorId: null,
+    curadorNome: null,
+    nota: null,
+    realizadaEm: null
+  });
+
+  const rowComCuradoria: AtendimentoSummaryRow = {
+    ...rowSemCuradoria,
+    curadorId: '33333333-3333-4333-8333-333333333333',
+    curadorNome: 'Caio Curador',
+    curadoriaNota: '8.50',
+    curadoriaRealizadaEm: new Date('2026-08-03T11:00:00.000Z')
+  };
+
+  const summaryComCuradoria = toAtendimentoSummary(rowComCuradoria);
+  assert.deepEqual(summaryComCuradoria.curadoria, {
+    realizada: true,
+    curadorId: '33333333-3333-4333-8333-333333333333',
+    curadorNome: 'Caio Curador',
+    nota: 8.5,
+    realizadaEm: '2026-08-03T11:00:00.000Z'
+  });
+});
+
+test('filtros SQL suportam curadoriaStatus e curadorId', async () => {
+  const { buildDetalhamentoFilters } = await import(
+    '../../apps/api/src/modules/atendimentos/detalhamentoFilters.js'
+  );
+
+  const realizada = buildDetalhamentoFilters(
+    atendimentosQuerySchema.parse({
+      curadoriaStatus: 'realizada'
+    })
+  );
+  assert.match(realizada.clauses.join(' '), /cur\.id is not null/);
+
+  const pendente = buildDetalhamentoFilters(
+    atendimentosQuerySchema.parse({
+      curadoriaStatus: 'pendente'
+    })
+  );
+  assert.match(pendente.clauses.join(' '), /a\.status = 'concluido' and cur\.id is null/);
+
+  const curador = buildDetalhamentoFilters(
+    atendimentosQuerySchema.parse({
+      curadorId: '11111111-1111-4111-8111-111111111111'
+    })
+  );
+  assert.match(curador.clauses.join(' '), /cur\.autor_usuario_id = \$1/);
+  assert.deepEqual(curador.values, ['11111111-1111-4111-8111-111111111111']);
+});
+
 

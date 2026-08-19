@@ -399,6 +399,16 @@ export function createCuradoriaRepository(db: pg.Pool) {
       } finally {
         client.release();
       }
+    },
+
+    async listCuradores(): Promise<Array<{ id: string; nome: string }>> {
+      const result = await db.query<{ id: string; nome: string }>(`
+        select id, nome
+        from usuarios
+        where papel = 'curador'
+        order by lower(nome), id
+      `);
+      return result.rows;
     }
   };
 }

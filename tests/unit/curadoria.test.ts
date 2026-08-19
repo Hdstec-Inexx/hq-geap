@@ -193,3 +193,61 @@ test('listDistinctMotivos retorna motivos distintos e ordenados', async () => {
   assert.match(executedSql, /distinct motivo_contato/i);
   assert.match(executedSql, /order by motivo_contato/i);
 });
+
+test('curadoresListSchema valida lista de curadores com id e nome', async () => {
+  const { curadoresListSchema, curadorItemSchema } = await import(
+    '../../packages/contracts/src/curadoria.js'
+  );
+
+  assert.equal(
+    curadorItemSchema.safeParse({
+      id: '33333333-3333-4333-8333-333333333333',
+      nome: 'Caio Curador'
+    }).success,
+    true
+  );
+
+  assert.equal(
+    curadoresListSchema.safeParse([
+      { id: '33333333-3333-4333-8333-333333333333', nome: 'Caio Curador' },
+      { id: '44444444-4444-4444-8444-444444444444', nome: 'Bruna Curadora' }
+    ]).success,
+    true
+  );
+
+  assert.equal(
+    curadoresListSchema.safeParse([
+      { id: 'invalido', nome: 'Invalido' }
+    ]).success,
+    false
+  );
+});
+
+test('listCuradores retorna usuarios com papel curador ordenados por nome', async () => {
+  const { createCuradoriaRepository } = await import(
+    '../../apps/api/src/modules/curadoria/repository.js'
+  );
+
+  let executedSql = '';
+  const mockDb = {
+    async query(sql: string) {
+      executedSql = sql;
+      return {
+        rows: [
+          { id: '44444444-4444-4444-8444-444444444444', nome: 'Bruna Curadora' },
+          { id: '33333333-3333-4333-8333-333333333333', nome: 'Caio Curador' }
+        ]
+      };
+    }
+  } as any;
+
+  const repo = createCuradoriaRepository(mockDb);
+  const curadores = await repo.listCuradores();
+  assert.deepEqual(curadores, [
+    { id: '44444444-4444-4444-8444-444444444444', nome: 'Bruna Curadora' },
+    { id: '33333333-3333-4333-8333-333333333333', nome: 'Caio Curador' }
+  ]);
+  assert.match(executedSql, /papel = 'curador'/i);
+  assert.match(executedSql, /order by lower\(nome\)/i);
+});
+

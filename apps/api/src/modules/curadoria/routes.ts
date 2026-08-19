@@ -2,6 +2,7 @@ import {
   filaCuradoriaQuerySchema,
   salvarConferenciaSchema,
   type AvaliacaoCurador,
+  type CuradorItem,
   type CuradoriaDetail,
   type FilaCuradoriaPage
 } from '@hq-geap/contracts/curadoria';
@@ -24,6 +25,10 @@ const routes: FastifyPluginAsync = async (app) => {
   const writeAuth = {
     config: { auth: { roles: ['curador' as const, 'admin' as const] } }
   };
+
+  app.get('/curadores', readAuth, async (): Promise<CuradorItem[]> => {
+    return repository.listCuradores();
+  });
 
   app.get('/curadoria', readAuth, async (request): Promise<FilaCuradoriaPage> => {
     const query = filaCuradoriaQuerySchema.safeParse(request.query);

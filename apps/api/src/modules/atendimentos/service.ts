@@ -31,6 +31,11 @@ function safeAudioUrl(audioUrl: string | null): string | null {
 function summaryValues(row: AtendimentoSummaryRow) {
   const custo =
     row.custo === null || row.custo === undefined ? null : Number(row.custo);
+  const curadoriaNota =
+    row.curadoriaNota === null || row.curadoriaNota === undefined
+      ? null
+      : Number(row.curadoriaNota);
+  const curadoriaRealizada = Boolean(row.curadorId);
   return {
     id: row.id,
     conversationId: row.conversationId,
@@ -51,7 +56,21 @@ function summaryValues(row: AtendimentoSummaryRow) {
     })(),
     motivoContato: row.motivoContato,
     houveTransferencia: Boolean(row.houveTransferencia),
-    custo: custo !== null && Number.isFinite(custo) && custo >= 0 ? custo : null
+    custo: custo !== null && Number.isFinite(custo) && custo >= 0 ? custo : null,
+    curadoria: {
+      realizada: curadoriaRealizada,
+      curadorId: curadoriaRealizada ? row.curadorId : null,
+      curadorNome: curadoriaRealizada ? row.curadorNome : null,
+      nota:
+        curadoriaRealizada &&
+        curadoriaNota !== null &&
+        Number.isFinite(curadoriaNota)
+          ? curadoriaNota
+          : null,
+      realizadaEm: curadoriaRealizada
+        ? toIsoDateTime(row.curadoriaRealizadaEm)
+        : null
+    }
   };
 }
 

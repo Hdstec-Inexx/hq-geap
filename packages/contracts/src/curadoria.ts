@@ -119,9 +119,17 @@ export const salvarConferenciaSchema = z.object({
     .transform((value) => (value && value.length > 0 ? value : null))
 });
 
+export const curadorItemSchema = z.object({
+  id: z.uuid(),
+  nome: z.string()
+});
+
+export const curadoresListSchema = z.array(curadorItemSchema);
+
 export type FilaCuradoriaItem = z.infer<typeof filaCuradoriaItemSchema>;
 export type FilaCuradoriaPage = z.infer<typeof filaCuradoriaSchema>;
 export type FilaCuradoriaQuery = z.infer<typeof filaCuradoriaQuerySchema>;
 export type AvaliacaoCurador = z.infer<typeof avaliacaoCuradorSchema>;
 export type CuradoriaDetail = z.infer<typeof curadoriaDetailSchema>;
 export type SalvarConferencia = z.infer<typeof salvarConferenciaSchema>;
+export type CuradorItem = z.infer<typeof curadorItemSchema>;

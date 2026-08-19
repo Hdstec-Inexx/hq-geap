@@ -1120,6 +1120,13 @@ h1 {
   font-size: 0.86rem;
 }
 
+.atendimento-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .atendimento-status {
   width: max-content;
   color: #08735f;
@@ -1132,6 +1139,29 @@ h1 {
 
 .atendimento-status.em_andamento {
   color: #9a6513;
+}
+
+.atendimento-curadoria-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  font-family: Consolas, monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border-radius: 2px;
+}
+
+.atendimento-curadoria-badge.realizada {
+  color: #0c5043;
+  background: #d1fae5;
+  border: 1px solid #a7f3d0;
+}
+
+.atendimento-curadoria-badge.pendente {
+  color: #52717a;
+  background: rgb(18 59 74 / 6%);
+  border: 1px solid rgb(18 59 74 / 14%);
 }
 
 .atendimento-row-data,
@@ -1936,7 +1966,9 @@ h1 {
 }
 
 .curadoria-filters-fields input[type="date"],
-.atendimentos-filters-fields input[type="date"] {
+.atendimentos-filters-fields input[type="date"],
+.curadoria-filters-fields select,
+.atendimentos-filters-fields select {
   padding: 8px 10px;
   font: inherit;
   font-size: 0.9rem;
