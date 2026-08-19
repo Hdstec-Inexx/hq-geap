@@ -38,6 +38,17 @@ export function buildDetalhamentoFilters(
     clauses.push(`coalesce(a.motivo_contato, 'Nao informado') = ${motivo}`);
   }
 
+  if (query.curadoriaStatus === 'realizada') {
+    clauses.push('cur.id is not null');
+  } else if (query.curadoriaStatus === 'pendente') {
+    clauses.push("a.status = 'concluido' and cur.id is null");
+  }
+
+  if (query.curadorId) {
+    const curadorId = param(query.curadorId);
+    clauses.push(`cur.autor_usuario_id = ${curadorId}::uuid`);
+  }
+
   switch (query.indicador) {
     case undefined:
       break;
@@ -58,12 +69,14 @@ export function buildDetalhamentoFilters(
       break;
     }
     case 'nota_media_ia':
+    case 'avaliados_ia':
       clauses.push(`exists (
         select 1 from avaliacoes ia
         where ia.atendimento_id = a.id and ia.autor = 'ia'
       )`);
       break;
     case 'nota_media_curador':
+    case 'avaliados_curador':
       clauses.push(`exists (
         select 1 from avaliacoes_curador curador
         where curador.atendimento_id = a.id

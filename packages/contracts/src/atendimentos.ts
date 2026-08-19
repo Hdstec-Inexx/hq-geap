@@ -320,6 +320,20 @@ export const agenteVozSchema = z.object({
   agentId: z.string()
 });
 
+export const curadoriaStatusFilterSchema = z.enum([
+  'todos',
+  'realizada',
+  'pendente'
+]);
+
+export const curadoriaAtendimentoSummarySchema = z.object({
+  realizada: z.boolean(),
+  curadorId: z.uuid().nullable(),
+  curadorNome: z.string().nullable(),
+  nota: z.number().min(0).max(10).nullable(),
+  realizadaEm: z.iso.datetime().nullable()
+});
+
 export const atendimentoSummarySchema = z.object({
   id: z.uuid(),
   conversationId: z.string(),
@@ -330,7 +344,8 @@ export const atendimentoSummarySchema = z.object({
   duracaoSegundos: z.number().int().nonnegative().nullable(),
   motivoContato: z.string().nullable(),
   houveTransferencia: z.boolean(),
-  custo: z.number().nonnegative().nullable().optional()
+  custo: z.number().nonnegative().nullable().optional(),
+  curadoria: curadoriaAtendimentoSummarySchema
 });
 
 export const atendimentoDetailSchema = atendimentoSummarySchema.extend({
@@ -353,6 +368,8 @@ export const detalhamentoIndicadorSchema = z.enum([
   'sla',
   'nota_media_ia',
   'nota_media_curador',
+  'avaliados_ia',
+  'avaliados_curador',
   'promessas',
   'tempo_resolucao',
   'motivo',
@@ -372,7 +389,9 @@ export const atendimentosQuerySchema = z
     fim: isoDateSchema.optional(),
     indicador: detalhamentoIndicadorSchema.optional(),
     motivo: z.string().trim().min(1).max(200).optional(),
-    criterioId: z.uuid().optional()
+    criterioId: z.uuid().optional(),
+    curadoriaStatus: curadoriaStatusFilterSchema.optional(),
+    curadorId: z.uuid().optional()
   })
   .superRefine((query, ctx) => {
     if (query.indicador !== undefined && (!query.inicio || !query.fim)) {
@@ -445,3 +464,5 @@ export type AtendimentoSummary = z.infer<typeof atendimentoSummarySchema>;
 export type AtendimentoList = z.infer<typeof atendimentoListSchema>;
 export type AtendimentoDetail = z.infer<typeof atendimentoDetailSchema>;
 export type MotivosAtendimentos = z.infer<typeof motivosAtendimentosSchema>;
+export type CuradoriaStatusFilter = z.infer<typeof curadoriaStatusFilterSchema>;
+export type CuradoriaAtendimentoSummary = z.infer<typeof curadoriaAtendimentoSummarySchema>;

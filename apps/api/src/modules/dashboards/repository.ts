@@ -11,6 +11,8 @@ export type DashboardKpisRow = {
   dentroSla: string;
   notaMediaIa: string | null;
   notaMediaCurador: string | null;
+  avaliadosIa: string;
+  avaliadosCurador: string;
   toolsTotal: string;
   toolsSuccessful: string;
   tempoMedioAteResolucao: string | null;
@@ -73,6 +75,8 @@ export function createDashboardRepository(db: pg.Pool) {
           ) as "dentroSla",
           avg(ia.nota) as "notaMediaIa",
           avg(curador.nota) as "notaMediaCurador",
+          count(ia.id) as "avaliadosIa",
+          count(curador.id) as "avaliadosCurador",
           coalesce(sum(a.tools_executados), 0) as "toolsTotal",
           coalesce(sum(a.tools_sucesso), 0) as "toolsSuccessful",
           avg(a.duracao_segundos) filter (
@@ -82,7 +86,7 @@ export function createDashboardRepository(db: pg.Pool) {
         left join avaliacoes ia
           on ia.atendimento_id = a.id and ia.autor = 'ia'
         left join lateral (
-          select avaliacao.nota
+          select avaliacao.id, avaliacao.nota
           from avaliacoes_curador avaliacao
           where avaliacao.atendimento_id = a.id
           order by avaliacao.criado_em desc, avaliacao.id desc

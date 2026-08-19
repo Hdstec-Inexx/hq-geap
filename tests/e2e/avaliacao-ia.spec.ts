@@ -299,11 +299,12 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
     await expect(page.getByRole('heading', { name: 'Avaliação da IA' })).toBeVisible();
     await expect(page.getByText('Reprovado', { exact: true })).toBeVisible();
     await expect(page.getByText('7,5').first()).toBeVisible();
-    await expect(page.getByText(/Claims da LLM/i)).toBeVisible();
-    await expect(page.getByText(/Aprovação claim: não/i)).toBeVisible();
+    await expect(page.getByText(/Claims da LLM/i)).not.toBeVisible();
+    await expect(page.getByText(/Aprovação claim/i)).not.toBeVisible();
+    await expect(page.getByText(/Prompt v/i)).not.toBeVisible();
     await expect(page.getByText('Informação de Protocolo')).toBeVisible();
-    await expect(page.getByText('Prompt v4')).toBeVisible();
     await expect(page.getByText('Uso Correto de Ferramentas')).toBeVisible();
+    await expect(page.locator('.avaliacao-resumo-scroll')).toBeVisible();
   });
 
   test('gate: ferramentas false forca resolucao false e perde 3 pontos', async () => {

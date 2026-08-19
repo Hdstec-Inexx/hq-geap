@@ -193,3 +193,201 @@ test('listDistinctMotivos retorna motivos distintos e ordenados', async () => {
   assert.match(executedSql, /distinct motivo_contato/i);
   assert.match(executedSql, /order by motivo_contato/i);
 });
+
+test('curadoresListSchema valida lista de curadores com id e nome', async () => {
+  const { curadoresListSchema, curadorItemSchema } = await import(
+    '../../packages/contracts/src/curadoria.js'
+  );
+
+  assert.equal(
+    curadorItemSchema.safeParse({
+      id: '33333333-3333-4333-8333-333333333333',
+      nome: 'Caio Curador'
+    }).success,
+    true
+  );
+
+  assert.equal(
+    curadoresListSchema.safeParse([
+      { id: '33333333-3333-4333-8333-333333333333', nome: 'Caio Curador' },
+      { id: '44444444-4444-4444-8444-444444444444', nome: 'Bruna Curadora' }
+    ]).success,
+    true
+  );
+
+  assert.equal(
+    curadoresListSchema.safeParse([
+      { id: 'invalido', nome: 'Invalido' }
+    ]).success,
+    false
+  );
+});
+
+test('listCuradores retorna usuarios com papel curador ordenados por nome', async () => {
+  const { createCuradoriaRepository } = await import(
+    '../../apps/api/src/modules/curadoria/repository.js'
+  );
+
+  let executedSql = '';
+  const mockDb = {
+    async query(sql: string) {
+      executedSql = sql;
+      return {
+        rows: [
+          { id: '44444444-4444-4444-8444-444444444444', nome: 'Bruna Curadora' },
+          { id: '33333333-3333-4333-8333-333333333333', nome: 'Caio Curador' }
+        ]
+      };
+    }
+  } as any;
+
+  const repo = createCuradoriaRepository(mockDb);
+  const curadores = await repo.listCuradores();
+  assert.deepEqual(curadores, [
+    { id: '44444444-4444-4444-8444-444444444444', nome: 'Bruna Curadora' },
+    { id: '33333333-3333-4333-8333-333333333333', nome: 'Caio Curador' }
+  ]);
+  assert.match(executedSql, /papel = 'curador'/i);
+  assert.match(executedSql, /order by lower\(nome\)/i);
+});
+
+test('curadoriasRealizadasQuerySchema valida filtros de periodo, motivo e curador', async () => {
+  const { curadoriasRealizadasQuerySchema } = await import(
+    '../../packages/contracts/src/curadoria.js'
+  );
+
+  const parsed = curadoriasRealizadasQuerySchema.parse({
+    inicio: '2025-01-10',
+    fim: '2025-01-20',
+    motivo: 'Rede credenciada',
+    curadorId: '33333333-3333-4333-8333-333333333333'
+  });
+  assert.deepEqual(parsed, {
+    limit: 50,
+    offset: 0,
+    inicio: '2025-01-10',
+    fim: '2025-01-20',
+    motivo: 'Rede credenciada',
+    curadorId: '33333333-3333-4333-8333-333333333333'
+  });
+
+  const diaUnico = curadoriasRealizadasQuerySchema.parse({
+    inicio: '2025-01-15'
+  });
+  assert.equal(diaUnico.fim, '2025-01-15');
+
+  assert.equal(
+    curadoriasRealizadasQuerySchema.safeParse({ fim: '2025-01-15' }).success,
+    false
+  );
+  assert.equal(
+    curadoriasRealizadasQuerySchema.safeParse({
+      inicio: '2025-01-20',
+      fim: '2025-01-10'
+    }).success,
+    false
+  );
+});
+
+test('curadoriasRealizadasPageSchema valida envelope de curadorias realizadas', async () => {
+  const { curadoriasRealizadasPageSchema } = await import(
+    '../../packages/contracts/src/curadoria.js'
+  );
+
+  const sample = {
+    items: [
+      {
+        id: '11111111-1111-4111-8111-111111111111',
+        conversationId: 'conv-123',
+        agenteVozNome: 'Livia',
+        concluidoEm: '2025-01-15T12:00:00.000Z',
+        duracaoSegundos: 45,
+        motivoContato: 'Rede credenciada',
+        notaIa: 9.5,
+        curadorId: '33333333-3333-4333-8333-333333333333',
+        curadorNome: 'Caio Curador',
+        notaCurador: 8.0,
+        realizadaEm: '2025-01-15T14:00:00.000Z'
+      }
+    ],
+    total: 1
+  };
+
+  const parsed = curadoriasRealizadasPageSchema.safeParse(sample);
+  assert.equal(parsed.success, true);
+});
+
+test('buildCuradoriasRealizadasFilters aplica filtros de data, motivo e curadorId', async () => {
+  const { buildCuradoriasRealizadasFilters } = await import(
+    '../../apps/api/src/modules/curadoria/repository.js'
+  );
+
+  const filters = buildCuradoriasRealizadasFilters(
+    {
+      inicio: '2025-01-10',
+      fim: '2025-01-20',
+      motivo: 'Rede credenciada',
+      curadorId: '33333333-3333-4333-8333-333333333333'
+    },
+    1
+  );
+
+  assert.match(
+    filters.clauses.join(' and '),
+    /a\.concluido_em at time zone 'America\/Sao_Paulo' >= \$1::date/
+  );
+  assert.match(
+    filters.clauses.join(' and '),
+    /a\.concluido_em at time zone 'America\/Sao_Paulo' < \$2::date \+ interval '1 day'/
+  );
+  assert.match(
+    filters.clauses.join(' and '),
+    /coalesce\(a\.motivo_contato, 'Nao informado'\) = \$3/
+  );
+  assert.match(
+    filters.clauses.join(' and '),
+    /cur\.autor_usuario_id = \$4::uuid/
+  );
+  assert.deepEqual(filters.values, [
+    '2025-01-10',
+    '2025-01-20',
+    'Rede credenciada',
+    '33333333-3333-4333-8333-333333333333'
+  ]);
+});
+
+test('toCuradoriaRealizadaItem mapeia campos da linha do banco', async () => {
+  const { toCuradoriaRealizadaItem } = await import(
+    '../../apps/api/src/modules/curadoria/service.js'
+  );
+
+  const item = toCuradoriaRealizadaItem({
+    id: '11111111-1111-4111-8111-111111111111',
+    conversationId: 'conv-123',
+    agenteVozNome: 'Livia',
+    concluidoEm: new Date('2025-01-15T12:00:00.000Z'),
+    duracaoSegundos: 45,
+    motivoContato: 'Rede credenciada',
+    notaIa: '9.50',
+    curadorId: '33333333-3333-4333-8333-333333333333',
+    curadorNome: 'Caio Curador',
+    notaCurador: '8.00',
+    realizadaEm: new Date('2025-01-15T14:00:00.000Z')
+  });
+
+  assert.deepEqual(item, {
+    id: '11111111-1111-4111-8111-111111111111',
+    conversationId: 'conv-123',
+    agenteVozNome: 'Livia',
+    concluidoEm: '2025-01-15T12:00:00.000Z',
+    duracaoSegundos: 45,
+    motivoContato: 'Rede credenciada',
+    notaIa: 9.5,
+    curadorId: '33333333-3333-4333-8333-333333333333',
+    curadorNome: 'Caio Curador',
+    notaCurador: 8.0,
+    realizadaEm: '2025-01-15T14:00:00.000Z'
+  });
+});
+
+

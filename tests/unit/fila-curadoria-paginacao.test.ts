@@ -6,11 +6,13 @@ import {
 } from '../../packages/contracts/src/curadoria.js';
 import {
   compactPageItems,
+  curadoriasRealizadasHref,
   filaHref,
   pageFromSearch,
   resolveFilaPage,
   reviewHref
 } from '../../apps/web/src/features/curadoria/pagination.js';
+
 import { motivosAtendimentosSchema } from '../../packages/contracts/src/atendimentos.js';
 
 test('GET /curadoria usa envelope com items e total, nao um array solto', () => {
@@ -120,7 +122,32 @@ test('filaHref e reviewHref preservam searchParams com filtros', () => {
     reviewHref('11111111-1111-1111-1111-111111111111', params),
     '/curadoria/11111111-1111-1111-1111-111111111111?page=2&inicio=2024-01-01&fim=2024-01-15&motivo=Rede'
   );
+  assert.equal(
+    reviewHref('11111111-1111-1111-1111-111111111111', params, '/minhas-curadorias'),
+    '/curadoria/11111111-1111-1111-1111-111111111111?page=2&inicio=2024-01-01&fim=2024-01-15&motivo=Rede&from=%2Fminhas-curadorias'
+  );
 });
+
+test('curadoriasRealizadasHref gera URLs paginadas e limpa page 1', () => {
+  const params = new URLSearchParams('inicio=2024-01-01&fim=2024-01-15&curadorId=33333333-3333-4333-8333-333333333333');
+  assert.equal(
+    curadoriasRealizadasHref('/minhas-curadorias', params, 2),
+    '/minhas-curadorias?inicio=2024-01-01&fim=2024-01-15&curadorId=33333333-3333-4333-8333-333333333333&page=2'
+  );
+  assert.equal(
+    curadoriasRealizadasHref('/curadorias-realizadas', params, 1),
+    '/curadorias-realizadas?inicio=2024-01-01&fim=2024-01-15&curadorId=33333333-3333-4333-8333-333333333333'
+  );
+  assert.equal(
+    curadoriasRealizadasHref('/minhas-curadorias', 1),
+    '/minhas-curadorias'
+  );
+  assert.equal(
+    curadoriasRealizadasHref('/minhas-curadorias', 3),
+    '/minhas-curadorias?page=3'
+  );
+});
+
 
 test('resolveFilaPage recua alem de totalPages e pagina 1 vazia permanece 1', () => {
   assert.equal(resolveFilaPage(1, 0), 1);

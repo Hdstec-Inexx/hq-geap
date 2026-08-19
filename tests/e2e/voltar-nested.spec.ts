@@ -37,7 +37,24 @@ test.describe('voltar nas telas nested', () => {
       page.getByRole('heading', { name: 'Fila de Curadoria' })
     ).toBeVisible();
     await expectBackToHome(page);
+
+    await page.getByRole('link', { name: 'Curadorias Realizadas' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Curadorias Realizadas' })
+    ).toBeVisible();
+    await expectBackToHome(page);
   });
+
+  test('Minhas Curadorias do curador volta ao inicio', async ({ page }) => {
+    await loginPage(page, 'curador');
+
+    await page.getByRole('link', { name: 'Minhas Curadorias' }).click();
+    await expect(
+      page.getByRole('heading', { name: 'Minhas Curadorias' })
+    ).toBeVisible();
+    await expectBackToHome(page);
+  });
+
 
   test('Home e Dashboard raiz nao exigem voltar', async ({ page }) => {
     await loginPage(page, 'admin');
