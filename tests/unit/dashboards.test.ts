@@ -224,3 +224,46 @@ test('detalhamentoListPath monta URLs para avaliados_ia e avaliados_curador', ()
     '/atendimentos?inicio=2025-01-01&fim=2025-01-31&indicador=avaliados_curador'
   );
 });
+
+test('styles.css mantem comparacoes de KPIs duplos lado a lado e legenda de motivos sem sobreposicao', async () => {
+  const fs = await import('node:fs/promises');
+  const path = await import('node:path');
+  const css = await fs.readFile(
+    path.resolve(process.cwd(), 'apps/web/src/styles.css'),
+    'utf8'
+  );
+
+  // Valida que o KPI dual exibe os valores lado a lado (flex, nowrap)
+  assert.match(
+    css,
+    /\.dashboard-kpi-dual strong\s*\{[^}]*display:\s*flex/i,
+    'dashboard-kpi-dual strong deve usar display flex para manter valores lado a lado'
+  );
+  assert.match(
+    css,
+    /\.dashboard-kpi-dual strong\s*\{[^}]*white-space:\s*nowrap/i,
+    'dashboard-kpi-dual strong deve ter white-space nowrap'
+  );
+
+  // Valida que a legenda de motivos previne quebra e sobreposição sobre as quantidades
+  assert.match(
+    css,
+    /\.motivos-legend a\s*\{[^}]*min-width:\s*0/i,
+    'links da legenda de motivos devem ter min-width: 0 para evitar blowout no grid'
+  );
+  assert.match(
+    css,
+    /\.motivos-legend a\s*\{[^}]*overflow-wrap:\s*break-word/i,
+    'links da legenda devem quebrar texto longo sem vazar no grid'
+  );
+  assert.match(
+    css,
+    /\.motivos-legend li strong\s*\{[^}]*white-space:\s*nowrap/i,
+    'quantidade na legenda deve ter white-space nowrap'
+  );
+  assert.match(
+    css,
+    /\.motivos-legend\s*\{[^}]*scrollbar-width:\s*thin/i,
+    'legenda de motivos deve usar scrollbar fina'
+  );
+});
