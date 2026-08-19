@@ -1020,6 +1020,32 @@ test('filtros SQL do Detalhamento espelham populacoes positivas do Dashboard', a
     /coalesce\(a\.motivo_contato, 'Nao informado'\) = \$1/
   );
   assert.equal(generalMotivo.values[0], 'Financeiro/Boletos');
+
+  const avaliadosIa = buildDetalhamentoFilters(
+    atendimentosQuerySchema.parse({
+      inicio: '2025-01-01',
+      fim: '2025-01-31',
+      indicador: 'avaliados_ia'
+    })
+  );
+  assert.match(
+    avaliadosIa.clauses.join(' '),
+    /from avaliacoes ia\s+where ia\.atendimento_id = a\.id and ia\.autor = 'ia'/
+  );
+  assert.deepEqual(avaliadosIa.values, ['2025-01-01', '2025-01-31']);
+
+  const avaliadosCurador = buildDetalhamentoFilters(
+    atendimentosQuerySchema.parse({
+      inicio: '2025-01-01',
+      fim: '2025-01-31',
+      indicador: 'avaliados_curador'
+    })
+  );
+  assert.match(
+    avaliadosCurador.clauses.join(' '),
+    /from avaliacoes_curador curador\s+where curador\.atendimento_id = a\.id/
+  );
+  assert.deepEqual(avaliadosCurador.values, ['2025-01-01', '2025-01-31']);
 });
 
 test('formatTime formata segundos em mm:ss e hh:mm:ss', () => {

@@ -58,12 +58,14 @@ export function buildDetalhamentoFilters(
       break;
     }
     case 'nota_media_ia':
+    case 'avaliados_ia':
       clauses.push(`exists (
         select 1 from avaliacoes ia
         where ia.atendimento_id = a.id and ia.autor = 'ia'
       )`);
       break;
     case 'nota_media_curador':
+    case 'avaliados_curador':
       clauses.push(`exists (
         select 1 from avaliacoes_curador curador
         where curador.atendimento_id = a.id

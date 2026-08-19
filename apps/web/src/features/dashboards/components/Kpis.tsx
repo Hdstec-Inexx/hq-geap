@@ -3,6 +3,7 @@ import {
   SLA_TME_LIMITE_SEGUNDOS,
   type Dashboard
 } from '@hq-geap/contracts/dashboards';
+import { type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { formatDuration } from '../../atendimentos/api';
 import { detalhamentoListPath } from '../detalhamento';
@@ -39,7 +40,7 @@ function KpiLink({
   indicador: DetalhamentoIndicador;
   label: string;
   value: string;
-  hint?: string;
+  hint?: ReactNode;
   ariaLabel: string;
 }) {
   return (
@@ -54,6 +55,42 @@ function KpiLink({
         {hint ? <small>{hint}</small> : null}
       </article>
     </Link>
+  );
+}
+
+function DualKpiCard({
+  label,
+  iaHref,
+  iaAriaLabel,
+  iaValue,
+  curadorHref,
+  curadorAriaLabel,
+  curadorValue
+}: {
+  label: string;
+  iaHref: string;
+  iaAriaLabel: string;
+  iaValue: string;
+  curadorHref: string;
+  curadorAriaLabel: string;
+  curadorValue: string;
+}) {
+  return (
+    <article className="dashboard-kpi-nota">
+      <span>{label}</span>
+      <strong>
+        <Link aria-label={iaAriaLabel} to={iaHref}>
+          {iaValue}
+        </Link>
+        <span className="dashboard-kpi-separator" aria-hidden="true">
+          {' × '}
+        </span>
+        <Link aria-label={curadorAriaLabel} to={curadorHref}>
+          {curadorValue}
+        </Link>
+      </strong>
+      <small>IA × Curador</small>
+    </article>
   );
 }
 
@@ -75,6 +112,16 @@ export function Kpis({
     inicio,
     fim,
     indicador: 'nota_media_curador'
+  });
+  const avaliadosIaHref = detalhamentoListPath({
+    inicio,
+    fim,
+    indicador: 'avaliados_ia'
+  });
+  const avaliadosCuradorHref = detalhamentoListPath({
+    inicio,
+    fim,
+    indicador: 'avaliados_curador'
   });
 
   return (
@@ -106,25 +153,36 @@ export function Kpis({
       <KpiLink
         ariaLabel="Detalhar SLA"
         fim={fim}
-        hint={`meta ${kpis.slaMeta}% · Tempo de Espera ≤ ${formatSlaLimit(SLA_TME_LIMITE_SEGUNDOS)}`}
+        hint={
+          <>
+            meta {kpis.slaMeta}% · Tempo de Espera{' '}
+            <span className="dashboard-kpi-symbol">≤</span>{' '}
+            {formatSlaLimit(SLA_TME_LIMITE_SEGUNDOS)}
+          </>
+        }
         indicador="sla"
         inicio={inicio}
         label="SLA"
         value={valueOrDash(kpis.sla, formatPercentage)}
       />
-      <article className="dashboard-kpi-nota">
-        <span>Nota média</span>
-        <strong>
-          <Link aria-label="Detalhar Nota média IA" to={notaIaHref}>
-            {valueOrDash(kpis.notaMediaIa, formatNota)}
-          </Link>
-          {' × '}
-          <Link aria-label="Detalhar Nota média Curador" to={notaCuradorHref}>
-            {valueOrDash(kpis.notaMediaCurador, formatNota)}
-          </Link>
-        </strong>
-        <small>IA × Curador</small>
-      </article>
+      <DualKpiCard
+        curadorAriaLabel="Detalhar Nota média Curador"
+        curadorHref={notaCuradorHref}
+        curadorValue={valueOrDash(kpis.notaMediaCurador, formatNota)}
+        iaAriaLabel="Detalhar Nota média IA"
+        iaHref={notaIaHref}
+        iaValue={valueOrDash(kpis.notaMediaIa, formatNota)}
+        label="Nota média"
+      />
+      <DualKpiCard
+        curadorAriaLabel="Detalhar Atendimentos Avaliados Curador"
+        curadorHref={avaliadosCuradorHref}
+        curadorValue={kpis.avaliadosCurador.toLocaleString('pt-BR')}
+        iaAriaLabel="Detalhar Atendimentos Avaliados IA"
+        iaHref={avaliadosIaHref}
+        iaValue={kpis.avaliadosIa.toLocaleString('pt-BR')}
+        label="Atendimentos Avaliados"
+      />
       <KpiLink
         ariaLabel="Detalhar Taxa de Promessas Cumpridas"
         fim={fim}

@@ -206,6 +206,8 @@ test.describe.serial('Dashboard da Gestao', () => {
       slaMeta: 80,
       notaMediaIa: 7,
       notaMediaCurador: 6.5,
+      avaliadosIa: 2,
+      avaliadosCurador: 2,
       taxaPromessasCumpridas: 66.7,
       tempoMedioAteResolucao: 60
     });
@@ -287,7 +289,8 @@ test.describe.serial('Dashboard da Gestao', () => {
     await expect(page.getByText('SLA', { exact: true })).toBeVisible();
     await expect(page.getByText('meta 80% · Tempo de Espera ≤ 2:30')).toBeVisible();
     await expect(page.getByText('Nota média', { exact: true })).toBeVisible();
-    await expect(page.getByText('IA × Curador', { exact: true })).toBeVisible();
+    await expect(page.getByText('Atendimentos Avaliados', { exact: true })).toBeVisible();
+    await expect(page.getByText('IA × Curador', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Taxa de Promessas Cumpridas', { exact: true })).toBeVisible();
     await expect(page.getByText('Tempo Médio até Resolução', { exact: true })).toBeVisible();
     await expect(page.getByText('Transferências')).toHaveCount(0);
@@ -424,5 +427,39 @@ test.describe.serial('Dashboard da Gestao', () => {
     await expect(page).toHaveURL(/fim=2025-01-31/);
     await expect(page.getByText('Detalhamento do Indicador')).toBeVisible();
     await expect(page.locator('.atendimento-row')).toHaveCount(1);
+  });
+
+  test('clique no KPI Atendimentos Avaliados navega para lista com indicador avaliados_ia e avaliados_curador', async ({
+    page,
+    request
+  }) => {
+    const gestao = await loginApi(request, 'gestao');
+    await loginPage(page, 'gestao');
+    await page.goto('/gestao/dashboard?inicio=2025-01-01&fim=2025-01-31');
+
+    await page.getByRole('link', { name: 'Detalhar Atendimentos Avaliados IA' }).click();
+    await expect(page).toHaveURL(/indicador=avaliados_ia/);
+    await expect(page.getByText('Detalhamento do Indicador')).toBeVisible();
+
+    const iaList = await request.get(
+      `${apiUrl}/atendimentos?inicio=2025-01-01&fim=2025-01-31&indicador=avaliados_ia`,
+      { headers: { authorization: `Bearer ${gestao.token}` } }
+    );
+    expect(iaList.status()).toBe(200);
+    const iaBody = (await iaList.json()) as { total: number };
+    expect(iaBody.total).toBe(2);
+
+    await page.goto('/gestao/dashboard?inicio=2025-01-01&fim=2025-01-31');
+    await page.getByRole('link', { name: 'Detalhar Atendimentos Avaliados Curador' }).click();
+    await expect(page).toHaveURL(/indicador=avaliados_curador/);
+    await expect(page.getByText('Detalhamento do Indicador')).toBeVisible();
+
+    const curadorList = await request.get(
+      `${apiUrl}/atendimentos?inicio=2025-01-01&fim=2025-01-31&indicador=avaliados_curador`,
+      { headers: { authorization: `Bearer ${gestao.token}` } }
+    );
+    expect(curadorList.status()).toBe(200);
+    const curadorBody = (await curadorList.json()) as { total: number };
+    expect(curadorBody.total).toBe(2);
   });
 });
