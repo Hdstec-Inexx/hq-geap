@@ -29,6 +29,8 @@ export async function getDashboard(
   const volume = Number(kpis.volume);
   const resolvidas = Number(kpis.resolvidas);
   const dentroSla = Number(kpis.dentroSla);
+  const avaliadosIa = Number(kpis.avaliadosIa);
+  const avaliadosCurador = Number(kpis.avaliadosCurador);
   const toolsTotal = Number(kpis.toolsTotal);
   const toolsSuccessful = Number(kpis.toolsSuccessful);
   const notasConcordantes = Number(concordancia.notasConcordantes);
@@ -46,6 +48,8 @@ export async function getDashboard(
       slaMeta: SLA_META_PERCENTUAL,
       notaMediaIa: numberOrNull(kpis.notaMediaIa),
       notaMediaCurador: numberOrNull(kpis.notaMediaCurador),
+      avaliadosIa,
+      avaliadosCurador,
       taxaPromessasCumpridas: percentage(toolsSuccessful, toolsTotal),
       tempoMedioAteResolucao: numberOrNull(kpis.tempoMedioAteResolucao, 0)
     },

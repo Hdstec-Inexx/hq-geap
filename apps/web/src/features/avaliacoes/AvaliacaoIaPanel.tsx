@@ -22,7 +22,6 @@ export function AvaliacaoIaPanel({ atendimentoId }: { atendimentoId: string }) {
     <section className="avaliacao-panel" aria-labelledby="avaliacao-ia-heading">
       <header className="avaliacao-heading">
         <div>
-          <p className="panel-label">Prompt v{avaliacao.promptVersao}</p>
           <h2 id="avaliacao-ia-heading">Avaliação da IA</h2>
         </div>
         <div className={`avaliacao-score ${avaliacao.aprovacao}`}>
@@ -30,18 +29,6 @@ export function AvaliacaoIaPanel({ atendimentoId }: { atendimentoId: string }) {
           <span>{avaliacao.aprovacao === 'aprovado' ? 'Aprovado' : 'Reprovado'}</span>
         </div>
       </header>
-
-      <div className="avaliacao-notes">
-        <div>
-          <p className="panel-label">Claims da LLM (não canônicos)</p>
-          <p>
-            Nota claim {avaliacao.notaQualidade.toLocaleString('pt-BR')} ·{' '}
-            {avaliacao.atendimentoAprovado
-              ? 'Aprovação claim: sim'
-              : 'Aprovação claim: não'}
-          </p>
-        </div>
-      </div>
 
       <div className="avaliacao-checklist">
         {avaliacao.criterios.map((criterio) => (
@@ -64,7 +51,7 @@ export function AvaliacaoIaPanel({ atendimentoId }: { atendimentoId: string }) {
       <div className="avaliacao-notes">
         <div>
           <p className="panel-label">Resumo</p>
-          <p>{avaliacao.resumoAtendimento ?? 'Resumo não informado.'}</p>
+          <p className="avaliacao-resumo-scroll">{avaliacao.resumoAtendimento ?? 'Resumo não informado.'}</p>
         </div>
         <div>
           <p className="panel-label">Falhas identificadas</p>

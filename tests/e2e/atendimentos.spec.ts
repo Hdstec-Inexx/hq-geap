@@ -3,6 +3,7 @@ import pg from 'pg';
 import aprovada from '../fixtures/avaliacoes/avaliacao-aprovada.json' with { type: 'json' };
 import fixture from '../fixtures/elevenlabs/atendimento-concluido.json' with { type: 'json' };
 import { authUsers } from '../support/auth-fixtures.js';
+import { ensureMinioTestAudio } from '../support/audio-fixture.js';
 import {
   firstTurnFitsWithoutEmptyBox,
   longTranscript,
@@ -52,6 +53,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       values ('Lívia', 'agent-livia-test')
       on conflict (elevenlabs_agent_id) do nothing
     `);
+    await ensureMinioTestAudio(['atendimentos/teste.mp3'], 60);
   });
 
   test('rejeita credencial de ingestao invalida sem persistir estado', async ({
@@ -645,5 +647,430 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     // Limpar filtros
     await page.getByRole('button', { name: 'Limpar filtros' }).click();
     await expect(page).toHaveURL('/atendimentos');
+  });
+
+  test('filtros de curadoriaStatus, curadorId, endpoint /curadores e badge de curadoria nos cards', async ({
+    page,
+    request
+  }) => {
+    const admin = await login(request, 'admin');
+    const curadorUser = authUsers.find((u) => u.role === 'curador')!;
+    const curadorSession = await login(request, 'curador');
+    const headers = { authorization: `Bearer ${admin.token}` };
+
+    // 1. GET /curadores retorna lista com { id, nome }
+    const curadoresResponse = await request.get(`${apiUrl}/curadores`, {
+      headers
+    });
+    expect(curadoresResponse.status()).toBe(200);
+    const curadores = (await curadoresResponse.json()) as Array<{
+      id: string;
+      nome: string;
+    }>;
+    expect(curadores.length).toBeGreaterThanOrEqual(1);
+    const curador = curadores.find((c) => c.nome === curadorUser.name);
+    expect(curador).toBeDefined();
+    expect(curador?.id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    );
+
+    // Ingestão de 2 atendimentos para o teste
+    const convRealizada = 'conv-curadoria-realizada-001';
+    const convPendente = 'conv-curadoria-pendente-001';
+
+    const resp1 = await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: {
+        ...atendimento,
+        conversation_id: convRealizada,
+        contact_reason: 'Curadoria Realizada Motivo',
+        status: 'concluido',
+        completed_at: '2026-08-18T10:00:00.000Z',
+        duration_seconds: 150
+      },
+      headers: ingestionHeaders
+    });
+    expect(resp1.status()).toBe(201);
+    const atend1 = (await resp1.json()) as { id: string };
+
+    const resp2 = await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: {
+        ...atendimento,
+        conversation_id: convPendente,
+        contact_reason: 'Curadoria Pendente Motivo',
+        status: 'concluido',
+        completed_at: '2026-08-18T11:00:00.000Z',
+        duration_seconds: 120
+      },
+      headers: ingestionHeaders
+    });
+    expect(resp2.status()).toBe(201);
+    const atend2 = (await resp2.json()) as { id: string };
+
+    // Avaliação da IA para o primeiro atendimento
+    await queryDatabase(
+      `
+      select * from persistir_avaliacao_ia(
+        $1,
+        (select id from prompts_ia_avaliadora where ativo),
+        $2::jsonb,
+        $3::jsonb,
+        $4,
+        $5,
+        $6
+      )
+    `,
+      [
+        atend1.id,
+        JSON.stringify(aprovada.checklist),
+        JSON.stringify(aprovada.falhas_identificadas),
+        aprovada.resumo_atendimento,
+        aprovada.atendimento_aprovado,
+        aprovada.nota_qualidade
+      ]
+    );
+
+    // Salvar conferência do curador no primeiro atendimento
+    const curadoriaDetailRes = await request.get(
+      `${apiUrl}/curadoria/${atend1.id}`,
+      { headers: { authorization: `Bearer ${curadorSession.token}` } }
+    );
+    expect(curadoriaDetailRes.status()).toBe(200);
+    const curadoriaDetailData = (await curadoriaDetailRes.json()) as {
+      avaliacaoIa: {
+        checklist: Array<{ chave: string; estado: 'atendido' | 'nao_atendido' | 'nao_se_aplica' }>;
+      };
+    };
+
+    const confRes = await request.post(
+      `${apiUrl}/curadoria/${atend1.id}/avaliacoes`,
+      {
+        data: {
+          checklist: curadoriaDetailData.avaliacaoIa.checklist.map((c) => ({
+            chave: c.chave,
+            estado: 'atendido'
+          })),
+          notaAvaliacaoIa: 9,
+          falhasIdentificadas: [],
+          resumoAtendimento: 'Atendimento revisado com sucesso',
+          comentario: 'Curadoria aprovada sem ressalvas.'
+        },
+        headers: { authorization: `Bearer ${curadorSession.token}` }
+      }
+    );
+    expect(confRes.status()).toBe(201);
+
+    // 2. Consulta GET /atendimentos verifica metadados de curadoria
+    const listRes = await request.get(`${apiUrl}/atendimentos`, { headers });
+    expect(listRes.status()).toBe(200);
+    const listData = (await listRes.json()) as {
+      items: Array<{
+        id: string;
+        conversationId: string;
+        curadoria: {
+          realizada: boolean;
+          curadorId: string | null;
+          curadorNome: string | null;
+          nota: number | null;
+          realizadaEm: string | null;
+        };
+      }>;
+    };
+
+    const itemRealizada = listData.items.find(
+      (item) => item.conversationId === convRealizada
+    );
+    expect(itemRealizada).toBeDefined();
+    expect(itemRealizada?.curadoria).toMatchObject({
+      realizada: true,
+      curadorId: curador?.id,
+      curadorNome: curadorUser.name,
+      nota: expect.any(Number),
+      realizadaEm: expect.any(String)
+    });
+
+    const itemPendente = listData.items.find(
+      (item) => item.conversationId === convPendente
+    );
+    expect(itemPendente).toBeDefined();
+    expect(itemPendente?.curadoria).toEqual({
+      realizada: false,
+      curadorId: null,
+      curadorNome: null,
+      nota: null,
+      realizadaEm: null
+    });
+
+    // 3. Filtro por curadoriaStatus=realizada via API
+    const listRealizada = await request.get(
+      `${apiUrl}/atendimentos?curadoriaStatus=realizada`,
+      { headers }
+    );
+    const dataRealizada = (await listRealizada.json()) as {
+      items: Array<{ conversationId: string }>;
+    };
+    expect(
+      dataRealizada.items.some((i) => i.conversationId === convRealizada)
+    ).toBe(true);
+    expect(
+      dataRealizada.items.some((i) => i.conversationId === convPendente)
+    ).toBe(false);
+
+    // 4. Filtro por curadoriaStatus=pendente via API
+    const listPendente = await request.get(
+      `${apiUrl}/atendimentos?curadoriaStatus=pendente`,
+      { headers }
+    );
+    const dataPendente = (await listPendente.json()) as {
+      items: Array<{ conversationId: string }>;
+    };
+    expect(
+      dataPendente.items.some((i) => i.conversationId === convRealizada)
+    ).toBe(false);
+    expect(
+      dataPendente.items.some((i) => i.conversationId === convPendente)
+    ).toBe(true);
+
+    // 5. Filtro por curadorId via API
+    const listCurador = await request.get(
+      `${apiUrl}/atendimentos?curadorId=${curador?.id}`,
+      { headers }
+    );
+    const dataCurador = (await listCurador.json()) as {
+      items: Array<{ conversationId: string }>;
+    };
+    expect(
+      dataCurador.items.some((i) => i.conversationId === convRealizada)
+    ).toBe(true);
+    expect(
+      dataCurador.items.some((i) => i.conversationId === convPendente)
+    ).toBe(false);
+
+    // 6. Teste da interface AtendimentosPage (filtros e badges)
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('admin@hq.test');
+    await page.getByLabel('Senha').fill('senha-admin');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto('/atendimentos');
+
+    // Verificar exibição dos badges nos cards
+    await expect(
+      page.getByText(`Curadoria: ${curadorUser.name}`).first()
+    ).toBeVisible();
+    await expect(page.getByText('Curadoria pendente').first()).toBeVisible();
+
+    // Filtrar por Status da Curadoria = Realizada
+    await page
+      .locator('#atendimentos-curadoria-status-filtro')
+      .selectOption('realizada');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page).toHaveURL(/curadoriaStatus=realizada/);
+    await expect(
+      page.getByText('Curadoria Realizada Motivo').first()
+    ).toBeVisible();
+    await expect(
+      page.getByText('Curadoria Pendente Motivo')
+    ).not.toBeVisible();
+
+    // Filtrar por Curador
+    await page
+      .locator('#atendimentos-curadoria-status-filtro')
+      .selectOption('');
+    await page
+      .locator('#atendimentos-curador-filtro')
+      .selectOption(curador!.id);
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page).toHaveURL(new RegExp(`curadorId=${curador!.id}`));
+    await expect(
+      page.getByText('Curadoria Realizada Motivo').first()
+    ).toBeVisible();
+    await expect(
+      page.getByText('Curadoria Pendente Motivo')
+    ).not.toBeVisible();
+
+    // Limpar filtros
+    await page.getByRole('button', { name: 'Limpar filtros' }).click();
+    await expect(page).toHaveURL('/atendimentos');
+  });
+
+  async function createAvaliacaoIa(atendimentoId: string) {
+    const result = await queryDatabase<{ avaliacao_id: string }>(`
+      select avaliacao_id from persistir_avaliacao_ia(
+        $1,
+        (select id from prompts_ia_avaliadora where ativo),
+        $2::jsonb,
+        $3::jsonb,
+        $4,
+        $5,
+        $6
+      )
+    `, [
+      atendimentoId,
+      JSON.stringify(aprovada.checklist),
+      JSON.stringify(aprovada.falhas_identificadas),
+      aprovada.resumo_atendimento,
+      aprovada.atendimento_aprovado,
+      aprovada.nota_qualidade
+    ]);
+    return result.rows[0]?.avaliacao_id;
+  }
+
+  test('exibição condicional da Avaliação do Curador: oculta quando inexistente e exibe lado a lado quando concluída', async ({
+    page
+  }) => {
+    const semCuradoriaId = await createAtendimentoComTranscricao(
+      'conv-atend-sem-curadoria',
+      shortTranscript
+    );
+    await createAvaliacaoIa(semCuradoriaId);
+
+    const comCuradoriaId = await createAtendimentoComTranscricao(
+      'conv-atend-com-curadoria',
+      shortTranscript
+    );
+    const avaliacaoIaId = await createAvaliacaoIa(comCuradoriaId);
+    await queryDatabase(`
+      insert into avaliacoes_curador (
+        atendimento_id, avaliacao_ia_id, autor_usuario_id, autor_usuario_nome,
+        nota, falhas_identificadas, nota_avaliacao_ia, resumo_atendimento
+      )
+      select
+        $1, $2, u.id, u.nome, 9.0, '[]'::jsonb, 9.5, 'Resumo do curador'
+      from usuarios u where u.email = 'curador@hq.test'
+    `, [comCuradoriaId, avaliacaoIaId]);
+
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('gestao@hq.test');
+    await page.getByLabel('Senha').fill('senha-gestao');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+
+    // 1. Atendimento sem curadoria: renderiza apenas IA, sem placeholder nem card vazio de Curador
+    await page.goto(`/atendimentos/${semCuradoriaId}`);
+    await expect(page.getByRole('heading', { name: 'Avaliação da IA' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toHaveCount(0);
+    await expect(page.getByText('Avaliação do Curador ainda não disponível')).toHaveCount(0);
+    await expect(page.locator('.avaliacoes-lado-a-lado > .avaliacao-panel')).toHaveCount(1);
+
+    // 2. Atendimento com curadoria: renderiza IA e Curador lado a lado
+    await page.goto(`/atendimentos/${comCuradoriaId}`);
+    await expect(page.getByRole('heading', { name: 'Avaliação da IA' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toBeVisible();
+    await expect(page.locator('.avaliacoes-lado-a-lado > .avaliacao-panel')).toHaveCount(2);
+  });
+
+  test('botão de download de áudio com controle de acesso para Admin e Gestão, bloqueado para Curador e indisponível sem áudio', async ({
+    page
+  }) => {
+    const conversationIdWithAudio = 'conv-download-audio-auth-001';
+    const atendimentoComAudioId = await createAtendimentoComTranscricao(
+      conversationIdWithAudio,
+      [
+        { role: 'agent', message: 'Olá, sou a Lívia da GEAP.', time_in_call_secs: 0 },
+        { role: 'user', message: 'Preciso do meu arquivo de áudio.', time_in_call_secs: 10 }
+      ]
+    );
+
+    // Também cria avaliação da IA para que o atendimento apareça na curadoria
+    await queryDatabase(`
+      select * from persistir_avaliacao_ia(
+        $1,
+        (select id from prompts_ia_avaliadora where ativo),
+        $2::jsonb,
+        $3::jsonb,
+        $4,
+        $5,
+        $6
+      )
+    `, [
+      atendimentoComAudioId,
+      JSON.stringify(aprovada.checklist),
+      JSON.stringify(aprovada.falhas_identificadas),
+      aprovada.resumo_atendimento,
+      aprovada.atendimento_aprovado,
+      aprovada.nota_qualidade
+    ]);
+
+    // Cria atendimento sem áudio
+    const conversationIdSemAudio = 'conv-download-no-audio-001';
+    const resultSemAudio = await queryDatabase<{ id: string }>(`
+      insert into atendimentos (
+        agente_voz_id, elevenlabs_conversation_id, status, transcricao,
+        audio_url, houve_transferencia, concluido_em, duracao_segundos,
+        motivo_contato
+      )
+      select id, $1, 'concluido'::status_atendimento,
+        '[{"role":"agent","message":"Olá sem áudio","time_in_call_secs":0}]'::jsonb,
+        null, false, now(), 30, 'Financeiro'
+      from agentes_voz
+      where elevenlabs_agent_id = 'agent-livia-test'
+      returning id
+    `, [conversationIdSemAudio]);
+    const atendimentoSemAudioId = resultSemAudio.rows[0]!.id;
+
+    // 1. Admin acessa detalhe do atendimento com áudio: vê botão e faz download com nome sugerido
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('admin@hq.test');
+    await page.getByLabel('Senha').fill('senha-admin');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto(`/atendimentos/${atendimentoComAudioId}`);
+
+    const downloadBtnAdmin = page.getByTestId('audio-download-btn');
+    await expect(downloadBtnAdmin).toBeVisible();
+    await expect(downloadBtnAdmin).toHaveAttribute('aria-label', 'Baixar áudio');
+    await expect(downloadBtnAdmin).toHaveAttribute('title', 'Baixar áudio');
+
+    const downloadPromiseAdmin = page.waitForEvent('download');
+    await downloadBtnAdmin.click();
+    const downloadAdmin = await downloadPromiseAdmin;
+    expect(downloadAdmin.suggestedFilename()).toBe(`atendimento-${conversationIdWithAudio}.mp3`);
+
+    // 1b. Admin acessa atendimento sem áudio: botão de download NÃO é exibido
+    await page.goto(`/atendimentos/${atendimentoSemAudioId}`);
+    await expect(page.getByTestId('audio-download-btn')).toHaveCount(0);
+
+    // 1c. Admin acessa revisão de curadoria: vê botão de download e dispara download
+    await page.goto(`/curadoria/${atendimentoComAudioId}`);
+    const downloadBtnAdminCuradoria = page.getByTestId('audio-download-btn');
+    await expect(downloadBtnAdminCuradoria).toBeVisible();
+    const downloadPromiseCuradoria = page.waitForEvent('download');
+    await downloadBtnAdminCuradoria.click();
+    const downloadCuradoria = await downloadPromiseCuradoria;
+    expect(downloadCuradoria.suggestedFilename()).toBe(`atendimento-${conversationIdWithAudio}.mp3`);
+
+    // 2. Gestão acessa detalhe do atendimento e revisão de curadoria: vê botão de download e dispara download
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('gestao@hq.test');
+    await page.getByLabel('Senha').fill('senha-gestao');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto(`/atendimentos/${atendimentoComAudioId}`);
+
+    const downloadBtnGestao = page.getByTestId('audio-download-btn');
+    await expect(downloadBtnGestao).toBeVisible();
+    const downloadPromiseGestao = page.waitForEvent('download');
+    await downloadBtnGestao.click();
+    const downloadGestao = await downloadPromiseGestao;
+    expect(downloadGestao.suggestedFilename()).toBe(`atendimento-${conversationIdWithAudio}.mp3`);
+
+    await page.goto(`/curadoria/${atendimentoComAudioId}`);
+    const downloadBtnGestaoCuradoria = page.getByTestId('audio-download-btn');
+    await expect(downloadBtnGestaoCuradoria).toBeVisible();
+
+    // 3. Curador acessa detalhe do atendimento e revisão de curadoria: player visível, botão de download OCULTO
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('curador@hq.test');
+    await page.getByLabel('Senha').fill('senha-curador');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto(`/atendimentos/${atendimentoComAudioId}`);
+
+    await expect(page.getByTestId('audio-player')).toBeVisible();
+    await expect(page.getByTestId('audio-download-btn')).toHaveCount(0);
+
+    await page.goto(`/curadoria/${atendimentoComAudioId}`);
+    await expect(page.getByTestId('audio-player')).toBeVisible();
+    await expect(page.getByTestId('audio-download-btn')).toHaveCount(0);
   });
 });

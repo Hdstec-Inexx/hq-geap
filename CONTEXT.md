@@ -45,10 +45,13 @@ Fato objetivo do Atendimento: o contato foi transferido para um número ou human
 **Custo**:
 O custo do Atendimento na ElevenLabs, tal qual exibido por ela após a conclusão. Atributo visível apenas para Admin e Gestão — o Curador não o vê.
 
+**Download de Áudio**:
+A exportação do arquivo de áudio (`.mp3`) do Atendimento. Acesso restrito aos papéis **Admin** e **Gestão** (auditoria técnica e arquivamento de contatos). O **Curador** acessa somente a reprodução no player durante a conferência, sem permissão para download.
+
 ### Avaliação
 
 **Avaliação**:
-O veredito sobre um Atendimento, produzido pela IA Avaliadora ou pelo Curador — as duas coexistem lado a lado, sem hierarquia, e são snapshots imutáveis. A da IA carrega: checklist de critérios, nota de 0–10 (soma dos atendidos), falhas identificadas e resumo do atendimento. A do Curador é a **conferência da avaliação da IA** em registro separado: ele confirma ou corrige o shape espelho (checklist, falhas e resumo), sua nota deriva da mesma soma da Régua, registra a **Nota da Avaliação da IA** (0–10, qualidade da própria IA Avaliadora) e pode adicionar um comentário opcional na revisão. Concordância não é flag gravada — deriva da comparação dos dois snapshots.
+O veredito sobre um Atendimento, produzido pela IA Avaliadora ou pelo Curador — as duas coexistem lado a lado quando ambas existem, sem hierarquia, e são snapshots imutáveis. A da IA é gerada para todo Atendimento concluído e carrega: checklist de critérios, nota de 0–10 (soma dos atendidos), falhas identificadas e resumo do atendimento. A do Curador é a **conferência da avaliação da IA** em registro separado: ele confirma ou corrige o shape espelho (checklist, falhas e resumo), sua nota deriva da mesma soma da Régua, registra a **Nota da Avaliação da IA** (0–10, qualidade da própria IA Avaliadora) e pode adicionar um comentário opcional na revisão. Enquanto a conferência humana não for realizada, o painel do Curador não é exibido (sem renderizar card vazio nem mensagem de placeholder) e o painel da Avaliação da IA se expande para ocupar a largura total do container. Quando a avaliação do Curador existir, ambos os painéis coexistem lado a lado. Concordância não é flag gravada — deriva da comparação dos dois snapshots.
 
 **Nota da Avaliação da IA**:
 Nota de 0–10 que o Curador atribui à qualidade da Avaliação da IA num Atendimento (calibração do avaliador), distinta da nota do Atendimento na Régua.
@@ -83,6 +86,15 @@ Anotação sobre um Atendimento, usada como insumo para ajustes e melhorias do A
 
 **Fila de Curadoria**:
 A lista de Atendimentos concluídos e já avaliados pela IA, da qual o Curador escolhe livremente quais revisar (modelo pull, sem gatilho automático).
+
+**Minhas Curadorias**:
+A lista de Atendimentos concluídos que já receberam conferência humana. Permite ao Curador consultar suas próprias revisões (e aos perfis de Gestão e Admin, auditar o histórico de conferências realizadas sob o nome "Curadorias Realizadas").
+
+**Curadoria no Atendimento**:
+Atributo de visualização e filtro na listagem de Atendimentos que indica se a conferência humana já foi realizada e identifica o Curador responsável pela avaliação mais recente.
+
+**Avaliados (IA × Curador)**:
+Indicador do dashboard que quantifica o volume de Atendimentos concluídos avaliados pela IA e conferidos por Curadores no período filtrado.
 
 **Monitoramento ao Vivo**:
 A observação em tempo real — somente texto, sem áudio — de Atendimentos ainda **abertos na ElevenLabs** (`initiated` / `in-progress`, sem sinais de término, com duração ainda acompanhando o relógio e início recente), via WebSocket. A lista não filtra por dia civil; conversas zombie (status aberto preso na fonte, inclusive no mesmo dia), IDs que só aparecem no filtro aberto (ausentes na listagem geral, mesmo que o monitor ainda responda `history_complete`) e Atendimentos já `concluido` no HQ ficam de fora. Estritamente observacional: nenhuma intervenção no Atendimento.

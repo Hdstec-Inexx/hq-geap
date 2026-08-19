@@ -1188,4 +1188,178 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page).toHaveURL(/[?&]motivo=Rede/);
     await expect(page.getByRole('link', { name: 'conv-combo-51' })).toBeVisible();
   });
+
+  test('endpoint GET /curadorias-realizadas lista conferencias e aplica filtros de periodo, motivo e curadorId', async ({
+    request
+  }) => {
+    // Cria um segundo curador
+    const curador2Result = await queryDatabase<{ id: string }>(`
+      insert into usuarios (email, nome, senha_hash, papel)
+      values ('curadora2@hq.test', 'Bruna Curadora', '$2b$10$dummyhash', 'curador')
+      on conflict (email) do update set nome = 'Bruna Curadora'
+      returning id
+    `);
+    const curador2Id = curador2Result.rows[0]!.id;
+
+    const at1Id = await createAtendimento('conv-realizada-caio');
+    const at2Id = await createAtendimento('conv-realizada-bruna');
+    await persistirAvaliacaoIa(at1Id);
+    await persistirAvaliacaoIa(at2Id);
+
+    const caio = await login(request, 'curador');
+    const gestao = await login(request, 'gestao');
+
+    // Caio realiza conferência do at1
+    const caioUser = await queryDatabase<{ id: string }>(
+      "select id from usuarios where email = 'curador@hq.test'"
+    );
+    const caioId = caioUser.rows[0]!.id;
+
+    const detalhe1 = await request.get(`${apiUrl}/curadoria/${at1Id}`, {
+      headers: { authorization: `Bearer ${caio.token}` }
+    });
+    const d1 = (await detalhe1.json()) as { avaliacaoIa: { id: string; checklist: Array<{ chave: string; estado: string }> } };
+    await request.post(`${apiUrl}/curadoria/${at1Id}/avaliacoes`, {
+      headers: { authorization: `Bearer ${caio.token}` },
+      data: {
+        checklist: d1.avaliacaoIa.checklist.map((c) => ({ chave: c.chave, estado: c.estado })),
+        notaAvaliacaoIa: 9,
+        falhasIdentificadas: [],
+        resumoAtendimento: 'Conferido por Caio'
+      }
+    });
+
+    // Bruna realiza conferência do at2
+    const detalhe2 = await request.get(`${apiUrl}/curadoria/${at2Id}`, {
+      headers: { authorization: `Bearer ${gestao.token}` }
+    });
+    const d2 = (await detalhe2.json()) as { avaliacaoIa: { id: string; checklist: Array<{ chave: string; estado: string }> } };
+
+    await queryDatabase(`
+      insert into avaliacoes_curador (
+        atendimento_id, avaliacao_ia_id, autor_usuario_id, autor_usuario_nome,
+        nota, falhas_identificadas, resumo_atendimento, nota_avaliacao_ia
+      )
+      values ($1, $2, $3, 'Bruna Curadora', 9.5, '[]'::jsonb, 'Conferido por Bruna', 9)
+    `, [at2Id, d2.avaliacaoIa.id, curador2Id]);
+
+    // Curador consulta /curadorias-realizadas -> padrão é ver apenas as suas
+    const resCurador = await request.get(`${apiUrl}/curadorias-realizadas`, {
+      headers: { authorization: `Bearer ${caio.token}` }
+    });
+    expect(resCurador.status()).toBe(200);
+    const bodyCurador = (await resCurador.json()) as { items: Array<{ id: string; curadorNome: string }> };
+    const curadorItemsIds = bodyCurador.items.map((it) => it.id);
+    expect(curadorItemsIds).toContain(at1Id);
+    expect(curadorItemsIds).not.toContain(at2Id);
+
+    // Gestão consulta /curadorias-realizadas -> vê todas
+    const resGestao = await request.get(`${apiUrl}/curadorias-realizadas`, {
+      headers: { authorization: `Bearer ${gestao.token}` }
+    });
+    expect(resGestao.status()).toBe(200);
+    const bodyGestao = (await resGestao.json()) as { items: Array<{ id: string; curadorNome: string }> };
+    const gestaoItemsIds = bodyGestao.items.map((it) => it.id);
+    expect(gestaoItemsIds).toContain(at1Id);
+    expect(gestaoItemsIds).toContain(at2Id);
+
+    // Gestão filtra por curadorId de Bruna
+    const resGestaoBruna = await request.get(
+      `${apiUrl}/curadorias-realizadas?curadorId=${curador2Id}`,
+      { headers: { authorization: `Bearer ${gestao.token}` } }
+    );
+    expect(resGestaoBruna.status()).toBe(200);
+    const bodyBruna = (await resGestaoBruna.json()) as { items: Array<{ id: string }> };
+    const brunaIds = bodyBruna.items.map((it) => it.id);
+    expect(brunaIds).toContain(at2Id);
+    expect(brunaIds).not.toContain(at1Id);
+  });
+
+  test('Curador acessa Minhas Curadorias na Casca e abre detalhe em modo conferencia', async ({
+    page,
+    request
+  }) => {
+    const atendimentoId = await createAtendimento('conv-minhas-curadorias-ui');
+    await persistirAvaliacaoIa(atendimentoId);
+
+    const curador = await login(request, 'curador');
+    const detalhe = await request.get(`${apiUrl}/curadoria/${atendimentoId}`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    });
+    const d = (await detalhe.json()) as { avaliacaoIa: { id: string; checklist: Array<{ chave: string; estado: string }> } };
+    await request.post(`${apiUrl}/curadoria/${atendimentoId}/avaliacoes`, {
+      headers: { authorization: `Bearer ${curador.token}` },
+      data: {
+        checklist: d.avaliacaoIa.checklist.map((c) => ({ chave: c.chave, estado: c.estado })),
+        notaAvaliacaoIa: 9,
+        falhasIdentificadas: [],
+        resumoAtendimento: 'Minha conferencia UI'
+      }
+    });
+
+    await loginUi(page, 'curador');
+    await page.getByRole('link', { name: 'Minhas Curadorias' }).click();
+    await expect(page).toHaveURL('/minhas-curadorias');
+    await expect(page.getByRole('heading', { name: 'Minhas Curadorias' })).toBeVisible();
+    await expect(page.getByText('Histórico de atendimentos conferidos por você.')).toBeVisible();
+
+    const linkConv = page.getByRole('link', { name: 'conv-minhas-curadorias-ui' });
+    await expect(linkConv).toBeVisible();
+    await linkConv.click();
+
+    await expect(page).toHaveURL(new RegExp(`/curadoria/${atendimentoId}`));
+    await expect(page.getByRole('heading', { name: 'Revisar Atendimento' })).toBeVisible();
+    const backLink = page.getByRole('link', { name: 'Voltar a Minhas Curadorias' });
+    await expect(backLink).toBeVisible();
+    await backLink.click();
+    await expect(page).toHaveURL('/minhas-curadorias');
+  });
+
+  test('Gestao acessa Curadorias Realizadas na Casca e pode filtrar por curador', async ({
+    page,
+    request
+  }) => {
+    const atId = await createAtendimento('conv-curadorias-realizadas-gestao');
+    await persistirAvaliacaoIa(atId);
+
+    const curador = await login(request, 'curador');
+    const detalhe = await request.get(`${apiUrl}/curadoria/${atId}`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    });
+    const d = (await detalhe.json()) as { avaliacaoIa: { id: string; checklist: Array<{ chave: string; estado: string }> } };
+    await request.post(`${apiUrl}/curadoria/${atId}/avaliacoes`, {
+      headers: { authorization: `Bearer ${curador.token}` },
+      data: {
+        checklist: d.avaliacaoIa.checklist.map((c) => ({ chave: c.chave, estado: c.estado })),
+        notaAvaliacaoIa: 8.5,
+        falhasIdentificadas: [],
+        resumoAtendimento: 'Realizada para Gestao'
+      }
+    });
+
+    await loginUi(page, 'gestao');
+    await page.getByRole('link', { name: 'Curadorias Realizadas' }).click();
+    await expect(page).toHaveURL('/curadorias-realizadas');
+    await expect(page.getByRole('heading', { name: 'Curadorias Realizadas' })).toBeVisible();
+    await expect(page.getByText('Histórico de atendimentos conferidos pelos curadores.')).toBeVisible();
+
+    // Filtro por curador está visível para gestão
+    const curadorSelect = page.getByLabel('Curador');
+    await expect(curadorSelect).toBeVisible();
+    await curadorSelect.selectOption({ label: 'Caio Curador' });
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+
+    await expect(page).toHaveURL(/curadorId=/);
+    const card = page.locator('article.curadoria-row').filter({ hasText: 'conv-curadorias-realizadas-gestao' });
+    await expect(card).toBeVisible();
+    await expect(card.getByText('Caio Curador')).toBeVisible();
+
+    await card.getByRole('link', { name: 'Consultar' }).click();
+    await expect(page.getByRole('heading', { name: 'Revisar Atendimento' })).toBeVisible();
+    const backLink = page.getByRole('link', { name: 'Voltar a Curadorias Realizadas' });
+    await expect(backLink).toBeVisible();
+    await backLink.click();
+    await expect(page).toHaveURL(/\/curadorias-realizadas/);
+  });
 });
+

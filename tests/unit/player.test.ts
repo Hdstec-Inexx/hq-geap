@@ -1,17 +1,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  canDownloadAudio,
   clampSeekTime,
   DEFAULT_PLAYBACK_RATE,
   formatPlaybackRate,
   formatPlayerTime,
   getActiveTurnIndex,
+  getAudioDownloadFilename,
   getNextPlaybackRate,
   getStoredPlaybackRate,
   parsePlaybackRate,
   PLAYBACK_RATE_STORAGE_KEY,
   PLAYBACK_RATES,
   setStoredPlaybackRate,
+  shouldShowAudioDownloadButton,
   shouldShowMiniplayer
 } from '../../apps/web/src/features/player/audio-player-logic.js';
 
@@ -264,3 +267,109 @@ test('getStoredPlaybackRate e setStoredPlaybackRate persistem e restauram no loc
   assert.equal(getStoredPlaybackRate(failingStorage), 1);
   assert.doesNotThrow(() => setStoredPlaybackRate(1.25, failingStorage));
 });
+
+test('canDownloadAudio autoriza estritamente admin e gestao, bloqueando curador, null e outros', () => {
+  assert.equal(canDownloadAudio('admin'), true);
+  assert.equal(canDownloadAudio('gestao'), true);
+  assert.equal(canDownloadAudio('curador'), false);
+  assert.equal(canDownloadAudio(null), false);
+  assert.equal(canDownloadAudio(undefined), false);
+  assert.equal(canDownloadAudio('outro' as unknown as 'admin'), false);
+  assert.equal(canDownloadAudio('' as unknown as 'admin'), false);
+});
+
+test('getAudioDownloadFilename gera o padrao atendimento-[conversationId].mp3', () => {
+  assert.equal(
+    getAudioDownloadFilename('conv-12345'),
+    'atendimento-conv-12345.mp3'
+  );
+  assert.equal(
+    getAudioDownloadFilename('livia-call-987'),
+    'atendimento-livia-call-987.mp3'
+  );
+});
+
+test('shouldShowAudioDownloadButton autoriza estritamente admin e gestao com audioUrl presente', () => {
+  // Curador -> false
+  assert.equal(
+    shouldShowAudioDownloadButton({
+      audioUrl: 'https://storage.local/audio.mp3',
+      role: 'curador'
+    }),
+    false
+  );
+
+  // Sem audioUrl -> false
+  assert.equal(
+    shouldShowAudioDownloadButton({
+      audioUrl: null,
+      role: 'admin'
+    }),
+    false
+  );
+
+  // Sem audioUrl (string vazia ou apenas espacos) -> false
+  assert.equal(
+    shouldShowAudioDownloadButton({
+      audioUrl: '',
+      role: 'gestao'
+    }),
+    false
+  );
+  assert.equal(
+    shouldShowAudioDownloadButton({
+      audioUrl: '   ',
+      role: 'admin'
+    }),
+    false
+  );
+
+  // Role nula/indefinida -> false
+  assert.equal(
+    shouldShowAudioDownloadButton({
+      audioUrl: 'https://storage.local/audio.mp3',
+      role: null
+    }),
+    false
+  );
+  assert.equal(
+    shouldShowAudioDownloadButton({
+      audioUrl: 'https://storage.local/audio.mp3',
+      role: undefined
+    }),
+    false
+  );
+
+  // Admin com audioUrl -> true
+  assert.equal(
+    shouldShowAudioDownloadButton({
+      audioUrl: 'https://storage.local/audio.mp3',
+      role: 'admin'
+    }),
+    true
+  );
+
+  // Gestao com audioUrl -> true
+  assert.equal(
+    shouldShowAudioDownloadButton({
+      audioUrl: 'https://storage.local/audio.mp3',
+      role: 'gestao'
+    }),
+    true
+  );
+});
+
+test('Miniplayer nao renderiza botao de download de audio', async () => {
+  const fs = await import('node:fs/promises');
+  const path = await import('node:path');
+  const miniplayerSource = await fs.readFile(
+    path.resolve(process.cwd(), 'apps/web/src/features/player/Miniplayer.tsx'),
+    'utf8'
+  );
+  assert.equal(miniplayerSource.includes('audio-download-btn'), false);
+  assert.equal(miniplayerSource.includes('AudioDownloadButton'), false);
+  assert.equal(miniplayerSource.includes('canDownloadAudio'), false);
+});
+
+
+

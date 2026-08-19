@@ -20,6 +20,10 @@ export type AtendimentoSummaryRow = {
   houveTransferencia: boolean;
   custo: string | null;
   eventTimestamp: string | null;
+  curadorId: string | null;
+  curadorNome: string | null;
+  curadoriaNota: string | null;
+  curadoriaRealizadaEm: Date | null;
 };
 
 export type AtendimentoRow = AtendimentoSummaryRow & {
@@ -45,9 +49,14 @@ const selectAtendimentoSummary = `
     a.motivo_contato as "motivoContato",
     a.houve_transferencia as "houveTransferencia",
     a.custo,
-    a.elevenlabs_event_timestamp as "eventTimestamp"
+    a.elevenlabs_event_timestamp as "eventTimestamp",
+    cur.autor_usuario_id as "curadorId",
+    cur.autor_usuario_nome as "curadorNome",
+    cur.nota as "curadoriaNota",
+    cur.criado_em as "curadoriaRealizadaEm"
   from atendimentos a
   join agentes_voz av on av.id = a.agente_voz_id
+  left join avaliacoes_curador_mais_recentes cur on cur.atendimento_id = a.id
 `;
 
 const selectAtendimento = `
@@ -196,6 +205,7 @@ export function createAtendimentosRepository(db: pg.Pool) {
           select count(*)::text as total
           from atendimentos a
           join agentes_voz av on av.id = a.agente_voz_id
+          left join avaliacoes_curador_mais_recentes cur on cur.atendimento_id = a.id
           where ${countClauses.join(' and ')}
         `, [query.status ?? null, ...countDetalhamento.values]),
         db.query<AtendimentoSummaryRow>(`

@@ -23,6 +23,13 @@ export function areasPorPapel(role: UserRole): AreaCasca[] {
     }
   );
 
+  if (role === 'curador') {
+    areas.push({ to: '/minhas-curadorias', label: 'Minhas Curadorias' });
+  } else {
+    areas.push({ to: '/curadorias-realizadas', label: 'Curadorias Realizadas' });
+  }
+
+
   if (role === 'admin') {
     areas.push(
       { to: '/admin/comentarios', label: 'Trabalhar fila de manutenção' },
