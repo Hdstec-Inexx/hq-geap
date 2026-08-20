@@ -66,7 +66,7 @@ Um Critério marcado como crítico que não foi atendido. Derruba a Aprovação 
 A avaliadora primária (LLM), que avalia automaticamente todo Atendimento concluído. É a "régua" do sistema: configurada pelo Admin dentro do sistema (prompt, modelo, temperatura).
 
 **Critério**:
-Uma verificação sobre o comportamento do Agente de Voz (ex: "Saudação", "Palavras Proibidas") com três estados: `Atendido` (vale seu valor fixo em pontos), `Não atendido` (zero) ou `Não se aplica` (pontua como atendido — ex: "Validação de E-mail" num Atendimento sem envio de e-mail). Pode ser marcado como **crítico** (ver Falha Crítica) e sua regra de aplicabilidade é parte da definição. A lista e os valores são fixos, definidos pelo desenvolvimento; o Admin apenas consulta. Um Critério pode ter valor 0 quando serve só à calibração (ex: **Uso Correto de Ferramentas**).
+Uma verificação sobre o comportamento do Agente de Voz (ex: "Saudação", "Palavras Proibidas") com três estados: `Atendido` (vale seu valor fixo em pontos), `Não atendido` (zero) ou `Não se aplica` (pontua como atendido — ex: "Validação de E-mail" num Atendimento sem envio de e-mail). Pode ser marcado como **crítico** (ver Falha Crítica) e sua regra de aplicabilidade é parte da definição. A lista e os valores são fixos, definidos pelo desenvolvimento; os usuários autenticados apenas consultam. Um Critério pode ter valor 0 quando serve só à calibração (ex: **Uso Correto de Ferramentas**).
 
 **Uso Correto de Ferramentas**:
 Critério da Régua (valor 0) que verifica se o Agente de Voz acionou as ferramentas corretas sem uso indevido ou falha operacional. Se não for atendido, **Resolução da Solicitação** também fica não atendida (perde 3,0) — ver ADR-0011.

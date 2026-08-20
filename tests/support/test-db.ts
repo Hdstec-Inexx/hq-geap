@@ -34,7 +34,7 @@ export default async function prepareTestDatabase() {
       throw new Error('Refusing to reset a database whose name does not end in _test');
     }
 
-    await client.query('drop schema public cascade');
+    await client.query('drop schema if exists public cascade');
     await client.query('create schema public');
     await runSqlDirectory(client, 'migrations');
     await runSqlDirectory(client, 'seeds');
