@@ -3,6 +3,7 @@ import {
   type DashboardPeriod
 } from '@hq-geap/contracts/dashboards';
 import type pg from 'pg';
+import { canonicalMotivoSql } from '../atendimentos/detalhamentoFilters.js';
 
 export type DashboardKpisRow = {
   volume: string;
@@ -99,10 +100,10 @@ export function createDashboardRepository(db: pg.Pool) {
 
     async listMotivos(periodo: DashboardPeriod): Promise<MotivoContatoRow[]> {
       const result = await db.query<MotivoContatoRow>(`
-        select coalesce(a.motivo_contato, 'Nao informado') as motivo, count(*) as total
+        select ${canonicalMotivoSql('a.motivo_contato')} as motivo, count(*) as total
         from atendimentos a
         where ${periodFilter}
-        group by coalesce(a.motivo_contato, 'Nao informado')
+        group by ${canonicalMotivoSql('a.motivo_contato')}
         order by motivo
       `, [periodo.inicio, periodo.fim]);
       return result.rows;

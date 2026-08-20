@@ -1,6 +1,7 @@
 import { motivosAtendimentosSchema } from '@hq-geap/contracts/atendimentos';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useAuthenticatedResource } from './api';
+import { filterMotivoOptions } from './motivo-combobox-logic';
 
 export type MotivoComboboxProps = {
   value: string;
@@ -33,9 +34,7 @@ export function MotivoCombobox({
   );
   const distinctMotivos = state.status === 'ready' ? state.data : [];
 
-  const filteredOptions = distinctMotivos.filter((option) =>
-    option.toLowerCase().includes(value.toLowerCase())
-  );
+  const filteredOptions = filterMotivoOptions(distinctMotivos, value);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {

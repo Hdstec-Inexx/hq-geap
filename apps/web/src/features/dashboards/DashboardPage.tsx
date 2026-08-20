@@ -1,6 +1,7 @@
 import { dashboardSchema } from '@hq-geap/contracts/dashboards';
 import { Form, Link, useSearchParams } from 'react-router-dom';
 import { useAuthenticatedResource } from '../atendimentos/api';
+import { formatMotivoContato } from '../atendimentos/motivo-combobox-logic';
 import { ConcordanciaChart } from './components/ConcordanciaChart';
 import { CriteriosChart } from './components/CriteriosChart';
 import { Kpis } from './components/Kpis';
@@ -113,7 +114,7 @@ export function DashboardPage() {
                       </strong>
                       <div>
                         <Link to={`/atendimentos/${atendimento.id}`}>
-                          {atendimento.motivoContato ?? 'Motivo não informado'}
+                          {formatMotivoContato(atendimento.motivoContato)}
                         </Link>
                         <span>
                           {dateTime.format(new Date(atendimento.concluidoEm))}

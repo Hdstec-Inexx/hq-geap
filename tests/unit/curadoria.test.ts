@@ -155,16 +155,30 @@ test('filtros da Fila de Curadoria fixam dia civil America/Sao_Paulo e motivo', 
   );
   assert.match(
     comMotivo.clauses.join(' and '),
-    /coalesce\(a\.motivo_contato, 'Nao informado'\) = \$3/
+    /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$3/
   );
   assert.deepEqual(comMotivo.values, [
     '2025-01-01',
     '2025-01-31',
     'Rede credenciada'
   ]);
+
+  const comMotivoNaoInformadoSemAcento = buildFilaCuradoriaFilters(
+    {
+      motivo: 'Nao informado'
+    },
+    1
+  );
+  assert.match(
+    comMotivoNaoInformadoSemAcento.clauses.join(' and '),
+    /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$1/
+  );
+  assert.deepEqual(comMotivoNaoInformadoSemAcento.values, [
+    'Não informado'
+  ]);
 });
 
-test('listDistinctMotivos retorna motivos distintos e ordenados', async () => {
+test('listDistinctMotivos retorna motivos distintos e ordenados incluindo Nao informado canônico', async () => {
   const { createAtendimentosRepository } = await import(
     '../../apps/api/src/modules/atendimentos/repository.js'
   );
@@ -177,6 +191,7 @@ test('listDistinctMotivos retorna motivos distintos e ordenados', async () => {
         rows: [
           { motivo: 'Cancelamento' },
           { motivo: 'Financeiro/Boletos' },
+          { motivo: 'Não informado' },
           { motivo: 'Rede credenciada' }
         ]
       };
@@ -188,10 +203,14 @@ test('listDistinctMotivos retorna motivos distintos e ordenados', async () => {
   assert.deepEqual(motivos, [
     'Cancelamento',
     'Financeiro/Boletos',
+    'Não informado',
     'Rede credenciada'
   ]);
-  assert.match(executedSql, /distinct motivo_contato/i);
-  assert.match(executedSql, /order by motivo_contato/i);
+  assert.match(
+    executedSql,
+    /coalesce\(nullif\(nullif\(trim\(motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) as motivo/i
+  );
+  assert.match(executedSql, /order by motivo/i);
 });
 
 test('curadoresListSchema valida lista de curadores com id e nome', async () => {
@@ -342,7 +361,7 @@ test('buildCuradoriasRealizadasFilters aplica filtros de data, motivo e curadorI
   );
   assert.match(
     filters.clauses.join(' and '),
-    /coalesce\(a\.motivo_contato, 'Nao informado'\) = \$3/
+    /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$3/
   );
   assert.match(
     filters.clauses.join(' and '),

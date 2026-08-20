@@ -938,9 +938,23 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.getByText('1 pendente', { exact: true })).toBeVisible();
   });
 
-  test('endpoint /atendimentos/motivos expoe motivos distintos registrados', async ({
+  test('endpoint /atendimentos/motivos expoe motivos distintos registrados incluindo Nao informado', async ({
     request
   }) => {
+    await createAtendimento('conv-motivo-test-rede', 'concluido');
+    await queryDatabase(`
+      insert into atendimentos (
+        agente_voz_id, elevenlabs_conversation_id, status, transcricao,
+        audio_url, houve_transferencia, concluido_em, duracao_segundos,
+        motivo_contato
+      )
+      select id, 'conv-motivo-test-sem', 'concluido'::status_atendimento,
+        '[{"role":"agent","message":"Ola","time_in_call_secs":0}]'::jsonb,
+        'atendimentos/teste.mp3', false, now(), 42, null
+      from agentes_voz
+      where elevenlabs_agent_id = 'agent-livia-curadoria'
+      limit 1
+    `);
     const curador = await login(request, 'curador');
     const response = await request.get(`${apiUrl}/atendimentos/motivos`, {
       headers: { authorization: `Bearer ${curador.token}` }
@@ -949,6 +963,7 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     const motivos = (await response.json()) as string[];
     expect(Array.isArray(motivos)).toBe(true);
     expect(motivos).toContain('Rede credenciada');
+    expect(motivos).toContain('Não informado');
   });
 
   test('filtra a Fila de Curadoria por dia unico e por periodo', async ({
@@ -1105,7 +1120,8 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
         cross join (
           values
             ('conv-motivo-rede', 'Rede credenciada'),
-            ('conv-motivo-fin', 'Financeiro/Boletos')
+            ('conv-motivo-fin', 'Financeiro/Boletos'),
+            ('conv-motivo-sem', null)
         ) as t(conv_id, motivo)
         where agente.elevenlabs_agent_id = 'agent-livia-curadoria'
         returning id
@@ -1125,7 +1141,7 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
 
     await loginUi(page, 'curador');
     await page.goto('/curadoria');
-    await expect(page.getByText('2 pendentes')).toBeVisible();
+    await expect(page.getByText('3 pendentes')).toBeVisible();
 
     // Typeahead do combobox sugere motivos distintos
     const combobox = page.getByRole('combobox', { name: 'Motivo de Contato' });
@@ -1138,6 +1154,20 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page).toHaveURL(/[?&]motivo=Financeiro%2FBoletos/);
     await expect(page.getByRole('link', { name: 'conv-motivo-fin' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'conv-motivo-rede' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'conv-motivo-sem' })).toHaveCount(0);
+
+    // Sugestão e filtro com Não informado (busca sem acento 'nao')
+    await combobox.fill('nao');
+    await expect(page.getByRole('option', { name: 'Não informado' })).toBeVisible();
+    await page.getByRole('option', { name: 'Não informado' }).click();
+    await expect(combobox).toHaveValue('Não informado');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+
+    await expect(page).toHaveURL(/[?&]motivo=N%C3%A3o(\+|%20)informado|motivo=Nao(\+|%20)informado/);
+    await expect(page.getByRole('link', { name: 'conv-motivo-sem' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'conv-motivo-fin' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'conv-motivo-rede' })).toHaveCount(0);
+    await expect(page.getByText('Não informado')).toBeVisible();
 
     // Aceita digitação livre fora da lista
     await combobox.fill('Motivo Inexistente Na Base');
@@ -1420,6 +1450,46 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(backLink).toBeVisible();
     await backLink.click();
     await expect(page).toHaveURL(/\/curadorias-realizadas/);
+  });
+
+  test('Curadorias Realizadas filtra por Não informado e exibe o motivo formatado', async ({
+    page,
+    request
+  }) => {
+    const atNullId = await createAtendimento('conv-realizada-motivo-null', 'concluido');
+    await queryDatabase(`
+      update atendimentos set motivo_contato = null where id = $1
+    `, [atNullId]);
+    await persistirAvaliacaoIa(atNullId);
+
+    const curador = await login(request, 'curador');
+    const detalhe = await request.get(`${apiUrl}/curadoria/${atNullId}`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    });
+    const d = (await detalhe.json()) as { avaliacaoIa: { id: string; checklist: Array<{ chave: string; estado: string }> } };
+    await request.post(`${apiUrl}/curadoria/${atNullId}/avaliacoes`, {
+      headers: { authorization: `Bearer ${curador.token}` },
+      data: {
+        checklist: d.avaliacaoIa.checklist.map((c) => ({ chave: c.chave, estado: c.estado })),
+        notaAvaliacaoIa: 8.0,
+        falhasIdentificadas: [],
+        resumoAtendimento: 'Conferencia sem motivo'
+      }
+    });
+
+    await loginUi(page, 'gestao');
+    await page.goto('/curadorias-realizadas');
+
+    const combobox = page.getByRole('combobox', { name: 'Motivo de Contato' });
+    await combobox.fill('nao');
+    await expect(page.getByRole('option', { name: 'Não informado' })).toBeVisible();
+    await page.getByRole('option', { name: 'Não informado' }).click();
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+
+    await expect(page).toHaveURL(/[?&]motivo=N%C3%A3o(\+|%20)informado|motivo=Nao(\+|%20)informado/);
+    const card = page.locator('article.curadoria-row').filter({ hasText: 'conv-realizada-motivo-null' });
+    await expect(card).toBeVisible();
+    await expect(card.getByText('Não informado')).toBeVisible();
   });
 });
 
