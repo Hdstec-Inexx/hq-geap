@@ -56,8 +56,7 @@ function CriterionTooltip({
       <span
         className="criterion-tooltip-trigger"
         tabIndex={0}
-        role="button"
-        aria-describedby={tooltipId}
+        aria-describedby={isOpen ? tooltipId : undefined}
         onFocus={() => setIsOpen(true)}
         onBlur={() => setIsOpen(false)}
         onKeyDown={(e) => {
