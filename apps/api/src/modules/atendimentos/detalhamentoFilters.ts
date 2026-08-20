@@ -36,7 +36,7 @@ export function buildDetalhamentoFilters(
   if (query.motivo && query.indicador !== 'motivo') {
     const motivo = param(query.motivo);
     clauses.push(
-      `(coalesce(a.motivo_contato, 'Nao informado') = ${motivo} or coalesce(a.motivo_contato, 'Não informado') = ${motivo})`
+      `(coalesce(a.motivo_contato, 'Nao informado') = ${motivo} or coalesce(nullif(a.motivo_contato, 'Nao informado'), 'Não informado') = ${motivo})`
     );
   }
 
@@ -92,7 +92,7 @@ export function buildDetalhamentoFilters(
     case 'motivo': {
       const motivo = param(query.motivo!);
       clauses.push(
-        `(coalesce(a.motivo_contato, 'Nao informado') = ${motivo} or coalesce(a.motivo_contato, 'Não informado') = ${motivo})`
+        `(coalesce(a.motivo_contato, 'Nao informado') = ${motivo} or coalesce(nullif(a.motivo_contato, 'Nao informado'), 'Não informado') = ${motivo})`
       );
       break;
     }
