@@ -1363,28 +1363,85 @@ h1 {
   line-height: 1.6;
 }
 
-.avaliacao-resumo-scroll {
-  max-height: 180px;
+.avaliacao-curador-nota-ia {
+  margin: 20px 0 0;
+  font-size: 0.95rem;
+  color: #143834;
+}
+
+.avaliacao-curador-top-scroll {
+  margin-top: 14px;
+}
+
+.avaliacao-curador-top-scroll p,
+.avaliacao-curador-top-scroll ul {
+  line-height: 1.6;
+}
+
+.avaliacao-curador-top-scroll p {
+  margin: 0 0 10px;
+}
+
+.avaliacao-curador-top-scroll p:last-child {
+  margin-bottom: 0;
+}
+
+.avaliacao-curador-top-scroll ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.avaliacao-notes .avaliacao-falhas-scroll ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.avaliacao-curador-comentario {
+  margin-top: 24px;
+}
+
+.avaliacao-curador-comentario p:not(.panel-label) {
+  margin: 8px 0 0;
+  line-height: 1.6;
+}
+
+.avaliacao-resumo-scroll,
+.avaliacao-falhas-scroll,
+.avaliacao-curador-top-scroll,
+.avaliacao-comentario-scroll {
+  max-height: 200px;
   overflow-y: auto;
   padding-right: 6px;
   scrollbar-width: thin;
   scrollbar-color: #9bbcb2 transparent;
 }
 
-.avaliacao-resumo-scroll::-webkit-scrollbar {
+.avaliacao-resumo-scroll::-webkit-scrollbar,
+.avaliacao-falhas-scroll::-webkit-scrollbar,
+.avaliacao-curador-top-scroll::-webkit-scrollbar,
+.avaliacao-comentario-scroll::-webkit-scrollbar {
   width: 6px;
 }
 
-.avaliacao-resumo-scroll::-webkit-scrollbar-track {
+.avaliacao-resumo-scroll::-webkit-scrollbar-track,
+.avaliacao-falhas-scroll::-webkit-scrollbar-track,
+.avaliacao-curador-top-scroll::-webkit-scrollbar-track,
+.avaliacao-comentario-scroll::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.avaliacao-resumo-scroll::-webkit-scrollbar-thumb {
+.avaliacao-resumo-scroll::-webkit-scrollbar-thumb,
+.avaliacao-falhas-scroll::-webkit-scrollbar-thumb,
+.avaliacao-curador-top-scroll::-webkit-scrollbar-thumb,
+.avaliacao-comentario-scroll::-webkit-scrollbar-thumb {
   background: #9bbcb2;
   border-radius: 3px;
 }
 
-.avaliacao-resumo-scroll::-webkit-scrollbar-thumb:hover {
+.avaliacao-resumo-scroll::-webkit-scrollbar-thumb:hover,
+.avaliacao-falhas-scroll::-webkit-scrollbar-thumb:hover,
+.avaliacao-curador-top-scroll::-webkit-scrollbar-thumb:hover,
+.avaliacao-comentario-scroll::-webkit-scrollbar-thumb:hover {
   background: #16816f;
 }
 

@@ -1196,7 +1196,7 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     const curador2Result = await queryDatabase<{ id: string }>(`
       insert into usuarios (email, nome, senha_hash, papel)
       values ('curadora2@hq.test', 'Bruna Curadora', '$2b$10$dummyhash', 'curador')
-      on conflict (email) do update set nome = 'Bruna Curadora'
+      on conflict (lower(email)) do update set nome = 'Bruna Curadora'
       returning id
     `);
     const curador2Id = curador2Result.rows[0]!.id;
@@ -1344,7 +1344,7 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.getByText('Histórico de atendimentos conferidos pelos curadores.')).toBeVisible();
 
     // Filtro por curador está visível para gestão
-    const curadorSelect = page.getByLabel('Curador');
+    const curadorSelect = page.locator('#curadorias-realizadas-curador-filtro');
     await expect(curadorSelect).toBeVisible();
     await curadorSelect.selectOption({ label: 'Caio Curador' });
     await page.getByRole('button', { name: 'Filtrar' }).click();
