@@ -35,7 +35,9 @@ export function buildDetalhamentoFilters(
 
   if (query.motivo && query.indicador !== 'motivo') {
     const motivo = param(query.motivo);
-    clauses.push(`coalesce(a.motivo_contato, 'Nao informado') = ${motivo}`);
+    clauses.push(
+      `(coalesce(a.motivo_contato, 'Nao informado') = ${motivo} or coalesce(a.motivo_contato, 'Não informado') = ${motivo})`
+    );
   }
 
   if (query.curadoriaStatus === 'realizada') {
@@ -89,7 +91,9 @@ export function buildDetalhamentoFilters(
       break;
     case 'motivo': {
       const motivo = param(query.motivo!);
-      clauses.push(`coalesce(a.motivo_contato, 'Nao informado') = ${motivo}`);
+      clauses.push(
+        `(coalesce(a.motivo_contato, 'Nao informado') = ${motivo} or coalesce(a.motivo_contato, 'Não informado') = ${motivo})`
+      );
       break;
     }
     case 'criterio': {
@@ -102,6 +106,19 @@ export function buildDetalhamentoFilters(
             and ia.autor = 'ia'
             and ac.criterio_id = ${criterioId}::uuid
             and ac.estado = 'atendido'
+        )`);
+      break;
+    }
+    case 'criterio_nao_atendido': {
+      const criterioId = param(query.criterioId!);
+      clauses.push(`exists (
+          select 1
+          from avaliacoes ia
+          join avaliacao_criterios ac on ac.avaliacao_id = ia.id
+          where ia.atendimento_id = a.id
+            and ia.autor = 'ia'
+            and ac.criterio_id = ${criterioId}::uuid
+            and ac.estado = 'nao_atendido'
         )`);
       break;
     }

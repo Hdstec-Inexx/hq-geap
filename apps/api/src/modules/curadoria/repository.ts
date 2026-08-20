@@ -171,7 +171,9 @@ export function buildFilaCuradoriaFilters(
 
   if (filters.motivo) {
     const motivo = param(filters.motivo);
-    clauses.push(`coalesce(a.motivo_contato, 'Nao informado') = ${motivo}`);
+    clauses.push(
+      `(coalesce(a.motivo_contato, 'Nao informado') = ${motivo} or coalesce(a.motivo_contato, 'Não informado') = ${motivo})`
+    );
   }
 
   return { clauses, values };

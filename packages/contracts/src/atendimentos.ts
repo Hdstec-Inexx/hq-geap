@@ -374,6 +374,7 @@ export const detalhamentoIndicadorSchema = z.enum([
   'tempo_resolucao',
   'motivo',
   'criterio',
+  'criterio_nao_atendido',
   'concordancia_nota',
   'concordancia_criterio'
 ]);
@@ -440,6 +441,7 @@ export const atendimentosQuerySchema = z
     }
     if (
       (query.indicador === 'criterio' ||
+        query.indicador === 'criterio_nao_atendido' ||
         query.indicador === 'concordancia_criterio') &&
       !query.criterioId
     ) {

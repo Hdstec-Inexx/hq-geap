@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   concordanciaChartSeries,
   criteriosChartSeries,
+  criteriosNaoConformidadeChartSeries,
   motivosChartSeries
 } from '../../apps/web/src/features/dashboards/chartSeries.js';
 
@@ -62,4 +63,24 @@ test('concordanciaChartSeries preserva percentual por Critério inclusive null',
 
   assert.deepEqual(series.labels, ['Saudação e Intenção', 'Validou E-mail']);
   assert.deepEqual(series.values, [50, null]);
+});
+
+test('criteriosNaoConformidadeChartSeries preserva labels e totais de falhas', () => {
+  const series = criteriosNaoConformidadeChartSeries([
+    {
+      criterioId: '11111111-1111-4111-a111-111111111111',
+      chave: 'informou_protocolo_email',
+      nome: 'Informação de Protocolo',
+      total: 5
+    },
+    {
+      criterioId: '22222222-2222-4222-a222-222222222222',
+      chave: 'saudacao_e_intencao',
+      nome: 'Saudação e Intenção',
+      total: 2
+    }
+  ]);
+
+  assert.deepEqual(series.labels, ['Informação de Protocolo', 'Saudação e Intenção']);
+  assert.deepEqual(series.values, [5, 2]);
 });

@@ -3325,10 +3325,6 @@ h1 {
   background: var(--dashboard-mint);
 }
 
-.criterios-panel {
-  grid-row: span 2;
-}
-
 .criterios-list small {
   display: block;
   margin-top: 7px;
@@ -3337,6 +3333,7 @@ h1 {
 }
 
 .concordancia-panel {
+  grid-column: 1 / -1;
   color: #eff9f5;
   background: var(--dashboard-ink);
 }
@@ -3472,10 +3469,6 @@ h1 {
 
   .dashboard-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .criterios-panel {
-    grid-row: auto;
   }
 }
 

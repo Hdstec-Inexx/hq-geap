@@ -3,6 +3,7 @@ import { Form, Link, useSearchParams } from 'react-router-dom';
 import { useAuthenticatedResource } from '../atendimentos/api';
 import { ConcordanciaChart } from './components/ConcordanciaChart';
 import { CriteriosChart } from './components/CriteriosChart';
+import { CriteriosNaoConformidadeChart } from './components/CriteriosNaoConformidadeChart';
 import { Kpis } from './components/Kpis';
 import { MotivosContatoChart } from './components/MotivosContatoChart';
 
@@ -89,6 +90,11 @@ export function DashboardPage() {
             />
             <ConcordanciaChart
               concordancia={state.data.concordancia}
+              fim={fim}
+              inicio={inicio}
+            />
+            <CriteriosNaoConformidadeChart
+              criterios={state.data.criteriosNaoConformidade}
               fim={fim}
               inicio={inicio}
             />

@@ -31,6 +31,13 @@ export type CriterioRow = {
   avaliados: string;
 };
 
+export type CriterioNaoConformidadeRow = {
+  criterioId: string;
+  chave: string;
+  nome: string;
+  total: string;
+};
+
 export type ConcordanciaRow = {
   notasConcordantes: string;
   totalNotas: string;
@@ -99,11 +106,11 @@ export function createDashboardRepository(db: pg.Pool) {
 
     async listMotivos(periodo: DashboardPeriod): Promise<MotivoContatoRow[]> {
       const result = await db.query<MotivoContatoRow>(`
-        select coalesce(a.motivo_contato, 'Nao informado') as motivo, count(*) as total
+        select coalesce(nullif(a.motivo_contato, 'Nao informado'), 'Não informado') as motivo, count(*) as total
         from atendimentos a
         where ${periodFilter}
-        group by coalesce(a.motivo_contato, 'Nao informado')
-        order by motivo
+        group by coalesce(nullif(a.motivo_contato, 'Nao informado'), 'Não informado')
+        order by total desc, motivo asc
       `, [periodo.inicio, periodo.fim]);
       return result.rows;
     },
@@ -123,6 +130,27 @@ export function createDashboardRepository(db: pg.Pool) {
         where ${periodFilter}
         group by ac.criterio_id, ac.criterio_chave, ac.criterio_nome, ac.criterio_ordem
         order by ac.criterio_ordem, ac.criterio_nome
+      `, [periodo.inicio, periodo.fim]);
+      return result.rows;
+    },
+
+    async listCriteriosNaoConformidade(
+      periodo: DashboardPeriod
+    ): Promise<CriterioNaoConformidadeRow[]> {
+      const result = await db.query<CriterioNaoConformidadeRow>(`
+        select
+          ac.criterio_id as "criterioId",
+          ac.criterio_chave as chave,
+          ac.criterio_nome as nome,
+          count(*) as total
+        from atendimentos a
+        join avaliacoes ia
+          on ia.atendimento_id = a.id and ia.autor = 'ia'
+        join avaliacao_criterios ac on ac.avaliacao_id = ia.id
+        where ${periodFilter}
+          and ac.estado = 'nao_atendido'
+        group by ac.criterio_id, ac.criterio_chave, ac.criterio_nome, ac.criterio_ordem
+        order by total desc, ac.criterio_ordem asc, ac.criterio_nome asc
       `, [periodo.inicio, periodo.fim]);
       return result.rows;
     },

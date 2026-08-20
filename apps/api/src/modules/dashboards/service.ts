@@ -24,6 +24,7 @@ export async function getDashboard(
   const criterios = await repository.listCriterios(periodo);
   const concordancia = await repository.getConcordancia(periodo);
   const porCriterio = await repository.listConcordanciaPorCriterio(periodo);
+  const criteriosNaoConformidade = await repository.listCriteriosNaoConformidade(periodo);
   const piores = await repository.listPiores(periodo);
 
   const volume = Number(kpis.volume);
@@ -93,6 +94,12 @@ export async function getDashboard(
         };
       })
     },
+    criteriosNaoConformidade: criteriosNaoConformidade.map((row) => ({
+      criterioId: row.criterioId,
+      chave: row.chave,
+      nome: row.nome,
+      total: Number(row.total)
+    })),
     pioresAtendimentos: piores.map((row) => ({
       id: row.id,
       conversationId: row.conversationId,
