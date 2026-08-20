@@ -2,19 +2,20 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { areasPorPapel } from '../../apps/web/src/app/casca-areas.js';
 
-test('Curador vê Atendimentos, Monitoramento ao Vivo, Fila de Curadoria e Minhas Curadorias', () => {
+test('Curador vê Atendimentos, Monitoramento ao Vivo, Fila de Curadoria, Minhas Curadorias e Régua', () => {
   assert.deepEqual(
     areasPorPapel('curador').map((area) => area.label),
     [
       'Consultar Atendimentos',
       'Monitoramento ao Vivo',
       'Abrir Fila de Curadoria',
-      'Minhas Curadorias'
+      'Minhas Curadorias',
+      'Consultar Régua de Avaliação'
     ]
   );
 });
 
-test('Gestão vê Dashboard, Atendimentos, Monitoramento ao Vivo, Fila de Curadoria e Curadorias Realizadas', () => {
+test('Gestão vê Dashboard, Atendimentos, Monitoramento ao Vivo, Fila de Curadoria, Curadorias Realizadas e Régua', () => {
   assert.deepEqual(
     areasPorPapel('gestao').map((area) => area.label),
     [
@@ -22,7 +23,8 @@ test('Gestão vê Dashboard, Atendimentos, Monitoramento ao Vivo, Fila de Curado
       'Consultar Atendimentos',
       'Monitoramento ao Vivo',
       'Consultar Fila de Curadoria',
-      'Curadorias Realizadas'
+      'Curadorias Realizadas',
+      'Consultar Régua de Avaliação'
     ]
   );
 });
@@ -61,12 +63,25 @@ test('áreas apontam para as rotas correspondentes', () => {
   );
 
   assert.deepEqual(
+    areasPorPapel('gestao').map((area) => area.to),
+    [
+      '/dashboard',
+      '/atendimentos',
+      '/monitoramento',
+      '/curadoria',
+      '/curadorias-realizadas',
+      '/admin/criterios'
+    ]
+  );
+
+  assert.deepEqual(
     areasPorPapel('curador').map((area) => area.to),
     [
       '/atendimentos',
       '/monitoramento',
       '/curadoria',
-      '/minhas-curadorias'
+      '/minhas-curadorias',
+      '/admin/criterios'
     ]
   );
 });

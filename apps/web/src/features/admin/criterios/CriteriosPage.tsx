@@ -106,11 +106,6 @@ export function CriteriosPage() {
           </li>
         ))}
       </ol>
-
-      <p className="criteria-footnote">
-        Alterações exigem uma nova Régua válida por código e preservam os
-        snapshots de Avaliações anteriores.
-      </p>
     </section>
   );
 }

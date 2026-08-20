@@ -800,15 +800,6 @@ h1 {
   background: #f4dcd6;
 }
 
-.criteria-footnote {
-  margin: 28px 0 0;
-  padding: 18px 22px;
-  color: #45636d;
-  background: #dcebe5;
-  border-left: 4px solid #16816f;
-  line-height: 1.55;
-}
-
 .criteria-error {
   color: #a73e32;
   font-weight: 700;
