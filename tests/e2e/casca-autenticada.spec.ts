@@ -25,14 +25,16 @@ const areasPorPapel: Record<AuthRole, string[]> = {
     'Consultar Atendimentos',
     'Monitoramento ao Vivo',
     'Abrir Fila de Curadoria',
-    'Minhas Curadorias'
+    'Minhas Curadorias',
+    'Consultar Régua de Avaliação'
   ],
   gestao: [
     'Abrir Dashboard da Gestão',
     'Consultar Atendimentos',
     'Monitoramento ao Vivo',
     'Consultar Fila de Curadoria',
-    'Curadorias Realizadas'
+    'Curadorias Realizadas',
+    'Consultar Régua de Avaliação'
   ],
   admin: [
     'Abrir Dashboard da Gestão',

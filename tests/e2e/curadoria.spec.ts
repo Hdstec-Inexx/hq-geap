@@ -591,6 +591,66 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(anterior).toContainText('Não atendido');
   });
 
+  test('formulário de curadoria exibe tag crítico alinhada ao título e custom tooltip com descrição no hover/focus', async ({
+    page,
+    request
+  }) => {
+    const atendimentoId = await createAtendimento('conv-curadoria-tooltip-layout');
+    await persistirAvaliacaoIa(atendimentoId);
+
+    const curador = await login(request, 'curador');
+    const detalheRes = await request.get(`${apiUrl}/curadoria/${atendimentoId}`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    });
+    expect(detalheRes.status()).toBe(200);
+    const detalheJson = await detalheRes.json();
+    const protocoloCriterio = detalheJson.avaliacaoIa.checklist.find(
+      (c: { chave: string }) => c.chave === 'informou_protocolo_email'
+    );
+    expect(protocoloCriterio).toBeDefined();
+    expect(protocoloCriterio.descricao).toBeTruthy();
+
+    await loginUi(page, 'curador');
+    await page.goto(`/curadoria/${atendimentoId}`);
+
+    const fieldset = page.locator('fieldset').filter({ hasText: 'Informação de Protocolo' });
+    await expect(fieldset).toBeVisible();
+
+    // Tag Crítico está presente e agrupada na legenda ao lado do título
+    const legend = fieldset.locator('legend');
+    await expect(legend.getByText('Crítico')).toBeVisible();
+    await expect(legend.locator('.criterion-critical-badge')).toBeVisible();
+
+    // Botões de opção permanecem no mesmo fieldset
+    const options = fieldset.locator('.criterion-options');
+    await expect(options).toBeVisible();
+    await expect(options.getByText('Atendido', { exact: true })).toBeVisible();
+    await expect(options.getByText('Não atendido', { exact: true })).toBeVisible();
+
+    // Tooltip inicialmente não está visível
+    const tooltip = page.locator('.criterion-tooltip');
+    await expect(tooltip).toHaveCount(0);
+
+    // Hover sobre o nome do critério exibe o custom tooltip com a descrição
+    const trigger = fieldset.locator('.criterion-tooltip-trigger');
+    await trigger.hover();
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText(protocoloCriterio.descricao);
+
+    // Tirar o mouse oculta o tooltip
+    await page.mouse.move(0, 0);
+    await expect(tooltip).toHaveCount(0);
+
+    // Foco via teclado no trigger exibe o tooltip
+    await trigger.focus();
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toContainText(protocoloCriterio.descricao);
+
+    // Pressionar Escape oculta o tooltip
+    await page.keyboard.press('Escape');
+    await expect(tooltip).toHaveCount(0);
+  });
+
   test('transcrição longa na revisão rola dentro do painel', async ({ page }) => {
     const atendimentoId = await createAtendimento(
       'conv-curadoria-transcricao-longa',

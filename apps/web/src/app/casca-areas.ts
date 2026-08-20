@@ -34,10 +34,11 @@ export function areasPorPapel(role: UserRole): AreaCasca[] {
     areas.push(
       { to: '/admin/comentarios', label: 'Trabalhar fila de manutenção' },
       { to: '/admin/usuarios', label: 'Administrar usuários' },
-      { to: '/admin/configuracao-ia', label: 'Configurar IA Avaliadora' },
-      { to: '/admin/criterios', label: 'Consultar Régua de Avaliação' }
+      { to: '/admin/configuracao-ia', label: 'Configurar IA Avaliadora' }
     );
   }
+
+  areas.push({ to: '/admin/criterios', label: 'Consultar Régua de Avaliação' });
 
   return areas;
 }

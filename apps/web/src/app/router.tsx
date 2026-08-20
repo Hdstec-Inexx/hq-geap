@@ -45,6 +45,7 @@ export const router = createBrowserRouter([
                 path: '/monitoramento/:conversationId',
                 element: MonitoramentoLiveRoute
               },
+              { path: '/admin/criterios', element: <CriteriosRoute /> },
               {
                 element: <RequireRole roles={['curador']} />,
                 children: [
@@ -59,7 +60,6 @@ export const router = createBrowserRouter([
                     path: '/admin/comentarios',
                     element: <ComentariosPendentesRoute />
                   },
-                  { path: '/admin/criterios', element: <CriteriosRoute /> },
                   { path: '/admin/usuarios', element: <UsuariosRoute /> },
                   {
                     path: '/admin/configuracao-ia',
