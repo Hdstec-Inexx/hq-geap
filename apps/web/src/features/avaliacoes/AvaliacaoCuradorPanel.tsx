@@ -51,19 +51,22 @@ export function AvaliacaoCuradorPanel({
         </div>
       </header>
 
-      <p>
+      <p className="avaliacao-curador-nota-ia">
         Nota da Avaliação da IA:{' '}
         {avaliacao.notaAvaliacaoIa.toLocaleString('pt-BR')}
       </p>
-      {avaliacao.resumoAtendimento ? <p>{avaliacao.resumoAtendimento}</p> : null}
-      {avaliacao.falhasIdentificadas.length > 0 ? (
-        <ul>
-          {avaliacao.falhasIdentificadas.map((falha) => (
-            <li key={falha}>{falha}</li>
-          ))}
-        </ul>
+      {avaliacao.resumoAtendimento || avaliacao.falhasIdentificadas.length > 0 ? (
+        <div className="avaliacao-curador-top-scroll">
+          {avaliacao.resumoAtendimento ? <p>{avaliacao.resumoAtendimento}</p> : null}
+          {avaliacao.falhasIdentificadas.length > 0 ? (
+            <ul>
+              {avaliacao.falhasIdentificadas.map((falha) => (
+                <li key={falha}>{falha}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       ) : null}
-      {avaliacao.comentario ? <p>{avaliacao.comentario}</p> : null}
 
       <div className="avaliacao-checklist">
         {avaliacao.checklist.map((criterio) => (
@@ -84,6 +87,13 @@ export function AvaliacaoCuradorPanel({
           </article>
         ))}
       </div>
+
+      {avaliacao.comentario ? (
+        <div className="avaliacao-curador-comentario">
+          <p className="panel-label">Comentário da revisão</p>
+          <p className="avaliacao-comentario-scroll">{avaliacao.comentario}</p>
+        </div>
+      ) : null}
     </section>
   );
 }

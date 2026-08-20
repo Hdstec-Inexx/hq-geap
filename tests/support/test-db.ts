@@ -37,7 +37,9 @@ export default async function prepareTestDatabase() {
 
     await client.query('drop extension if exists "pgcrypto" cascade');
     await client.query('drop schema if exists public cascade');
-    await client.query('create schema if not exists public');
+    await client.query('create schema public');
+    await client.query('create extension if not exists "pgcrypto"');
+    await client.query('set search_path to public');
     await runSqlDirectory(client, 'migrations');
     await runSqlDirectory(client, 'seeds');
     for (const user of authUsers) {
