@@ -10,7 +10,7 @@ const criteriosRoutes: FastifyPluginAsync = async (app) => {
 
   app.get(
     '/admin/criterios',
-    { config: { auth: { roles: ['admin'] } } },
+    { config: { auth: { roles: ['admin', 'gestao', 'curador'] } } },
     async (): Promise<ReguaAvaliacao> => {
       const criterios = await repository.findVigentes();
       return reguaAvaliacaoSchema.parse({

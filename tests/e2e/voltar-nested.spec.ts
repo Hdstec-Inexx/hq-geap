@@ -8,17 +8,21 @@ async function expectBackToHome(page: Page) {
   await expect(page).toHaveURL('/');
 }
 
+async function expectReguaBackToHome(page: Page) {
+  await page.getByRole('link', { name: 'Consultar Régua de Avaliação' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Régua de Avaliação' })
+  ).toBeVisible();
+  await expectBackToHome(page);
+}
+
 test.describe('voltar nas telas nested', () => {
   test('Criterios, Configuracao da IA, Comentarios pendentes e Fila de Curadoria voltam ao inicio', async ({
     page
   }) => {
     await loginPage(page, 'admin');
 
-    await page.getByRole('link', { name: 'Consultar Régua de Avaliação' }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Régua de Avaliação' })
-    ).toBeVisible();
-    await expectBackToHome(page);
+    await expectReguaBackToHome(page);
 
     await page.getByRole('link', { name: 'Configurar IA Avaliadora' }).click();
     await expect(
@@ -45,14 +49,22 @@ test.describe('voltar nas telas nested', () => {
     await expectBackToHome(page);
   });
 
-  test('Minhas Curadorias do curador volta ao inicio', async ({ page }) => {
+  test('Minhas Curadorias e Régua do curador voltam ao inicio', async ({ page }) => {
     await loginPage(page, 'curador');
+
+    await expectReguaBackToHome(page);
 
     await page.getByRole('link', { name: 'Minhas Curadorias' }).click();
     await expect(
       page.getByRole('heading', { name: 'Minhas Curadorias' })
     ).toBeVisible();
     await expectBackToHome(page);
+  });
+
+  test('Régua da gestao volta ao inicio', async ({ page }) => {
+    await loginPage(page, 'gestao');
+
+    await expectReguaBackToHome(page);
   });
 
 
