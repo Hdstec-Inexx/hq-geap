@@ -1011,9 +1011,34 @@ test('filtros SQL do Detalhamento espelham populacoes positivas do Dashboard', a
   );
   assert.match(
     motivo.clauses.join(' '),
-    /coalesce\(a\.motivo_contato, 'Nao informado'\) = \$3/
+    /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$3/
   );
   assert.equal(motivo.values[2], 'Rede credenciada');
+
+  const motivoNaoInformado = buildDetalhamentoFilters(
+    atendimentosQuerySchema.parse({
+      inicio: '2025-01-01',
+      fim: '2025-01-31',
+      indicador: 'motivo',
+      motivo: 'Não informado'
+    })
+  );
+  assert.match(
+    motivoNaoInformado.clauses.join(' '),
+    /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$3/
+  );
+  assert.equal(motivoNaoInformado.values[2], 'Não informado');
+
+  const motivoSemAcentoNormalizado = buildDetalhamentoFilters(
+    atendimentosQuerySchema.parse({
+      motivo: 'Nao informado'
+    })
+  );
+  assert.match(
+    motivoSemAcentoNormalizado.clauses.join(' '),
+    /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$1/
+  );
+  assert.equal(motivoSemAcentoNormalizado.values[0], 'Não informado');
 
   const generalMotivo = buildDetalhamentoFilters(
     atendimentosQuerySchema.parse({
@@ -1022,7 +1047,7 @@ test('filtros SQL do Detalhamento espelham populacoes positivas do Dashboard', a
   );
   assert.match(
     generalMotivo.clauses.join(' '),
-    /coalesce\(a\.motivo_contato, 'Nao informado'\) = \$1/
+    /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$1/
   );
   assert.equal(generalMotivo.values[0], 'Financeiro/Boletos');
 

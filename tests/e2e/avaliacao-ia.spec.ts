@@ -305,6 +305,7 @@ test.describe.serial('persistencia e exibicao da Avaliacao da IA', () => {
     await expect(page.getByText('Informação de Protocolo')).toBeVisible();
     await expect(page.getByText('Uso Correto de Ferramentas')).toBeVisible();
     await expect(page.locator('.avaliacao-resumo-scroll')).toBeVisible();
+    await expect(page.locator('.avaliacao-falhas-scroll')).toBeVisible();
   });
 
   test('gate: ferramentas false forca resolucao false e perde 3 pontos', async () => {

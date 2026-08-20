@@ -48,7 +48,7 @@ test('AvaliacaoIaPanel nao renderiza versao do prompt nem claims da LLM', async 
   );
 });
 
-test('AvaliacaoIaPanel e styles.css aplicam scrollbar personalizada com max-height 180px no Resumo', async () => {
+test('AvaliacaoIaPanel e styles.css aplicam scrollbar personalizada com max-height ampliada no Resumo e Falhas', async () => {
   const panelContent = await readFile(panelPath, 'utf8');
   const stylesContent = await readFile(stylesPath, 'utf8');
 
@@ -59,27 +59,39 @@ test('AvaliacaoIaPanel e styles.css aplicam scrollbar personalizada com max-heig
     'AvaliacaoIaPanel deve aplicar a classe avaliacao-resumo-scroll no resumo'
   );
 
-  // styles.css deve definir max-height: 180px e overflow-y: auto para o resumo
+  // Painel deve conter a classe de scroll nas falhas identificadas
+  assert.match(
+    panelContent,
+    /avaliacao-falhas-scroll/,
+    'AvaliacaoIaPanel deve aplicar a classe avaliacao-falhas-scroll nas falhas identificadas'
+  );
+
+  // styles.css deve definir max-height: 200px e overflow-y: auto para resumo e falhas
   assert.match(
     stylesContent,
-    /\.avaliacao-resumo-scroll\s*\{[^}]*max-height:\s*180px;/s,
-    'styles.css deve ter max-height: 180px em .avaliacao-resumo-scroll'
+    /\.avaliacao-resumo-scroll[^}]*max-height:\s*200px;/s,
+    'styles.css deve ter max-height: 200px para .avaliacao-resumo-scroll'
   );
   assert.match(
     stylesContent,
-    /\.avaliacao-resumo-scroll\s*\{[^}]*overflow-y:\s*auto;/s,
-    'styles.css deve ter overflow-y: auto em .avaliacao-resumo-scroll'
+    /\.avaliacao-falhas-scroll[^}]*max-height:\s*200px;/s,
+    'styles.css deve ter max-height: 200px para .avaliacao-falhas-scroll'
+  );
+  assert.match(
+    stylesContent,
+    /\.avaliacao-falhas-scroll[^}]*overflow-y:\s*auto;/s,
+    'styles.css deve ter overflow-y: auto para .avaliacao-falhas-scroll'
   );
 
   // styles.css deve ter personalização de scrollbar (standard e webkit)
   assert.match(
     stylesContent,
-    /\.avaliacao-resumo-scroll\s*\{[^}]*scrollbar-width:\s*thin;/s,
-    'styles.css deve definir scrollbar-width: thin'
+    /\.avaliacao-falhas-scroll[^}]*scrollbar-width:\s*thin;/s,
+    'styles.css deve definir scrollbar-width: thin para .avaliacao-falhas-scroll'
   );
   assert.match(
     stylesContent,
-    /\.avaliacao-resumo-scroll::-webkit-scrollbar/s,
-    'styles.css deve definir ::-webkit-scrollbar para .avaliacao-resumo-scroll'
+    /\.avaliacao-falhas-scroll::-webkit-scrollbar/s,
+    'styles.css deve definir ::-webkit-scrollbar para .avaliacao-falhas-scroll'
   );
 });

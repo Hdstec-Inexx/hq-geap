@@ -1,5 +1,7 @@
+import { normalizeMotivo } from '@hq-geap/contracts/atendimentos';
 import type { EstadoCriterio } from '@hq-geap/contracts/avaliacoes';
 import type pg from 'pg';
+import { canonicalMotivoSql } from '../atendimentos/detalhamentoFilters.js';
 import type { AtendimentoRow } from '../atendimentos/repository.js';
 import type { AvaliacaoIaRow } from '../avaliacoes/repository.js';
 import type { CriterioConferencia } from './service.js';
@@ -79,12 +81,14 @@ async function findIaChecklists(
       ac.criterio_id as "criterioId",
       ac.criterio_chave as chave,
       ac.criterio_nome as nome,
+      c.descricao as descricao,
       ac.estado,
       ac.valor_criterio as valor,
       ac.criterio_critico as critico,
       ac.criterio_condicional as condicional,
       ac.criterio_ordem as ordem
     from avaliacao_criterios ac
+    left join criterios c on c.id = ac.criterio_id
     where ac.avaliacao_id = any($1::uuid[])
     order by ac.avaliacao_id, ac.criterio_ordem
   `, [avaliacaoIds]);
@@ -114,12 +118,14 @@ async function findCuradorChecklists(
       ac.criterio_id as "criterioId",
       ac.criterio_chave as chave,
       ac.criterio_nome as nome,
+      c.descricao as descricao,
       ac.estado,
       ac.valor_criterio as valor,
       ac.criterio_critico as critico,
       ac.criterio_condicional as condicional,
       ac.criterio_ordem as ordem
     from avaliacao_curador_criterios ac
+    left join criterios c on c.id = ac.criterio_id
     where ac.avaliacao_curador_id = any($1::uuid[])
     order by ac.avaliacao_curador_id, ac.criterio_ordem
   `, [avaliacaoIds]);
@@ -170,8 +176,8 @@ export function buildFilaCuradoriaFilters(
   }
 
   if (filters.motivo) {
-    const motivo = param(filters.motivo);
-    clauses.push(`coalesce(a.motivo_contato, 'Nao informado') = ${motivo}`);
+    const motivo = param(normalizeMotivo(filters.motivo));
+    clauses.push(`${canonicalMotivoSql('a.motivo_contato')} = ${motivo}`);
   }
 
   return { clauses, values };

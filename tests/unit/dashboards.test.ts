@@ -416,3 +416,41 @@ test('styles.css mantem comparacoes de KPIs duplos lado a lado e legenda de moti
     'concordancia-panel deve ocupar as 2 colunas para permitir a Linha 3 com Não Conformidades e Piores'
   );
 });
+
+test('listMotivos agrupa com Não informado canônico e acentuado', async () => {
+  const { createDashboardRepository } = await import(
+    '../../apps/api/src/modules/dashboards/repository.js'
+  );
+
+  let executedSql = '';
+  const mockDb = {
+    async query(sql: string) {
+      executedSql = sql;
+      return {
+        rows: [
+          { motivo: 'Financeiro/Boletos', total: '3' },
+          { motivo: 'Não informado', total: '1' }
+        ]
+      };
+    }
+  } as any;
+
+  const repo = createDashboardRepository(mockDb);
+  const motivos = await repo.listMotivos({
+    inicio: '2025-01-01',
+    fim: '2025-01-31'
+  });
+
+  assert.deepEqual(motivos, [
+    { motivo: 'Financeiro/Boletos', total: '3' },
+    { motivo: 'Não informado', total: '1' }
+  ]);
+  assert.match(
+    executedSql,
+    /select coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) as motivo/i
+  );
+  assert.match(
+    executedSql,
+    /group by coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\)/i
+  );
+});

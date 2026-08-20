@@ -11,6 +11,7 @@ import { apiUrl, getSession } from '../auth/session';
 
 import { canWriteAsCurador, usePerfil } from '../auth/perfil-context';
 import { formatDuration, useAuthenticatedResource } from '../atendimentos/api';
+import { formatMotivoContato } from '../atendimentos/motivo-combobox-logic';
 import { ComentariosPanel } from '../comentarios/ComentariosPanel';
 import {
   AudioDownloadButton,
@@ -30,6 +31,54 @@ const dateTime = new Intl.DateTimeFormat('pt-BR', {
   dateStyle: 'short',
   timeStyle: 'short'
 });
+
+function CriterionTooltip({
+  chave,
+  nome,
+  descricao
+}: {
+  chave: string;
+  nome: string;
+  descricao?: string | null;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const tooltipId = `tooltip-${chave}`;
+
+  if (!descricao) {
+    return <span className="criterion-title-text">{nome}</span>;
+  }
+
+  return (
+    <span
+      className="criterion-tooltip-wrapper"
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+    >
+      <span
+        className="criterion-tooltip-trigger"
+        tabIndex={0}
+        aria-describedby={isOpen ? tooltipId : undefined}
+        onFocus={() => setIsOpen(true)}
+        onBlur={() => setIsOpen(false)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setIsOpen(false);
+        }}
+      >
+        {nome}
+      </span>
+      {isOpen ? (
+        <span
+          id={tooltipId}
+          role="tooltip"
+          className="criterion-tooltip"
+        >
+          <span className="criterion-tooltip-arrow" aria-hidden="true" />
+          {descricao}
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
 function CuradoriaMedia({ detail }: { detail: CuradoriaDetail }) {
   const mainPlayerRef = useRef<HTMLElement | null>(null);
@@ -173,8 +222,14 @@ function ReviewForm({
         {checklist.map((criterio) => (
           <fieldset key={criterio.chave}>
             <legend>
-              {criterio.nome}
-              {criterio.critico ? <span>Crítico</span> : null}
+              <CriterionTooltip
+                chave={criterio.chave}
+                nome={criterio.nome}
+                descricao={criterio.descricao}
+              />
+              {criterio.critico ? (
+                <span className="criterion-critical-badge">Crítico</span>
+              ) : null}
             </legend>
             <div className="criterion-options">
               {(['atendido', 'nao_atendido', 'nao_se_aplica'] as const).map((estado) =>
@@ -317,7 +372,7 @@ function ReviewContent({
 
 
       <section className="atendimento-facts" aria-label="Dados do Atendimento">
-        <div><span>Motivo de Contato</span><strong>{atendimento.motivoContato ?? 'Não informado'}</strong></div>
+        <div><span>Motivo de Contato</span><strong>{formatMotivoContato(atendimento.motivoContato)}</strong></div>
         <div><span>Duração</span><strong>{formatDuration(atendimento.duracaoSegundos)}</strong></div>
         <div><span>Nota da IA</span><strong>{detail.avaliacaoIa.nota.toLocaleString('pt-BR')}</strong></div>
         <div><span>Resultado IA</span><strong>{detail.avaliacaoIa.aprovacao === 'aprovado' ? 'Aprovado' : 'Reprovado'}</strong></div>
