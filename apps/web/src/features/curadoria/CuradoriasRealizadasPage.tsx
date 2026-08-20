@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { usePerfil } from '../auth/perfil-context';
 import { formatDuration, useAuthenticatedResource } from '../atendimentos/api';
+import { formatMotivoContato } from '../atendimentos/motivo-combobox-logic';
 import { MotivoCombobox } from '../atendimentos/MotivoCombobox';
 import {
   compactPageItems,
@@ -240,7 +241,7 @@ export function CuradoriasRealizadasPage() {
                 <small>{dateTime.format(new Date(item.realizadaEm))}</small>
               </div>
               <dl>
-                <div><dt>Motivo</dt><dd>{item.motivoContato ?? 'Não informado'}</dd></div>
+                <div><dt>Motivo</dt><dd>{formatMotivoContato(item.motivoContato)}</dd></div>
                 <div><dt>Duração</dt><dd>{formatDuration(item.duracaoSegundos)}</dd></div>
                 <div><dt>Nota IA</dt><dd>{item.notaIa.toLocaleString('pt-BR')}</dd></div>
                 <div><dt>Nota Curador</dt><dd>{item.notaCurador.toLocaleString('pt-BR')}</dd></div>

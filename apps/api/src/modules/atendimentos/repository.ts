@@ -236,11 +236,9 @@ export function createAtendimentosRepository(db: pg.Pool) {
 
     async listDistinctMotivos(): Promise<string[]> {
       const result = await db.query<{ motivo: string }>(`
-        select distinct motivo_contato as motivo
+        select distinct coalesce(nullif(nullif(trim(motivo_contato), ''), 'Nao informado'), 'Não informado') as motivo
         from atendimentos
-        where motivo_contato is not null
-          and trim(motivo_contato) <> ''
-        order by motivo_contato
+        order by motivo
       `);
       return result.rows.map((row) => row.motivo);
     }

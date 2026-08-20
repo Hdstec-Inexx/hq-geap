@@ -1,10 +1,17 @@
-import type { AtendimentosQuery } from '@hq-geap/contracts/atendimentos';
+import {
+  MOTIVO_NAO_INFORMADO,
+  type AtendimentosQuery
+} from '@hq-geap/contracts/atendimentos';
 import { SLA_TME_LIMITE_SEGUNDOS } from '@hq-geap/contracts/dashboards';
 
 export type DetalhamentoSql = {
   clauses: string[];
   values: unknown[];
 };
+
+function normalizeMotivoFilter(motivo: string): string {
+  return motivo === 'Nao informado' ? MOTIVO_NAO_INFORMADO : motivo;
+}
 
 /**
  * Constrói cláusulas SQL parametrizadas para o Detalhamento do Indicador.
@@ -34,8 +41,10 @@ export function buildDetalhamentoFilters(
   }
 
   if (query.motivo && query.indicador !== 'motivo') {
-    const motivo = param(query.motivo);
-    clauses.push(`coalesce(a.motivo_contato, 'Nao informado') = ${motivo}`);
+    const motivo = param(normalizeMotivoFilter(query.motivo));
+    clauses.push(
+      `coalesce(nullif(nullif(trim(a.motivo_contato), ''), 'Nao informado'), 'Não informado') = ${motivo}`
+    );
   }
 
   if (query.curadoriaStatus === 'realizada') {
@@ -88,8 +97,10 @@ export function buildDetalhamentoFilters(
       clauses.push('a.tools_sucesso > 0');
       break;
     case 'motivo': {
-      const motivo = param(query.motivo!);
-      clauses.push(`coalesce(a.motivo_contato, 'Nao informado') = ${motivo}`);
+      const motivo = param(normalizeMotivoFilter(query.motivo!));
+      clauses.push(
+        `coalesce(nullif(nullif(trim(a.motivo_contato), ''), 'Nao informado'), 'Não informado') = ${motivo}`
+      );
       break;
     }
     case 'criterio': {

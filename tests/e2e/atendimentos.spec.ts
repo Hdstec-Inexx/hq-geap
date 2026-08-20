@@ -621,6 +621,17 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       },
       headers: ingestionHeaders
     });
+    await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: {
+        ...atendimento,
+        conversation_id: 'conv-filtro-atend-3',
+        contact_reason: null,
+        status: 'concluido',
+        completed_at: '2026-08-18T16:00:00.000Z',
+        duration_seconds: 90
+      },
+      headers: ingestionHeaders
+    });
 
     await page.goto('/login');
     await page.getByLabel('E-mail').fill('gestao@hq.test');
@@ -643,6 +654,17 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await page.getByRole('button', { name: 'Filtrar' }).click();
     await expect(page).toHaveURL(/motivo=Rede\+Credenciada|motivo=Rede%20Credenciada/);
     await expect(page.getByText('Rede Credenciada')).toBeVisible();
+
+    // Filtro pelo motivo canônico Não informado
+    await motivoCombobox.click();
+    await motivoCombobox.fill('nao');
+    await expect(page.getByRole('option', { name: 'Não informado' })).toBeVisible();
+    await page.getByRole('option', { name: 'Não informado' }).click();
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page).toHaveURL(/motivo=N%C3%A3o(\+|%20)informado|motivo=Nao(\+|%20)informado/);
+    await expect(page.getByRole('link', { name: 'Não informado' })).toBeVisible();
+    await expect(page.getByText('Boleto/Pagamento')).toHaveCount(0);
+    await expect(page.getByText('Rede Credenciada')).toHaveCount(0);
 
     // Limpar filtros
     await page.getByRole('button', { name: 'Limpar filtros' }).click();

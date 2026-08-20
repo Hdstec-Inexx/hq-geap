@@ -99,10 +99,10 @@ export function createDashboardRepository(db: pg.Pool) {
 
     async listMotivos(periodo: DashboardPeriod): Promise<MotivoContatoRow[]> {
       const result = await db.query<MotivoContatoRow>(`
-        select coalesce(a.motivo_contato, 'Nao informado') as motivo, count(*) as total
+        select coalesce(nullif(nullif(trim(a.motivo_contato), ''), 'Nao informado'), 'Não informado') as motivo, count(*) as total
         from atendimentos a
         where ${periodFilter}
-        group by coalesce(a.motivo_contato, 'Nao informado')
+        group by coalesce(nullif(nullif(trim(a.motivo_contato), ''), 'Nao informado'), 'Não informado')
         order by motivo
       `, [periodo.inicio, periodo.fim]);
       return result.rows;

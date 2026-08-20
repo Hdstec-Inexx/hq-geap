@@ -13,7 +13,10 @@ import {
   reviewHref
 } from '../../apps/web/src/features/curadoria/pagination.js';
 
-import { motivosAtendimentosSchema } from '../../packages/contracts/src/atendimentos.js';
+import {
+  MOTIVO_NAO_INFORMADO,
+  motivosAtendimentosSchema
+} from '../../packages/contracts/src/atendimentos.js';
 
 test('GET /curadoria usa envelope com items e total, nao um array solto', () => {
   assert.equal(filaCuradoriaSchema.safeParse([]).success, false);
@@ -99,10 +102,11 @@ test('query da Fila de Curadoria valida consistencia de datas e fuso', () => {
   );
 });
 
-test('contrato de motivos de Atendimentos valida array de strings', () => {
+test('contrato de motivos de Atendimentos valida array de strings e constante canonica', () => {
+  assert.equal(MOTIVO_NAO_INFORMADO, 'Não informado');
   assert.deepEqual(
-    motivosAtendimentosSchema.parse(['Cancelamento', 'Financeiro/Boletos']),
-    ['Cancelamento', 'Financeiro/Boletos']
+    motivosAtendimentosSchema.parse(['Cancelamento', 'Financeiro/Boletos', MOTIVO_NAO_INFORMADO]),
+    ['Cancelamento', 'Financeiro/Boletos', 'Não informado']
   );
   assert.equal(motivosAtendimentosSchema.safeParse('string-solta').success, false);
   assert.equal(motivosAtendimentosSchema.safeParse([123]).success, false);

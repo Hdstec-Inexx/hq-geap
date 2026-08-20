@@ -11,6 +11,7 @@ import { apiUrl, getSession } from '../auth/session';
 
 import { canWriteAsCurador, usePerfil } from '../auth/perfil-context';
 import { formatDuration, useAuthenticatedResource } from '../atendimentos/api';
+import { formatMotivoContato } from '../atendimentos/motivo-combobox-logic';
 import { ComentariosPanel } from '../comentarios/ComentariosPanel';
 import {
   AudioDownloadButton,
@@ -317,7 +318,7 @@ function ReviewContent({
 
 
       <section className="atendimento-facts" aria-label="Dados do Atendimento">
-        <div><span>Motivo de Contato</span><strong>{atendimento.motivoContato ?? 'Não informado'}</strong></div>
+        <div><span>Motivo de Contato</span><strong>{formatMotivoContato(atendimento.motivoContato)}</strong></div>
         <div><span>Duração</span><strong>{formatDuration(atendimento.duracaoSegundos)}</strong></div>
         <div><span>Nota da IA</span><strong>{detail.avaliacaoIa.nota.toLocaleString('pt-BR')}</strong></div>
         <div><span>Resultado IA</span><strong>{detail.avaliacaoIa.aprovacao === 'aprovado' ? 'Aprovado' : 'Reprovado'}</strong></div>
