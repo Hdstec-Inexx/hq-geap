@@ -1,6 +1,7 @@
-import { MOTIVO_NAO_INFORMADO } from '@hq-geap/contracts/atendimentos';
+import { normalizeMotivo } from '@hq-geap/contracts/atendimentos';
 import type { EstadoCriterio } from '@hq-geap/contracts/avaliacoes';
 import type pg from 'pg';
+import { canonicalMotivoSql } from '../atendimentos/detalhamentoFilters.js';
 import type { AtendimentoRow } from '../atendimentos/repository.js';
 import type { AvaliacaoIaRow } from '../avaliacoes/repository.js';
 import type { CriterioConferencia } from './service.js';
@@ -171,12 +172,8 @@ export function buildFilaCuradoriaFilters(
   }
 
   if (filters.motivo) {
-    const normalizedMotivo =
-      filters.motivo === 'Nao informado' ? MOTIVO_NAO_INFORMADO : filters.motivo;
-    const motivo = param(normalizedMotivo);
-    clauses.push(
-      `coalesce(nullif(nullif(trim(a.motivo_contato), ''), 'Nao informado'), 'Não informado') = ${motivo}`
-    );
+    const motivo = param(normalizeMotivo(filters.motivo));
+    clauses.push(`${canonicalMotivoSql('a.motivo_contato')} = ${motivo}`);
   }
 
   return { clauses, values };

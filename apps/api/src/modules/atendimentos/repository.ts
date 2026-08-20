@@ -4,7 +4,7 @@ import type {
   IngestAtendimento
 } from '@hq-geap/contracts/atendimentos';
 import type pg from 'pg';
-import { buildDetalhamentoFilters } from './detalhamentoFilters.js';
+import { buildDetalhamentoFilters, canonicalMotivoSql } from './detalhamentoFilters.js';
 
 export type AtendimentoSummaryRow = {
   id: string;
@@ -236,7 +236,7 @@ export function createAtendimentosRepository(db: pg.Pool) {
 
     async listDistinctMotivos(): Promise<string[]> {
       const result = await db.query<{ motivo: string }>(`
-        select distinct coalesce(nullif(nullif(trim(motivo_contato), ''), 'Nao informado'), 'Não informado') as motivo
+        select distinct ${canonicalMotivoSql('motivo_contato')} as motivo
         from atendimentos
         order by motivo
       `);

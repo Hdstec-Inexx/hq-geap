@@ -360,6 +360,10 @@ export const atendimentoListSchema = z.object({
 
 export const MOTIVO_NAO_INFORMADO = 'Não informado';
 
+export function normalizeMotivo(motivo: string): string {
+  return motivo === 'Nao informado' ? MOTIVO_NAO_INFORMADO : motivo;
+}
+
 export const motivosAtendimentosSchema = z.array(z.string());
 
 /** Dimensão do Detalhamento do Indicador (Dashboard → lista filtrada). */
