@@ -1404,7 +1404,7 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.getByText('Histórico de atendimentos conferidos pelos curadores.')).toBeVisible();
 
     // Filtro por curador está visível para gestão
-    const curadorSelect = page.getByLabel('Curador');
+    const curadorSelect = page.locator('#curadorias-realizadas-curador-filtro');
     await expect(curadorSelect).toBeVisible();
     await curadorSelect.selectOption({ label: 'Caio Curador' });
     await page.getByRole('button', { name: 'Filtrar' }).click();
