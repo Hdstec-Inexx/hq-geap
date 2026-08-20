@@ -800,15 +800,6 @@ h1 {
   background: #f4dcd6;
 }
 
-.criteria-footnote {
-  margin: 28px 0 0;
-  padding: 18px 22px;
-  color: #45636d;
-  background: #dcebe5;
-  border-left: 4px solid #16816f;
-  line-height: 1.55;
-}
-
 .criteria-error {
   color: #a73e32;
   font-weight: 700;
@@ -2358,15 +2349,94 @@ h1 {
 }
 
 .review-checklist legend {
-  display: contents;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 800;
+  color: #123b4a;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
 }
 
-.review-checklist legend span {
-  margin-left: 8px;
+.review-checklist legend .criterion-critical-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
   color: #9f3f32;
+  background: #fde8e5;
+  border-radius: 4px;
   font-size: 0.7rem;
+  font-weight: 800;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.criterion-tooltip-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.criterion-tooltip-trigger {
+  display: inline-block;
+  cursor: help;
+  color: #123b4a;
+  border-bottom: 1px dotted #16816f;
+  text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.criterion-tooltip-trigger:hover,
+.criterion-tooltip-trigger:focus-visible {
+  color: #16816f;
+  border-bottom-color: #123b4a;
+  outline: none;
+}
+
+.criterion-tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  z-index: 50;
+  width: max-content;
+  max-width: 360px;
+  padding: 10px 14px;
+  color: #eff9f5;
+  background: #123b4a;
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgb(18 59 74 / 28%), 0 2px 6px rgb(0 0 0 / 18%);
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.45;
+  pointer-events: none;
+  white-space: normal;
+  word-break: break-word;
+  animation: tooltipFadeIn 0.15s ease-out;
+}
+
+.criterion-tooltip-arrow {
+  position: absolute;
+  top: 100%;
+  left: 20px;
+  width: 0;
+  height: 0;
+  border-width: 6px 6px 0 6px;
+  border-style: solid;
+  border-color: #123b4a transparent transparent transparent;
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .criterion-options {

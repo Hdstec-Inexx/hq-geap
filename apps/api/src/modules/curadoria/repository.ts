@@ -81,12 +81,14 @@ async function findIaChecklists(
       ac.criterio_id as "criterioId",
       ac.criterio_chave as chave,
       ac.criterio_nome as nome,
+      c.descricao as descricao,
       ac.estado,
       ac.valor_criterio as valor,
       ac.criterio_critico as critico,
       ac.criterio_condicional as condicional,
       ac.criterio_ordem as ordem
     from avaliacao_criterios ac
+    left join criterios c on c.id = ac.criterio_id
     where ac.avaliacao_id = any($1::uuid[])
     order by ac.avaliacao_id, ac.criterio_ordem
   `, [avaliacaoIds]);
@@ -116,12 +118,14 @@ async function findCuradorChecklists(
       ac.criterio_id as "criterioId",
       ac.criterio_chave as chave,
       ac.criterio_nome as nome,
+      c.descricao as descricao,
       ac.estado,
       ac.valor_criterio as valor,
       ac.criterio_critico as critico,
       ac.criterio_condicional as condicional,
       ac.criterio_ordem as ordem
     from avaliacao_curador_criterios ac
+    left join criterios c on c.id = ac.criterio_id
     where ac.avaliacao_curador_id = any($1::uuid[])
     order by ac.avaliacao_curador_id, ac.criterio_ordem
   `, [avaliacaoIds]);

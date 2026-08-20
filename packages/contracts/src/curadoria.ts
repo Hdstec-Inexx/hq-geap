@@ -5,6 +5,7 @@ import { avaliacaoIaSchema, estadoCriterioSchema } from './avaliacoes.js';
 export const criterioCuradoriaSchema = z.object({
   chave: z.string(),
   nome: z.string(),
+  descricao: z.string().nullable().default(null),
   estado: estadoCriterioSchema,
   valor: z.number().nonnegative(),
   critico: z.boolean(),
