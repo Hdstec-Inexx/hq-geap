@@ -82,6 +82,14 @@ export const dashboardSchema = z.object({
       })
     )
   }),
+  criteriosNaoConformidade: z.array(
+    z.object({
+      criterioId: z.string().uuid(),
+      chave: z.string(),
+      nome: z.string(),
+      total: z.number().int().nonnegative()
+    })
+  ),
   pioresAtendimentos: z.array(
     z.object({
       id: z.string().uuid(),

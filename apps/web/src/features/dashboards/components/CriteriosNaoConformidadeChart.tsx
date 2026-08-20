@@ -1,22 +1,22 @@
 import type { Dashboard } from '@hq-geap/contracts/dashboards';
 import type { ChartConfiguration } from 'chart.js';
 import { Link, useNavigate } from 'react-router-dom';
-import { motivosChartSeries } from '../chartSeries';
+import { criteriosNaoConformidadeChartSeries } from '../chartSeries';
 import { motivosColors } from '../chartTheme';
 import { detalhamentoListPath } from '../detalhamento';
 import { DashboardChart } from './DashboardChart';
 
-export function MotivosContatoChart({
-  motivos,
+export function CriteriosNaoConformidadeChart({
+  criterios,
   inicio,
   fim
 }: {
-  motivos: Dashboard['motivosContato'];
+  criterios: Dashboard['criteriosNaoConformidade'];
   inicio: string;
   fim: string;
 }) {
   const navigate = useNavigate();
-  const series = motivosChartSeries(motivos);
+  const series = criteriosNaoConformidadeChartSeries(criterios);
   const colors = motivosColors(series.values.length);
   const total = series.values.reduce<number>(
     (sum, value) => sum + (value ?? 0),
@@ -45,40 +45,43 @@ export function MotivosContatoChart({
   };
 
   return (
-    <section className="dashboard-panel motivos-panel">
+    <section className="dashboard-panel criterios-nao-conformidade-panel">
       <header>
-        <p className="dashboard-panel-kicker">Distribuição</p>
-        <h2>Motivos de Contato</h2>
+        <p className="dashboard-panel-kicker">Distribuição de Falhas</p>
+        <h2>Critérios de Não Conformidade</h2>
+        <p>Avaliados como não atendidos pela IA no período.</p>
       </header>
-      {motivos.length === 0 ? (
-        <p className="dashboard-empty">Nenhum Motivo de Contato no período.</p>
+      {criterios.length === 0 ? (
+        <p className="dashboard-empty">
+          Nenhum Critério com Não Conformidade no período.
+        </p>
       ) : (
         <div className="motivos-chart-layout">
           <div className="dashboard-chart-frame motivos-chart-frame">
             <DashboardChart
-              ariaLabel="Gráfico de Motivos de Contato"
+              ariaLabel="Gráfico de Critérios de Não Conformidade"
               configuration={configuration}
               onIndexClick={(index) => {
-                const motivo = motivos[index];
-                if (!motivo) {
+                const criterio = criterios[index];
+                if (!criterio) {
                   return;
                 }
                 navigate(
                   detalhamentoListPath({
                     inicio,
                     fim,
-                    indicador: 'motivo',
-                    motivo: motivo.motivo
+                    indicador: 'criterio_nao_atendido',
+                    criterioId: criterio.criterioId
                   })
                 );
               }}
             />
           </div>
           <ul className="motivos-legend">
-            {motivos.map((item, index) => {
+            {criterios.map((item, index) => {
               const share = total === 0 ? 0 : (item.total / total) * 100;
               return (
-                <li key={item.motivo}>
+                <li key={item.criterioId}>
                   <span
                     className="motivos-swatch"
                     style={{ background: colors[index]! }}
@@ -87,11 +90,11 @@ export function MotivosContatoChart({
                     to={detalhamentoListPath({
                       inicio,
                       fim,
-                      indicador: 'motivo',
-                      motivo: item.motivo
+                      indicador: 'criterio_nao_atendido',
+                      criterioId: item.criterioId
                     })}
                   >
-                    {item.motivo}
+                    {item.nome}
                   </Link>
                   <strong>
                     {item.total.toLocaleString('pt-BR')} ({share.toFixed(0)}%)

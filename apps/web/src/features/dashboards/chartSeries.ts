@@ -31,3 +31,12 @@ export function concordanciaChartSeries(
     values: porCriterio.map((item) => item.percentual)
   };
 }
+
+export function criteriosNaoConformidadeChartSeries(
+  criterios: Dashboard['criteriosNaoConformidade']
+): ChartSeries {
+  return {
+    labels: criterios.map((item) => item.nome),
+    values: criterios.map((item) => item.total)
+  };
+}

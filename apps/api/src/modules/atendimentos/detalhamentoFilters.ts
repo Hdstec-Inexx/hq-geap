@@ -113,6 +113,19 @@ export function buildDetalhamentoFilters(
         )`);
       break;
     }
+    case 'criterio_nao_atendido': {
+      const criterioId = param(query.criterioId!);
+      clauses.push(`exists (
+          select 1
+          from avaliacoes ia
+          join avaliacao_criterios ac on ac.avaliacao_id = ia.id
+          where ia.atendimento_id = a.id
+            and ia.autor = 'ia'
+            and ac.criterio_id = ${criterioId}::uuid
+            and ac.estado = 'nao_atendido'
+        )`);
+      break;
+    }
     case 'concordancia_nota':
       clauses.push(`exists (
         select 1
