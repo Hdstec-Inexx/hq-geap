@@ -7,7 +7,7 @@ Sistema de qualidade que analisa os atendimentos de um agente de voz: uma IA ava
 ### Papéis
 
 **Admin**:
-Papel com acesso total: gerencia usuários, configura a IA Avaliadora (prompt, modelo), consulta a Régua de Avaliação e trabalha a fila de comentários pendentes.
+Papel com acesso total: gerencia usuários, configura a IA Avaliadora (prompt, modelo) e trabalha a fila de comentários pendentes.
 
 **Gestão**:
 Papel de acompanhamento, 100% leitura. Vê dashboards, relatórios, atendimentos com suas avaliações e comentários — sem escrever nem alterar nada.
@@ -37,7 +37,7 @@ _Avoid_: Conversa, ligação, chamada
 O agente conversacional (ElevenLabs) que atende os clientes. É o "avaliado" do sistema: configurado na ElevenLabs, observado aqui.
 
 **Motivo de Contato**:
-A razão do contato (ex: "Rede credenciada", "Financeiro/Boletos"), coletada pelo próprio Agente de Voz durante o Atendimento (data collection da ElevenLabs) e recebida pronta no webhook. O sistema apenas armazena e agrega.
+A razão do contato (ex: "Rede credenciada", "Financeiro/Boletos"), coletada pelo próprio Agente de Voz durante o Atendimento (data collection da ElevenLabs) e recebida pronta no webhook. O sistema apenas armazena e agrega; quando ausente na fonte, é representado canonicamente como **Não informado**.
 
 **Transferência**:
 Fato objetivo do Atendimento: o contato foi transferido para um número ou humano (a tool de transferência foi executada). "Resolvido sem transferência" é derivado: total − transferidos.
@@ -72,7 +72,10 @@ Uma verificação sobre o comportamento do Agente de Voz (ex: "Saudação", "Pal
 Critério da Régua (valor 0) que verifica se o Agente de Voz acionou as ferramentas corretas sem uso indevido ou falha operacional. Se não for atendido, **Resolução da Solicitação** também fica não atendida (perde 3,0) — ver ADR-0011.
 
 **Régua de Avaliação**:
-O conjunto de critérios ativos cujos valores somam exatamente 10, mais o limiar de Aprovação (nota ≥ 7.0). É a escala contra a qual todo Atendimento é medido. Sua definição completa é fixa, do desenvolvimento. Inclui Critérios de valor 0 sem alterar a soma.
+O conjunto de critérios ativos cujos valores somam exatamente 10, mais o limiar de Aprovação (nota ≥ 7.0). É a escala contra a qual todo Atendimento é medido, disponível para consulta por todos os perfis autenticados. Sua definição completa é fixa, do desenvolvimento. Inclui Critérios de valor 0 sem alterar a soma.
+
+**Critérios de Não Conformidade**:
+Agregação no dashboard que contabiliza o volume e a distribuição de Atendimentos em que cada Critério da Régua foi avaliado como `Não atendido` pela IA Avaliadora no período.
 
 **Concordância**:
 A medida de alinhamento entre a Avaliação da IA e a do Curador num mesmo Atendimento — por nota e por critério. É a métrica de calibração da IA Avaliadora: cada critério em que o Curador confirma o check da IA é um acerto dela.
