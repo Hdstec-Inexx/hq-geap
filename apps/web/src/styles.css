@@ -2596,17 +2596,21 @@ h1 {
 }
 
 .review-checklist legend {
-  display: flex;
+  display: contents;
+  font-weight: 800;
+  color: #123b4a;
+}
+
+.criterion-legend-content {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
   font-weight: 800;
   color: #123b4a;
-  padding: 0;
-  margin: 0;
   min-width: 0;
 }
 
-.review-checklist legend .criterion-critical-badge {
+.review-checklist .criterion-critical-badge {
   display: inline-flex;
   align-items: center;
   padding: 2px 6px;

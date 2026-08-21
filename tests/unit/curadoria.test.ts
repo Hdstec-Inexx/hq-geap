@@ -580,17 +580,16 @@ test('styles.css corrige layout de review-checklist legend e define tooltip flut
   );
   const css = await fs.readFile(cssPath, 'utf8');
 
-  // Não deve usar display: contents no legend do checklist (quebra o grid dos critérios críticos)
-  assert.equal(
-    /\.review-checklist\s+legend\s*\{[^}]*display:\s*contents/s.test(css),
-    false,
-    'review-checklist legend nao deve usar display: contents'
-  );
-  // Deve usar display: flex no legend para agrupar nome e tag crítico
+  // Deve usar display: contents no legend e flex no wrapper interno para manter legend e options lado a lado no grid
   assert.match(
     css,
-    /\.review-checklist\s+legend\s*\{[^}]*display:\s*flex/s,
-    'review-checklist legend deve usar display: flex'
+    /\.review-checklist\s+legend\s*\{[^}]*display:\s*contents/s,
+    'review-checklist legend deve usar display: contents'
+  );
+  assert.match(
+    css,
+    /\.criterion-legend-content\s*\{[^}]*display:\s*(inline-flex|flex)/s,
+    'criterion-legend-content deve usar flex/inline-flex para agrupar nome e tag critico'
   );
   // Deve ter estilos para o custom tooltip e seu indicador de seta
   assert.match(css, /\.criterion-tooltip\b/);

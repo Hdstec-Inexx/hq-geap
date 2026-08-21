@@ -222,14 +222,16 @@ function ReviewForm({
         {checklist.map((criterio) => (
           <fieldset key={criterio.chave}>
             <legend>
-              <CriterionTooltip
-                chave={criterio.chave}
-                nome={criterio.nome}
-                descricao={criterio.descricao}
-              />
-              {criterio.critico ? (
-                <span className="criterion-critical-badge">Crítico</span>
-              ) : null}
+              <div className="criterion-legend-content">
+                <CriterionTooltip
+                  chave={criterio.chave}
+                  nome={criterio.nome}
+                  descricao={criterio.descricao}
+                />
+                {criterio.critico ? (
+                  <span className="criterion-critical-badge">Crítico</span>
+                ) : null}
+              </div>
             </legend>
             <div className="criterion-options">
               {(['atendido', 'nao_atendido', 'nao_se_aplica'] as const).map((estado) =>
