@@ -29,14 +29,21 @@ const dateTime = new Intl.DateTimeFormat('pt-BR', {
 });
 
 export function DashboardPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const fallback = defaultPeriod();
-  const inicio = searchParams.get('inicio') ?? fallback.inicio;
-  const fim = searchParams.get('fim') ?? fallback.fim;
+  const inicioParam = searchParams.get('inicio');
+  const fimParam = searchParams.get('fim');
+  const hasCustomPeriod = Boolean(inicioParam || fimParam);
+  const inicio = inicioParam ?? fallback.inicio;
+  const fim = fimParam ?? fallback.fim;
   const state = useAuthenticatedResource(
     `/dashboards/gestao?inicio=${encodeURIComponent(inicio)}&fim=${encodeURIComponent(fim)}`,
     dashboardSchema
   );
+
+  function handleClearPeriod() {
+    setSearchParams({});
+  }
 
   return (
     <main className="dashboard-page">
@@ -58,7 +65,20 @@ export function DashboardPage() {
             Fim
             <input defaultValue={fim} key={`fim-${fim}`} name="fim" type="date" />
           </label>
-          <button type="submit">Aplicar período</button>
+          <div className="period-filter-actions">
+            <button className="period-filter-submit" type="submit">
+              Aplicar período
+            </button>
+            {hasCustomPeriod ? (
+              <button
+                className="period-filter-clear"
+                onClick={handleClearPeriod}
+                type="button"
+              >
+                Limpar período
+              </button>
+            ) : null}
+          </div>
         </Form>
       </header>
 
