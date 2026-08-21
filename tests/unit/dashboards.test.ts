@@ -415,6 +415,13 @@ test('styles.css mantem comparacoes de KPIs duplos lado a lado e legenda de moti
     /\.criterios-panel\s*\{[^}]*grid-row:\s*span\s+2/i,
     'criterios-panel deve ocupar 2 linhas no grid ao lado de Motivos e Concordância'
   );
+
+  // Valida que o painel de não conformidade se ajusta ao tamanho do gráfico sem esticar desnecessariamente
+  assert.match(
+    css,
+    /\.criterios-nao-conformidade-panel\s*\{[^}]*align-self:\s*start/i,
+    'criterios-nao-conformidade-panel deve usar align-self: start para ajustar a altura ao conteudo'
+  );
 });
 
 test('listMotivos agrupa com Não informado canônico e acentuado', async () => {
