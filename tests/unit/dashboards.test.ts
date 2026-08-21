@@ -422,6 +422,13 @@ test('styles.css mantem comparacoes de KPIs duplos lado a lado e legenda de moti
     /\.criterios-nao-conformidade-panel\s*\{[^}]*align-self:\s*start/i,
     'criterios-nao-conformidade-panel deve usar align-self: start para ajustar a altura ao conteudo'
   );
+
+  // Valida que o filtro de período possui ações e botão de limpar período
+  assert.match(
+    css,
+    /\.period-filter-clear\s*\{/i,
+    'period-filter-clear deve estar definido no CSS'
+  );
 });
 
 test('listMotivos agrupa com Não informado canônico e acentuado', async () => {

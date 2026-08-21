@@ -3314,8 +3314,16 @@ h1 {
   letter-spacing: 0;
 }
 
-.period-filter button {
+.period-filter-actions {
   grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.period-filter button,
+.period-filter-submit {
+  flex: 1 1 auto;
   padding: 11px 14px;
   color: var(--dashboard-ink);
   background: var(--dashboard-mint);
@@ -3323,10 +3331,37 @@ h1 {
   border-radius: 2px;
   font-weight: 800;
   cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.period-filter-submit:hover {
+  opacity: 0.92;
+}
+
+.period-filter-clear {
+  padding: 10px 14px;
+  color: #eff9f5;
+  background: transparent;
+  border: 1px solid rgb(239 249 245 / 35%);
+  border-radius: 2px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.period-filter-clear:hover {
+  color: var(--dashboard-mint);
+  border-color: var(--dashboard-mint);
+  background: rgb(22 129 111 / 15%);
 }
 
 .period-filter input:focus-visible,
 .period-filter button:focus-visible,
+.period-filter-clear:focus-visible,
 .dashboard-page a:focus-visible {
   outline: 3px solid #e5b85c;
   outline-offset: 3px;
@@ -3820,6 +3855,11 @@ h1 {
 
   .period-filter > span {
     display: none;
+  }
+
+  .period-filter-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .dashboard-kpis {

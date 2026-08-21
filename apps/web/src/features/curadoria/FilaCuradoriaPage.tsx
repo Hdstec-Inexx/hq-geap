@@ -31,11 +31,15 @@ export function FilaCuradoriaPage() {
   const inicioParam = searchParams.get('inicio') ?? '';
   const fimParam = searchParams.get('fim') ?? '';
   const motivoParam = searchParams.get('motivo') ?? '';
-  const hasActiveFilters = Boolean(inicioParam || fimParam || motivoParam);
 
   const [draftInicio, setDraftInicio] = useState(inicioParam);
   const [draftFim, setDraftFim] = useState(fimParam);
   const [draftMotivo, setDraftMotivo] = useState(motivoParam);
+
+  const hasDraftFilters = Boolean(draftInicio || draftFim || draftMotivo);
+  const hasActiveFilters = Boolean(
+    inicioParam || fimParam || motivoParam || hasDraftFilters
+  );
 
   useEffect(() => {
     setDraftInicio(inicioParam);
