@@ -49,15 +49,6 @@ export function CuradoriasRealizadasPage() {
     searchParams,
     'criteriosAtendidos'
   );
-  const hasActiveFilters = Boolean(
-    inicioParam ||
-      fimParam ||
-      motivoParam ||
-      (!isMinhas && curadorIdParam) ||
-      criteriosNaoAtendidosParam.length > 0 ||
-      criteriosAtendidosParam.length > 0
-  );
-
   const [draftInicio, setDraftInicio] = useState(inicioParam);
   const [draftFim, setDraftFim] = useState(fimParam);
   const [draftMotivo, setDraftMotivo] = useState(motivoParam);
@@ -66,6 +57,25 @@ export function CuradoriasRealizadasPage() {
     useState<string[]>(criteriosNaoAtendidosParam);
   const [draftCriteriosAtendidos, setDraftCriteriosAtendidos] =
     useState<string[]>(criteriosAtendidosParam);
+
+  const hasDraftFilters = Boolean(
+    draftInicio ||
+      draftFim ||
+      draftMotivo ||
+      (!isMinhas && draftCuradorId) ||
+      draftCriteriosNaoAtendidos.length > 0 ||
+      draftCriteriosAtendidos.length > 0
+  );
+
+  const hasActiveFilters = Boolean(
+    inicioParam ||
+      fimParam ||
+      motivoParam ||
+      (!isMinhas && curadorIdParam) ||
+      criteriosNaoAtendidosParam.length > 0 ||
+      criteriosAtendidosParam.length > 0 ||
+      hasDraftFilters
+  );
 
   const curadoresState = useAuthenticatedResource('/curadores', curadoresListSchema);
   const curadores = curadoresState.status === 'ready' ? curadoresState.data : [];

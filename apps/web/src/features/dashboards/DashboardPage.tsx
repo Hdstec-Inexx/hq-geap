@@ -1,4 +1,5 @@
 import { dashboardSchema } from '@hq-geap/contracts/dashboards';
+import { useEffect, useState } from 'react';
 import { Form, Link, useSearchParams } from 'react-router-dom';
 import { useAuthenticatedResource } from '../atendimentos/api';
 import { formatMotivoContato } from '../atendimentos/motivo-combobox-logic';
@@ -33,15 +34,32 @@ export function DashboardPage() {
   const fallback = defaultPeriod();
   const inicioParam = searchParams.get('inicio');
   const fimParam = searchParams.get('fim');
-  const hasCustomPeriod = Boolean(inicioParam || fimParam);
   const inicio = inicioParam ?? fallback.inicio;
   const fim = fimParam ?? fallback.fim;
+
+  const [draftInicio, setDraftInicio] = useState(inicio);
+  const [draftFim, setDraftFim] = useState(fim);
+
+  useEffect(() => {
+    setDraftInicio(inicio);
+    setDraftFim(fim);
+  }, [inicio, fim]);
+
+  const hasCustomPeriod = Boolean(
+    inicioParam ||
+      fimParam ||
+      draftInicio !== fallback.inicio ||
+      draftFim !== fallback.fim
+  );
+
   const state = useAuthenticatedResource(
     `/dashboards/gestao?inicio=${encodeURIComponent(inicio)}&fim=${encodeURIComponent(fim)}`,
     dashboardSchema
   );
 
   function handleClearPeriod() {
+    setDraftInicio(fallback.inicio);
+    setDraftFim(fallback.fim);
     setSearchParams({});
   }
 
@@ -58,12 +76,22 @@ export function DashboardPage() {
         <Form className="period-filter" method="get">
           <label>
             Início
-            <input defaultValue={inicio} key={`inicio-${inicio}`} name="inicio" type="date" />
+            <input
+              name="inicio"
+              onChange={(e) => setDraftInicio(e.target.value)}
+              type="date"
+              value={draftInicio}
+            />
           </label>
           <span aria-hidden="true">→</span>
           <label>
             Fim
-            <input defaultValue={fim} key={`fim-${fim}`} name="fim" type="date" />
+            <input
+              name="fim"
+              onChange={(e) => setDraftFim(e.target.value)}
+              type="date"
+              value={draftFim}
+            />
           </label>
           <div className="period-filter-actions">
             <button className="period-filter-submit" type="submit">
