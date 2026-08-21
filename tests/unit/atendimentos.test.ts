@@ -1307,4 +1307,41 @@ test('filtros SQL suportam curadoriaStatus e curadorId', async () => {
   assert.deepEqual(curador.values, ['11111111-1111-4111-8111-111111111111']);
 });
 
+test('filtros SQL suportam criteriosAtendidos e criteriosNaoAtendidos com conjuncao AND para IA', async () => {
+  const { buildDetalhamentoFilters } = await import(
+    '../../apps/api/src/modules/atendimentos/detalhamentoFilters.js'
+  );
+
+  const filtro = buildDetalhamentoFilters(
+    atendimentosQuerySchema.parse({
+      criteriosAtendidos: [
+        '11111111-1111-4111-8111-111111111111',
+        '22222222-2222-4222-8222-222222222222'
+      ],
+      criteriosNaoAtendidos: ['33333333-3333-4333-8333-333333333333']
+    }),
+    1
+  );
+
+  assert.equal(filtro.clauses.length, 3);
+  assert.match(
+    filtro.clauses[0]!,
+    /ac\.criterio_id = \$1::uuid\s+and\s+ac\.estado = 'atendido'/
+  );
+  assert.match(
+    filtro.clauses[1]!,
+    /ac\.criterio_id = \$2::uuid\s+and\s+ac\.estado = 'atendido'/
+  );
+  assert.match(
+    filtro.clauses[2]!,
+    /ac\.criterio_id = \$3::uuid\s+and\s+ac\.estado = 'nao_atendido'/
+  );
+  assert.deepEqual(filtro.values, [
+    '11111111-1111-4111-8111-111111111111',
+    '22222222-2222-4222-8222-222222222222',
+    '33333333-3333-4333-8333-333333333333'
+  ]);
+});
+
+
 

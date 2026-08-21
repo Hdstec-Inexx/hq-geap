@@ -375,6 +375,43 @@ test('buildCuradoriasRealizadasFilters aplica filtros de data, motivo e curadorI
   ]);
 });
 
+test('buildCuradoriasRealizadasFilters suporta criteriosAtendidos e criteriosNaoAtendidos com conjuncao AND para Curador', async () => {
+  const { buildCuradoriasRealizadasFilters } = await import(
+    '../../apps/api/src/modules/curadoria/repository.js'
+  );
+
+  const filters = buildCuradoriasRealizadasFilters(
+    {
+      criteriosAtendidos: ['11111111-1111-4111-8111-111111111111'],
+      criteriosNaoAtendidos: [
+        '22222222-2222-4222-8222-222222222222',
+        '33333333-3333-4333-8333-333333333333'
+      ]
+    },
+    1
+  );
+
+  assert.equal(filters.clauses.length, 3);
+  assert.match(
+    filters.clauses[0]!,
+    /acc\.avaliacao_curador_id = cur\.id\s+and\s+acc\.criterio_id = \$1::uuid\s+and\s+acc\.estado = 'atendido'/
+  );
+  assert.match(
+    filters.clauses[1]!,
+    /acc\.avaliacao_curador_id = cur\.id\s+and\s+acc\.criterio_id = \$2::uuid\s+and\s+acc\.estado = 'nao_atendido'/
+  );
+  assert.match(
+    filters.clauses[2]!,
+    /acc\.avaliacao_curador_id = cur\.id\s+and\s+acc\.criterio_id = \$3::uuid\s+and\s+acc\.estado = 'nao_atendido'/
+  );
+  assert.deepEqual(filters.values, [
+    '11111111-1111-4111-8111-111111111111',
+    '22222222-2222-4222-8222-222222222222',
+    '33333333-3333-4333-8333-333333333333'
+  ]);
+});
+
+
 test('toCuradoriaRealizadaItem mapeia campos da linha do banco', async () => {
   const { toCuradoriaRealizadaItem } = await import(
     '../../apps/api/src/modules/curadoria/service.js'

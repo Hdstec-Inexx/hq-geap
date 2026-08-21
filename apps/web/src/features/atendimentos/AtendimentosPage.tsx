@@ -7,6 +7,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { formatDuration, useAuthenticatedResource } from './api';
 import { formatMotivoContato } from './motivo-combobox-logic';
 import { MotivoCombobox } from './MotivoCombobox';
+import { CriteriosMultiSelect } from './CriteriosMultiSelect';
+import { parseCriteriaParam } from './criterios-filtro-logic';
 import { detalhamentoQueryFromSearch } from '../dashboards/detalhamento';
 import {
   compactPageItems,
@@ -64,11 +66,25 @@ export function AtendimentosPage() {
   const motivoParam = searchParams.get('motivo') ?? '';
   const curadoriaStatusParam = searchParams.get('curadoriaStatus') ?? '';
   const curadorIdParam = searchParams.get('curadorId') ?? '';
+  const criteriosNaoAtendidosParam = parseCriteriaParam(
+    searchParams,
+    'criteriosNaoAtendidos'
+  );
+  const criteriosAtendidosParam = parseCriteriaParam(
+    searchParams,
+    'criteriosAtendidos'
+  );
   const indicador = searchParams.get('indicador');
   const isDetalhamento = Boolean(indicador && inicioParam && fimParam);
   const hasActiveFilters = Boolean(
     !isDetalhamento &&
-      (inicioParam || fimParam || motivoParam || curadoriaStatusParam || curadorIdParam)
+      (inicioParam ||
+        fimParam ||
+        motivoParam ||
+        curadoriaStatusParam ||
+        curadorIdParam ||
+        criteriosNaoAtendidosParam.length > 0 ||
+        criteriosAtendidosParam.length > 0)
   );
 
   const [draftInicio, setDraftInicio] = useState(inicioParam);
@@ -76,6 +92,10 @@ export function AtendimentosPage() {
   const [draftMotivo, setDraftMotivo] = useState(motivoParam);
   const [draftCuradoriaStatus, setDraftCuradoriaStatus] = useState(curadoriaStatusParam);
   const [draftCuradorId, setDraftCuradorId] = useState(curadorIdParam);
+  const [draftCriteriosNaoAtendidos, setDraftCriteriosNaoAtendidos] =
+    useState<string[]>(criteriosNaoAtendidosParam);
+  const [draftCriteriosAtendidos, setDraftCriteriosAtendidos] =
+    useState<string[]>(criteriosAtendidosParam);
 
   const curadoresState = useAuthenticatedResource('/curadores', curadoresListSchema);
   const curadores = curadoresState.status === 'ready' ? curadoresState.data : [];
@@ -86,7 +106,16 @@ export function AtendimentosPage() {
     setDraftMotivo(motivoParam);
     setDraftCuradoriaStatus(curadoriaStatusParam);
     setDraftCuradorId(curadorIdParam);
-  }, [inicioParam, fimParam, motivoParam, curadoriaStatusParam, curadorIdParam]);
+    setDraftCriteriosNaoAtendidos(criteriosNaoAtendidosParam);
+    setDraftCriteriosAtendidos(criteriosAtendidosParam);
+  }, [
+    inicioParam,
+    fimParam,
+    motivoParam,
+    curadoriaStatusParam,
+    curadorIdParam,
+    searchParams
+  ]);
 
   const listQuery = new URLSearchParams({
     limit: String(PAGE_SIZE),
@@ -102,6 +131,12 @@ export function AtendimentosPage() {
     if (motivoParam) listQuery.set('motivo', motivoParam);
     if (curadoriaStatusParam) listQuery.set('curadoriaStatus', curadoriaStatusParam);
     if (curadorIdParam) listQuery.set('curadorId', curadorIdParam);
+    if (criteriosNaoAtendidosParam.length > 0) {
+      listQuery.set('criteriosNaoAtendidos', criteriosNaoAtendidosParam.join(','));
+    }
+    if (criteriosAtendidosParam.length > 0) {
+      listQuery.set('criteriosAtendidos', criteriosAtendidosParam.join(','));
+    }
   }
   const requestPath = `/atendimentos?${listQuery.toString()}`;
   const state = useAuthenticatedResource(requestPath, atendimentoListSchema);
@@ -131,6 +166,12 @@ export function AtendimentosPage() {
     if (draftMotivo.trim()) next.set('motivo', draftMotivo.trim());
     if (draftCuradoriaStatus) next.set('curadoriaStatus', draftCuradoriaStatus);
     if (draftCuradorId) next.set('curadorId', draftCuradorId);
+    if (draftCriteriosNaoAtendidos.length > 0) {
+      next.set('criteriosNaoAtendidos', draftCriteriosNaoAtendidos.join(','));
+    }
+    if (draftCriteriosAtendidos.length > 0) {
+      next.set('criteriosAtendidos', draftCriteriosAtendidos.join(','));
+    }
     navigate(paginationHref(next, 1));
   }
 
@@ -140,6 +181,8 @@ export function AtendimentosPage() {
     setDraftMotivo('');
     setDraftCuradoriaStatus('');
     setDraftCuradorId('');
+    setDraftCriteriosNaoAtendidos([]);
+    setDraftCriteriosAtendidos([]);
     navigate('/atendimentos');
   }
 
@@ -216,6 +259,26 @@ export function AtendimentosPage() {
                 onChange={setDraftMotivo}
                 placeholder="Todos os motivos"
                 value={draftMotivo}
+              />
+            </label>
+            <label>
+              Critérios Não Atendidos
+              <CriteriosMultiSelect
+                id="atendimentos-criterios-nao-atendidos-filtro"
+                name="criteriosNaoAtendidos"
+                onChange={setDraftCriteriosNaoAtendidos}
+                placeholder="Todos os critérios"
+                value={draftCriteriosNaoAtendidos}
+              />
+            </label>
+            <label>
+              Critérios Atendidos
+              <CriteriosMultiSelect
+                id="atendimentos-criterios-atendidos-filtro"
+                name="criteriosAtendidos"
+                onChange={setDraftCriteriosAtendidos}
+                placeholder="Todos os critérios"
+                value={draftCriteriosAtendidos}
               />
             </label>
             <label>

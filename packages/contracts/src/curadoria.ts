@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { atendimentoDetailSchema } from './atendimentos.js';
+import {
+  atendimentoDetailSchema,
+  criteriosQueryFilterSchema
+} from './atendimentos.js';
 import { avaliacaoIaSchema, estadoCriterioSchema } from './avaliacoes.js';
 
 export const criterioCuradoriaSchema = z.object({
@@ -142,7 +145,9 @@ export const curadoriasRealizadasQuerySchema = z
     inicio: isoDateSchema.optional(),
     fim: isoDateSchema.optional(),
     motivo: z.string().trim().min(1).max(200).optional(),
-    curadorId: z.uuid().optional()
+    curadorId: z.uuid().optional(),
+    criteriosNaoAtendidos: criteriosQueryFilterSchema,
+    criteriosAtendidos: criteriosQueryFilterSchema
   })
   .superRefine(refinePeriodo)
   .transform(transformPeriodo);

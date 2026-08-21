@@ -9,6 +9,8 @@ import { usePerfil } from '../auth/perfil-context';
 import { formatDuration, useAuthenticatedResource } from '../atendimentos/api';
 import { formatMotivoContato } from '../atendimentos/motivo-combobox-logic';
 import { MotivoCombobox } from '../atendimentos/MotivoCombobox';
+import { CriteriosMultiSelect } from '../atendimentos/CriteriosMultiSelect';
+import { parseCriteriaParam } from '../atendimentos/criterios-filtro-logic';
 import {
   compactPageItems,
   curadoriasRealizadasHref,
@@ -39,14 +41,31 @@ export function CuradoriasRealizadasPage() {
   const fimParam = searchParams.get('fim') ?? '';
   const motivoParam = searchParams.get('motivo') ?? '';
   const curadorIdParam = searchParams.get('curadorId') ?? '';
+  const criteriosNaoAtendidosParam = parseCriteriaParam(
+    searchParams,
+    'criteriosNaoAtendidos'
+  );
+  const criteriosAtendidosParam = parseCriteriaParam(
+    searchParams,
+    'criteriosAtendidos'
+  );
   const hasActiveFilters = Boolean(
-    inicioParam || fimParam || motivoParam || (!isMinhas && curadorIdParam)
+    inicioParam ||
+      fimParam ||
+      motivoParam ||
+      (!isMinhas && curadorIdParam) ||
+      criteriosNaoAtendidosParam.length > 0 ||
+      criteriosAtendidosParam.length > 0
   );
 
   const [draftInicio, setDraftInicio] = useState(inicioParam);
   const [draftFim, setDraftFim] = useState(fimParam);
   const [draftMotivo, setDraftMotivo] = useState(motivoParam);
   const [draftCuradorId, setDraftCuradorId] = useState(curadorIdParam);
+  const [draftCriteriosNaoAtendidos, setDraftCriteriosNaoAtendidos] =
+    useState<string[]>(criteriosNaoAtendidosParam);
+  const [draftCriteriosAtendidos, setDraftCriteriosAtendidos] =
+    useState<string[]>(criteriosAtendidosParam);
 
   const curadoresState = useAuthenticatedResource('/curadores', curadoresListSchema);
   const curadores = curadoresState.status === 'ready' ? curadoresState.data : [];
@@ -56,7 +75,15 @@ export function CuradoriasRealizadasPage() {
     setDraftFim(fimParam);
     setDraftMotivo(motivoParam);
     setDraftCuradorId(curadorIdParam);
-  }, [inicioParam, fimParam, motivoParam, curadorIdParam]);
+    setDraftCriteriosNaoAtendidos(criteriosNaoAtendidosParam);
+    setDraftCriteriosAtendidos(criteriosAtendidosParam);
+  }, [
+    inicioParam,
+    fimParam,
+    motivoParam,
+    curadorIdParam,
+    searchParams
+  ]);
 
   const query = new URLSearchParams({
     limit: String(FILA_PAGE_SIZE),
@@ -66,6 +93,12 @@ export function CuradoriasRealizadasPage() {
   if (fimParam) query.set('fim', fimParam);
   if (motivoParam) query.set('motivo', motivoParam);
   if (!isMinhas && curadorIdParam) query.set('curadorId', curadorIdParam);
+  if (criteriosNaoAtendidosParam.length > 0) {
+    query.set('criteriosNaoAtendidos', criteriosNaoAtendidosParam.join(','));
+  }
+  if (criteriosAtendidosParam.length > 0) {
+    query.set('criteriosAtendidos', criteriosAtendidosParam.join(','));
+  }
 
   const requestPath = `/curadorias-realizadas?${query.toString()}`;
   const state = useAuthenticatedResource(requestPath, curadoriasRealizadasPageSchema);
@@ -99,6 +132,12 @@ export function CuradoriasRealizadasPage() {
     }
     if (draftMotivo.trim()) next.set('motivo', draftMotivo.trim());
     if (!isMinhas && draftCuradorId) next.set('curadorId', draftCuradorId);
+    if (draftCriteriosNaoAtendidos.length > 0) {
+      next.set('criteriosNaoAtendidos', draftCriteriosNaoAtendidos.join(','));
+    }
+    if (draftCriteriosAtendidos.length > 0) {
+      next.set('criteriosAtendidos', draftCriteriosAtendidos.join(','));
+    }
     navigate(curadoriasRealizadasHref(basePath, next, 1));
   }
 
@@ -107,6 +146,8 @@ export function CuradoriasRealizadasPage() {
     setDraftFim('');
     setDraftMotivo('');
     setDraftCuradorId('');
+    setDraftCriteriosNaoAtendidos([]);
+    setDraftCriteriosAtendidos([]);
     navigate(basePath);
   }
 
@@ -172,6 +213,26 @@ export function CuradoriasRealizadasPage() {
               onChange={setDraftMotivo}
               placeholder="Todos os motivos"
               value={draftMotivo}
+            />
+          </label>
+          <label>
+            Critérios Não Atendidos
+            <CriteriosMultiSelect
+              id="curadorias-criterios-nao-atendidos-filtro"
+              name="criteriosNaoAtendidos"
+              onChange={setDraftCriteriosNaoAtendidos}
+              placeholder="Todos os critérios"
+              value={draftCriteriosNaoAtendidos}
+            />
+          </label>
+          <label>
+            Critérios Atendidos
+            <CriteriosMultiSelect
+              id="curadorias-criterios-atendidos-filtro"
+              name="criteriosAtendidos"
+              onChange={setDraftCriteriosAtendidos}
+              placeholder="Todos os critérios"
+              value={draftCriteriosAtendidos}
             />
           </label>
           {!isMinhas ? (

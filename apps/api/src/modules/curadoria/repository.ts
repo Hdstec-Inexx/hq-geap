@@ -148,6 +148,8 @@ export type CuradoriasRealizadasFilters = {
   fim?: string;
   motivo?: string;
   curadorId?: string;
+  criteriosNaoAtendidos?: string[];
+  criteriosAtendidos?: string[];
 };
 
 export function buildFilaCuradoriaFilters(
@@ -183,6 +185,16 @@ export function buildFilaCuradoriaFilters(
   return { clauses, values };
 }
 
+function buildCuradorCriterioClause(criterioPlaceholder: string, estado: 'atendido' | 'nao_atendido'): string {
+  return `exists (
+    select 1
+    from avaliacao_curador_criterios acc
+    where acc.avaliacao_curador_id = cur.id
+      and acc.criterio_id = ${criterioPlaceholder}::uuid
+      and acc.estado = '${estado}'
+  )`;
+}
+
 export function buildCuradoriasRealizadasFilters(
   filters: CuradoriasRealizadasFilters,
   startIndex = 1
@@ -190,11 +202,30 @@ export function buildCuradoriasRealizadasFilters(
   const base = buildFilaCuradoriaFilters(filters, startIndex);
   const clauses = [...base.clauses];
   const values = [...base.values];
+  let next = startIndex + base.values.length;
+
+  const param = (value: unknown) => {
+    values.push(value);
+    const placeholder = `$${next}`;
+    next += 1;
+    return placeholder;
+  };
 
   if (filters.curadorId) {
-    values.push(filters.curadorId);
-    const placeholder = `$${startIndex + base.values.length}`;
-    clauses.push(`cur.autor_usuario_id = ${placeholder}::uuid`);
+    const curadorPlaceholder = param(filters.curadorId);
+    clauses.push(`cur.autor_usuario_id = ${curadorPlaceholder}::uuid`);
+  }
+
+  if (filters.criteriosAtendidos && filters.criteriosAtendidos.length > 0) {
+    for (const criterioId of filters.criteriosAtendidos) {
+      clauses.push(buildCuradorCriterioClause(param(criterioId), 'atendido'));
+    }
+  }
+
+  if (filters.criteriosNaoAtendidos && filters.criteriosNaoAtendidos.length > 0) {
+    for (const criterioId of filters.criteriosNaoAtendidos) {
+      clauses.push(buildCuradorCriterioClause(param(criterioId), 'nao_atendido'));
+    }
   }
 
   return { clauses, values };
@@ -249,13 +280,9 @@ export function createCuradoriaRepository(db: pg.Pool) {
     },
 
     async listRealizadas(
-      query: {
+      query: CuradoriasRealizadasFilters & {
         limit: number;
         offset: number;
-        inicio?: string;
-        fim?: string;
-        motivo?: string;
-        curadorId?: string;
       }
     ): Promise<{ items: CuradoriaRealizadaRow[]; total: number }> {
       const selectFilters = buildCuradoriasRealizadasFilters(query, 3);

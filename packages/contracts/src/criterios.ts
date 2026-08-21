@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const criterioSchema = z.object({
+  id: z.uuid().optional(),
   chave: z.string().trim().min(1),
   nome: z.string().trim().min(1),
   descricao: z.string().trim().min(1).nullable(),
