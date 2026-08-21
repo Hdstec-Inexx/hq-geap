@@ -57,6 +57,36 @@ export function buildDetalhamentoFilters(
     clauses.push(`cur.autor_usuario_id = ${curadorId}::uuid`);
   }
 
+  if (query.criteriosAtendidos && query.criteriosAtendidos.length > 0) {
+    for (const criterioId of query.criteriosAtendidos) {
+      const placeholder = param(criterioId);
+      clauses.push(`exists (
+        select 1
+        from avaliacoes ia
+        join avaliacao_criterios ac on ac.avaliacao_id = ia.id
+        where ia.atendimento_id = a.id
+          and ia.autor = 'ia'
+          and ac.criterio_id = ${placeholder}::uuid
+          and ac.estado = 'atendido'
+      )`);
+    }
+  }
+
+  if (query.criteriosNaoAtendidos && query.criteriosNaoAtendidos.length > 0) {
+    for (const criterioId of query.criteriosNaoAtendidos) {
+      const placeholder = param(criterioId);
+      clauses.push(`exists (
+        select 1
+        from avaliacoes ia
+        join avaliacao_criterios ac on ac.avaliacao_id = ia.id
+        where ia.atendimento_id = a.id
+          and ia.autor = 'ia'
+          and ac.criterio_id = ${placeholder}::uuid
+          and ac.estado = 'nao_atendido'
+      )`);
+    }
+  }
+
   switch (query.indicador) {
     case undefined:
       break;

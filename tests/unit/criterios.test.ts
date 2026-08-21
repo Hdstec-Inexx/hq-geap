@@ -173,3 +173,15 @@ test('CriteriosPage nao exibe mensagem tecnica de rodape sobre snapshots e alter
   assert.doesNotMatch(content, /snapshots de Avaliações anteriores/);
   assert.doesNotMatch(content, /criteria-footnote/);
 });
+
+test('criterioSchema aceita id uuid opcional', () => {
+  const parsed = criterioSchema.safeParse({
+    ...reguaValida.criterios[0]!,
+    id: '11111111-1111-4111-8111-111111111111'
+  });
+  assert.equal(parsed.success, true);
+  if (parsed.success) {
+    assert.equal(parsed.data.id, '11111111-1111-4111-8111-111111111111');
+  }
+});
+

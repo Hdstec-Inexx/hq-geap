@@ -387,6 +387,20 @@ export const detalhamentoIndicadorSchema = z.enum([
 
 const isoDateSchema = z.iso.date();
 
+export const criteriosQueryFilterSchema = z.preprocess((val) => {
+  if (val === undefined || val === null || val === '') return undefined;
+  const items = Array.isArray(val)
+    ? val.flatMap((v) => (typeof v === 'string' ? v.split(',') : v))
+    : typeof val === 'string'
+      ? val.split(',')
+      : [];
+  const normalized = items
+    .map((v) => (typeof v === 'string' ? v.trim() : v))
+    .filter((v): v is string => typeof v === 'string' && v.length > 0);
+  if (normalized.length === 0) return undefined;
+  return Array.from(new Set(normalized));
+}, z.array(z.uuid()).optional());
+
 export const atendimentosQuerySchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -398,7 +412,9 @@ export const atendimentosQuerySchema = z
     motivo: z.string().trim().min(1).max(200).optional(),
     criterioId: z.uuid().optional(),
     curadoriaStatus: curadoriaStatusFilterSchema.optional(),
-    curadorId: z.uuid().optional()
+    curadorId: z.uuid().optional(),
+    criteriosNaoAtendidos: criteriosQueryFilterSchema,
+    criteriosAtendidos: criteriosQueryFilterSchema
   })
   .superRefine((query, ctx) => {
     if (query.indicador !== undefined && (!query.inicio || !query.fim)) {

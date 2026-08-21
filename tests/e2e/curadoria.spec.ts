@@ -1491,5 +1491,77 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(card).toBeVisible();
     await expect(card.getByText('Não informado')).toBeVisible();
   });
+
+  test('Curadorias Realizadas filtra combinando multiplos criterios do Curador com logica AND', async ({
+    page,
+    request
+  }) => {
+    const at1Id = await createAtendimento('conv-realizada-crit-1', 'concluido');
+    const at2Id = await createAtendimento('conv-realizada-crit-2', 'concluido');
+    await persistirAvaliacaoIa(at1Id);
+    await persistirAvaliacaoIa(at2Id);
+
+    const curador = await login(request, 'curador');
+    const d1 = (await (await request.get(`${apiUrl}/curadoria/${at1Id}`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    })).json()) as { avaliacaoIa: { checklist: Array<{ chave: string; estado: string }> } };
+
+    await request.post(`${apiUrl}/curadoria/${at1Id}/avaliacoes`, {
+      headers: { authorization: `Bearer ${curador.token}` },
+      data: {
+        checklist: d1.avaliacaoIa.checklist.map((c) => ({
+          chave: c.chave,
+          estado: c.chave === 'informou_protocolo_email' ? 'nao_atendido' : 'atendido'
+        })),
+        notaAvaliacaoIa: 7.5,
+        falhasIdentificadas: ['informou_protocolo_email'],
+        resumoAtendimento: 'Sem protocolo'
+      }
+    });
+
+    const d2 = (await (await request.get(`${apiUrl}/curadoria/${at2Id}`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    })).json()) as { avaliacaoIa: { checklist: Array<{ chave: string; estado: string }> } };
+
+    await request.post(`${apiUrl}/curadoria/${at2Id}/avaliacoes`, {
+      headers: { authorization: `Bearer ${curador.token}` },
+      data: {
+        checklist: d2.avaliacaoIa.checklist.map((c) => ({
+          chave: c.chave,
+          estado: 'atendido'
+        })),
+        notaAvaliacaoIa: 10.0,
+        falhasIdentificadas: [],
+        resumoAtendimento: 'Tudo atendido'
+      }
+    });
+
+    await loginUi(page, 'gestao');
+    await page.goto('/curadorias-realizadas');
+
+    const triggerNaoAtendidos = page.locator('#curadorias-criterios-nao-atendidos-filtro');
+    await triggerNaoAtendidos.click();
+    await page.locator('label.criterios-multiselect-option').filter({ hasText: 'Informação de Protocolo' }).click();
+    await triggerNaoAtendidos.click();
+
+    const triggerAtendidos = page.locator('#curadorias-criterios-atendidos-filtro');
+    await triggerAtendidos.click();
+    await page.locator('label.criterios-multiselect-option').filter({ hasText: 'Saudação e Intenção' }).click();
+    await triggerAtendidos.click();
+
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+
+    await expect(page).toHaveURL(/criteriosNaoAtendidos=/);
+    await expect(page).toHaveURL(/criteriosAtendidos=/);
+
+    await expect(page.locator('article.curadoria-row').filter({ hasText: 'conv-realizada-crit-1' })).toBeVisible();
+    await expect(page.locator('article.curadoria-row').filter({ hasText: 'conv-realizada-crit-2' })).toHaveCount(0);
+
+    // Limpa filtros
+    await page.getByRole('button', { name: 'Limpar filtros' }).click();
+    await expect(page).toHaveURL('/curadorias-realizadas');
+    await expect(page.locator('article.curadoria-row').filter({ hasText: 'conv-realizada-crit-1' })).toBeVisible();
+    await expect(page.locator('article.curadoria-row').filter({ hasText: 'conv-realizada-crit-2' })).toBeVisible();
+  });
 });
 

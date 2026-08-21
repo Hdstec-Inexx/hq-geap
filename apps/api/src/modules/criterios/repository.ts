@@ -1,6 +1,7 @@
 import type pg from 'pg';
 
 export type CriterioRow = {
+  id: string;
   chave: string;
   nome: string;
   descricao: string | null;
@@ -14,7 +15,7 @@ export function createCriteriosRepository(db: pg.Pool) {
   return {
     async findVigentes(): Promise<CriterioRow[]> {
       const result = await db.query<CriterioRow>(`
-        select chave, nome, descricao, valor, critico, condicional, ordem
+        select id, chave, nome, descricao, valor, critico, condicional, ordem
         from criterios
         where ativo
         order by ordem
