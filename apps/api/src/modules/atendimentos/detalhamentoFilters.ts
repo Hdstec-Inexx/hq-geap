@@ -18,6 +18,18 @@ export function canonicalMotivoSql(column = 'a.motivo_contato'): string {
  * Constrói cláusulas SQL parametrizadas para o Detalhamento do Indicador.
  * Espelha as populações do Dashboard (lado positivo nas taxas).
  */
+function buildIaCriterioClause(criterioPlaceholder: string, estado: 'atendido' | 'nao_atendido'): string {
+  return `exists (
+    select 1
+    from avaliacoes ia
+    join avaliacao_criterios ac on ac.avaliacao_id = ia.id
+    where ia.atendimento_id = a.id
+      and ia.autor = 'ia'
+      and ac.criterio_id = ${criterioPlaceholder}::uuid
+      and ac.estado = '${estado}'
+  )`;
+}
+
 export function buildDetalhamentoFilters(
   query: AtendimentosQuery,
   startIndex = 1
@@ -59,31 +71,13 @@ export function buildDetalhamentoFilters(
 
   if (query.criteriosAtendidos && query.criteriosAtendidos.length > 0) {
     for (const criterioId of query.criteriosAtendidos) {
-      const placeholder = param(criterioId);
-      clauses.push(`exists (
-        select 1
-        from avaliacoes ia
-        join avaliacao_criterios ac on ac.avaliacao_id = ia.id
-        where ia.atendimento_id = a.id
-          and ia.autor = 'ia'
-          and ac.criterio_id = ${placeholder}::uuid
-          and ac.estado = 'atendido'
-      )`);
+      clauses.push(buildIaCriterioClause(param(criterioId), 'atendido'));
     }
   }
 
   if (query.criteriosNaoAtendidos && query.criteriosNaoAtendidos.length > 0) {
     for (const criterioId of query.criteriosNaoAtendidos) {
-      const placeholder = param(criterioId);
-      clauses.push(`exists (
-        select 1
-        from avaliacoes ia
-        join avaliacao_criterios ac on ac.avaliacao_id = ia.id
-        where ia.atendimento_id = a.id
-          and ia.autor = 'ia'
-          and ac.criterio_id = ${placeholder}::uuid
-          and ac.estado = 'nao_atendido'
-      )`);
+      clauses.push(buildIaCriterioClause(param(criterioId), 'nao_atendido'));
     }
   }
 

@@ -33,7 +33,7 @@ export function CriteriosMultiSelect({
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   const reguaState = useAuthenticatedResource(
-    '/admin/criterios',
+    '/criterios',
     reguaAvaliacaoSchema
   );
   const availableCriterios: CriterioOption[] =
@@ -65,6 +65,31 @@ export function CriteriosMultiSelect({
     if (event.key === 'Escape') {
       setIsOpen(false);
       triggerRef.current?.focus();
+    }
+  }
+
+  function handleOptionKeyDown(
+    event: React.KeyboardEvent<HTMLInputElement>,
+    index: number
+  ) {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      const checkboxes = containerRef.current?.querySelectorAll<HTMLInputElement>(
+        '.criterios-multiselect-checkbox'
+      );
+      if (checkboxes && checkboxes.length > 0) {
+        const nextIndex = (index + 1) % checkboxes.length;
+        checkboxes[nextIndex]?.focus();
+      }
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      const checkboxes = containerRef.current?.querySelectorAll<HTMLInputElement>(
+        '.criterios-multiselect-checkbox'
+      );
+      if (checkboxes && checkboxes.length > 0) {
+        const prevIndex = (index - 1 + checkboxes.length) % checkboxes.length;
+        checkboxes[prevIndex]?.focus();
+      }
     }
   }
 
@@ -155,8 +180,8 @@ export function CriteriosMultiSelect({
             </button>
           </div>
 
-          <div className="criterios-multiselect-options">
-            {availableCriterios.map((criterio) => {
+          <div className="criterios-multiselect-options" role="group">
+            {availableCriterios.map((criterio, index) => {
               const criterioId = criterio.id;
               if (!criterioId) return null;
               const isChecked = value.includes(criterioId);
@@ -170,6 +195,7 @@ export function CriteriosMultiSelect({
                     checked={isChecked}
                     className="criterios-multiselect-checkbox"
                     onChange={() => toggleCriterion(criterioId)}
+                    onKeyDown={(e) => handleOptionKeyDown(e, index)}
                     type="checkbox"
                   />
                   <span className="criterios-multiselect-option-name">
