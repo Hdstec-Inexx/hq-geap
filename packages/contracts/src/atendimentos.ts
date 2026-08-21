@@ -358,6 +358,12 @@ export const atendimentoListSchema = z.object({
   total: z.number().int().min(0)
 });
 
+export const MOTIVO_NAO_INFORMADO = 'Não informado';
+
+export function normalizeMotivo(motivo: string): string {
+  return motivo === 'Nao informado' ? MOTIVO_NAO_INFORMADO : motivo;
+}
+
 export const motivosAtendimentosSchema = z.array(z.string());
 
 /** Dimensão do Detalhamento do Indicador (Dashboard → lista filtrada). */
@@ -374,11 +380,26 @@ export const detalhamentoIndicadorSchema = z.enum([
   'tempo_resolucao',
   'motivo',
   'criterio',
+  'criterio_nao_atendido',
   'concordancia_nota',
   'concordancia_criterio'
 ]);
 
 const isoDateSchema = z.iso.date();
+
+export const criteriosQueryFilterSchema = z.preprocess((val) => {
+  if (val === undefined || val === null || val === '') return undefined;
+  const items = Array.isArray(val)
+    ? val.flatMap((v) => (typeof v === 'string' ? v.split(',') : v))
+    : typeof val === 'string'
+      ? val.split(',')
+      : [];
+  const normalized = items
+    .map((v) => (typeof v === 'string' ? v.trim() : v))
+    .filter((v): v is string => typeof v === 'string' && v.length > 0);
+  if (normalized.length === 0) return undefined;
+  return Array.from(new Set(normalized));
+}, z.array(z.uuid()).optional());
 
 export const atendimentosQuerySchema = z
   .object({
@@ -391,7 +412,9 @@ export const atendimentosQuerySchema = z
     motivo: z.string().trim().min(1).max(200).optional(),
     criterioId: z.uuid().optional(),
     curadoriaStatus: curadoriaStatusFilterSchema.optional(),
-    curadorId: z.uuid().optional()
+    curadorId: z.uuid().optional(),
+    criteriosNaoAtendidos: criteriosQueryFilterSchema,
+    criteriosAtendidos: criteriosQueryFilterSchema
   })
   .superRefine((query, ctx) => {
     if (query.indicador !== undefined && (!query.inicio || !query.fim)) {
@@ -440,6 +463,7 @@ export const atendimentosQuerySchema = z
     }
     if (
       (query.indicador === 'criterio' ||
+        query.indicador === 'criterio_nao_atendido' ||
         query.indicador === 'concordancia_criterio') &&
       !query.criterioId
     ) {

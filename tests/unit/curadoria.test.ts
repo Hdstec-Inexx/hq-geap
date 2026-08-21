@@ -155,16 +155,30 @@ test('filtros da Fila de Curadoria fixam dia civil America/Sao_Paulo e motivo', 
   );
   assert.match(
     comMotivo.clauses.join(' and '),
-    /coalesce\(a\.motivo_contato, 'Nao informado'\) = \$3/
+    /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$3/
   );
   assert.deepEqual(comMotivo.values, [
     '2025-01-01',
     '2025-01-31',
     'Rede credenciada'
   ]);
+
+  const comMotivoNaoInformadoSemAcento = buildFilaCuradoriaFilters(
+    {
+      motivo: 'Nao informado'
+    },
+    1
+  );
+  assert.match(
+    comMotivoNaoInformadoSemAcento.clauses.join(' and '),
+    /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$1/
+  );
+  assert.deepEqual(comMotivoNaoInformadoSemAcento.values, [
+    'Não informado'
+  ]);
 });
 
-test('listDistinctMotivos retorna motivos distintos e ordenados', async () => {
+test('listDistinctMotivos retorna motivos distintos e ordenados incluindo Nao informado canônico', async () => {
   const { createAtendimentosRepository } = await import(
     '../../apps/api/src/modules/atendimentos/repository.js'
   );
@@ -177,6 +191,7 @@ test('listDistinctMotivos retorna motivos distintos e ordenados', async () => {
         rows: [
           { motivo: 'Cancelamento' },
           { motivo: 'Financeiro/Boletos' },
+          { motivo: 'Não informado' },
           { motivo: 'Rede credenciada' }
         ]
       };
@@ -188,10 +203,14 @@ test('listDistinctMotivos retorna motivos distintos e ordenados', async () => {
   assert.deepEqual(motivos, [
     'Cancelamento',
     'Financeiro/Boletos',
+    'Não informado',
     'Rede credenciada'
   ]);
-  assert.match(executedSql, /distinct motivo_contato/i);
-  assert.match(executedSql, /order by motivo_contato/i);
+  assert.match(
+    executedSql,
+    /coalesce\(nullif\(nullif\(trim\(motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) as motivo/i
+  );
+  assert.match(executedSql, /order by motivo/i);
 });
 
 test('curadoresListSchema valida lista de curadores com id e nome', async () => {
@@ -342,7 +361,7 @@ test('buildCuradoriasRealizadasFilters aplica filtros de data, motivo e curadorI
   );
   assert.match(
     filters.clauses.join(' and '),
-    /coalesce\(a\.motivo_contato, 'Nao informado'\) = \$3/
+    /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$3/
   );
   assert.match(
     filters.clauses.join(' and '),
@@ -355,6 +374,43 @@ test('buildCuradoriasRealizadasFilters aplica filtros de data, motivo e curadorI
     '33333333-3333-4333-8333-333333333333'
   ]);
 });
+
+test('buildCuradoriasRealizadasFilters suporta criteriosAtendidos e criteriosNaoAtendidos com conjuncao AND para Curador', async () => {
+  const { buildCuradoriasRealizadasFilters } = await import(
+    '../../apps/api/src/modules/curadoria/repository.js'
+  );
+
+  const filters = buildCuradoriasRealizadasFilters(
+    {
+      criteriosAtendidos: ['11111111-1111-4111-8111-111111111111'],
+      criteriosNaoAtendidos: [
+        '22222222-2222-4222-8222-222222222222',
+        '33333333-3333-4333-8333-333333333333'
+      ]
+    },
+    1
+  );
+
+  assert.equal(filters.clauses.length, 3);
+  assert.match(
+    filters.clauses[0]!,
+    /acc\.avaliacao_curador_id = cur\.id\s+and\s+acc\.criterio_id = \$1::uuid\s+and\s+acc\.estado = 'atendido'/
+  );
+  assert.match(
+    filters.clauses[1]!,
+    /acc\.avaliacao_curador_id = cur\.id\s+and\s+acc\.criterio_id = \$2::uuid\s+and\s+acc\.estado = 'nao_atendido'/
+  );
+  assert.match(
+    filters.clauses[2]!,
+    /acc\.avaliacao_curador_id = cur\.id\s+and\s+acc\.criterio_id = \$3::uuid\s+and\s+acc\.estado = 'nao_atendido'/
+  );
+  assert.deepEqual(filters.values, [
+    '11111111-1111-4111-8111-111111111111',
+    '22222222-2222-4222-8222-222222222222',
+    '33333333-3333-4333-8333-333333333333'
+  ]);
+});
+
 
 test('toCuradoriaRealizadaItem mapeia campos da linha do banco', async () => {
   const { toCuradoriaRealizadaItem } = await import(
@@ -389,5 +445,156 @@ test('toCuradoriaRealizadaItem mapeia campos da linha do banco', async () => {
     realizadaEm: '2025-01-15T14:00:00.000Z'
   });
 });
+
+test('criterioCuradoriaSchema valida descricao obrigatoria no contrato (string ou null)', async () => {
+  const { criterioCuradoriaSchema } = await import(
+    '../../packages/contracts/src/curadoria.js'
+  );
+
+  const comDescricao = {
+    chave: 'saudacao_e_intencao',
+    nome: 'Saudação e Intenção',
+    descricao: 'Cumprimentou e identificou a intenção inicial do cliente?',
+    estado: 'atendido' as const,
+    valor: 1.0,
+    critico: false,
+    condicional: false,
+    ordem: 1
+  };
+  const parsed = criterioCuradoriaSchema.parse(comDescricao);
+  assert.equal(parsed.descricao, 'Cumprimentou e identificou a intenção inicial do cliente?');
+
+  const comDescricaoNula = {
+    ...comDescricao,
+    descricao: null
+  };
+  const parsedNulo = criterioCuradoriaSchema.parse(comDescricaoNula);
+  assert.equal(parsedNulo.descricao, null);
+});
+
+test('toCuradoriaDetail preserva descricao da Regua no checklist da IA e do Curador', async () => {
+  const { toCuradoriaDetail } = await import(
+    '../../apps/api/src/modules/curadoria/service.js'
+  );
+
+  const detail = toCuradoriaDetail(
+    {
+      id: '11111111-1111-4111-8111-111111111111',
+      conversationId: 'conv-123',
+      agenteVozId: '22222222-2222-4222-8222-222222222222',
+      agenteVozNome: 'Livia',
+      agentId: 'agent-livia',
+      status: 'concluido',
+      iniciadoEm: new Date('2025-01-15T12:00:00.000Z'),
+      concluidoEm: new Date('2025-01-15T12:01:00.000Z'),
+      duracaoSegundos: 60,
+      motivoContato: 'Cancelamento',
+      houveTransferencia: false,
+      custo: null,
+      eventTimestamp: null,
+      curadorId: null,
+      curadorNome: null,
+      curadoriaNota: null,
+      curadoriaRealizadaEm: null,
+      transcricao: [],
+      audioReference: null,
+      avaliacaoIa: {
+        id: '33333333-3333-4333-8333-333333333333',
+        atendimentoId: '11111111-1111-4111-8111-111111111111',
+        nota: '9.50',
+        notaQualidade: '9.50',
+        atendimentoAprovado: true,
+        falhasIdentificadas: [],
+        resumoAtendimento: 'Atendimento correto.',
+        promptVersao: 1,
+        criadoEm: new Date('2025-01-15T12:01:05.000Z'),
+        saudacaoEIntencao: true,
+        solicitouCpf: true,
+        informouProtocoloEmail: true,
+        resolveuSolicitacao: true,
+        validouEmailPorExtenso: true,
+        semDiminutivos: true,
+        encerramentoGeap: true,
+        usoCorretoFerramentas: true,
+        checklist: [
+          {
+            criterioId: '44444444-4444-4444-8444-444444444444',
+            chave: 'saudacao_e_intencao',
+            nome: 'Saudação e Intenção',
+            descricao: 'Cumprimentou e identificou a intenção inicial do cliente?',
+            estado: 'atendido',
+            valor: '1.00',
+            critico: false,
+            condicional: false,
+            ordem: 1
+          }
+        ]
+      },
+      historico: [
+        {
+          id: '55555555-5555-4555-8555-555555555555',
+          atendimentoId: '11111111-1111-4111-8111-111111111111',
+          avaliacaoIaId: '33333333-3333-4333-8333-333333333333',
+          autorId: '66666666-6666-4666-8666-666666666666',
+          autorNome: 'Caio Curador',
+          nota: '9.50',
+          falhasIdentificadas: [],
+          resumoAtendimento: 'Conferido.',
+          notaAvaliacaoIa: '9.50',
+          comentario: null,
+          criadoEm: new Date('2025-01-15T12:02:00.000Z'),
+          checklist: [
+            {
+              criterioId: '44444444-4444-4444-8444-444444444444',
+              chave: 'saudacao_e_intencao',
+              nome: 'Saudação e Intenção',
+              descricao: 'Cumprimentou e identificou a intenção inicial do cliente?',
+              estado: 'atendido',
+              valor: '1.00',
+              critico: false,
+              condicional: false,
+              ordem: 1
+            }
+          ]
+        }
+      ]
+    },
+    null
+  );
+
+  assert.equal(
+    detail.avaliacaoIa.checklist[0]?.descricao,
+    'Cumprimentou e identificou a intenção inicial do cliente?'
+  );
+  assert.equal(
+    detail.historico[0]?.checklist[0]?.descricao,
+    'Cumprimentou e identificou a intenção inicial do cliente?'
+  );
+});
+
+test('styles.css corrige layout de review-checklist legend e define tooltip flutuante', async () => {
+  const fs = await import('node:fs/promises');
+  const { fileURLToPath } = await import('node:url');
+  const cssPath = fileURLToPath(
+    new URL('../../apps/web/src/styles.css', import.meta.url)
+  );
+  const css = await fs.readFile(cssPath, 'utf8');
+
+  // Deve usar display: contents no legend e flex no wrapper interno para manter legend e options lado a lado no grid
+  assert.match(
+    css,
+    /\.review-checklist\s+legend\s*\{[^}]*display:\s*contents/s,
+    'review-checklist legend deve usar display: contents'
+  );
+  assert.match(
+    css,
+    /\.criterion-legend-content\s*\{[^}]*display:\s*(inline-flex|flex)/s,
+    'criterion-legend-content deve usar flex/inline-flex para agrupar nome e tag critico'
+  );
+  // Deve ter estilos para o custom tooltip e seu indicador de seta
+  assert.match(css, /\.criterion-tooltip\b/);
+  assert.match(css, /\.criterion-tooltip-arrow\b/);
+});
+
 
 

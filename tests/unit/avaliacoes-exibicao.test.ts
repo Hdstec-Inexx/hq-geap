@@ -64,6 +64,86 @@ test('AvaliacaoCuradorPanel nao renderiza mensagem de placeholder nem cards vazi
   );
 });
 
+test('AvaliacaoCuradorPanel delimita bloco superior com scroll e renderiza comentario abaixo da grade de criterios', async () => {
+  const code = await readFile(curadorPanelPath, 'utf8');
+
+  // Bloco superior deve ter container de scroll para resumo e falhas
+  assert.match(
+    code,
+    /avaliacao-curador-top-scroll/,
+    'AvaliacaoCuradorPanel deve aplicar a classe avaliacao-curador-top-scroll no bloco superior'
+  );
+
+  // Comentário da revisão deve ter container dedicado com scroll
+  assert.match(
+    code,
+    /avaliacao-curador-comentario/,
+    'AvaliacaoCuradorPanel deve aplicar a classe avaliacao-curador-comentario no container do comentário'
+  );
+  assert.match(
+    code,
+    /avaliacao-comentario-scroll/,
+    'AvaliacaoCuradorPanel deve aplicar a classe avaliacao-comentario-scroll no parágrafo do comentário'
+  );
+  assert.match(
+    code,
+    /Comentário da revisão/,
+    'AvaliacaoCuradorPanel deve exibir label Comentário da revisão'
+  );
+
+  // Ordem do DOM: o bloco superior vem antes da checklist e o comentário vem depois da checklist
+  const topIndex = code.indexOf('avaliacao-curador-top-scroll');
+  const checklistIndex = code.indexOf('avaliacao-checklist');
+  const comentarioIndex = code.indexOf('avaliacao-curador-comentario');
+
+  assert.ok(topIndex !== -1, 'avaliacao-curador-top-scroll deve existir');
+  assert.ok(checklistIndex !== -1, 'avaliacao-checklist deve existir');
+  assert.ok(comentarioIndex !== -1, 'avaliacao-curador-comentario deve existir');
+  assert.ok(
+    topIndex < checklistIndex,
+    'Bloco superior de resumo/falhas deve vir antes da grade de critérios'
+  );
+  assert.ok(
+    checklistIndex < comentarioIndex,
+    'Comentário da revisão deve ser renderizado abaixo da grade de critérios'
+  );
+});
+
+test('styles.css define limites de altura e barras de rolagem para bloco superior e comentario do Curador', async () => {
+  const css = await readFile(stylesPath, 'utf8');
+
+  assert.match(
+    css,
+    /\.avaliacao-curador-top-scroll[^}]*max-height:\s*200px;/s,
+    'styles.css deve ter max-height: 200px para .avaliacao-curador-top-scroll'
+  );
+  assert.match(
+    css,
+    /\.avaliacao-curador-top-scroll[^}]*overflow-y:\s*auto;/s,
+    'styles.css deve ter overflow-y: auto para .avaliacao-curador-top-scroll'
+  );
+  assert.match(
+    css,
+    /\.avaliacao-comentario-scroll[^}]*max-height:\s*200px;/s,
+    'styles.css deve ter max-height: 200px para .avaliacao-comentario-scroll'
+  );
+  assert.match(
+    css,
+    /\.avaliacao-comentario-scroll[^}]*overflow-y:\s*auto;/s,
+    'styles.css deve ter overflow-y: auto para .avaliacao-comentario-scroll'
+  );
+  assert.match(
+    css,
+    /\.avaliacao-curador-top-scroll::-webkit-scrollbar/s,
+    'styles.css deve definir ::-webkit-scrollbar para .avaliacao-curador-top-scroll'
+  );
+  assert.match(
+    css,
+    /\.avaliacao-comentario-scroll::-webkit-scrollbar/s,
+    'styles.css deve definir ::-webkit-scrollbar para .avaliacao-comentario-scroll'
+  );
+});
+
 test('styles.css expande a Avaliacao da IA para 100% da largura quando for o unico painel no container', async () => {
   const css = await readFile(stylesPath, 'utf8');
 

@@ -1011,9 +1011,34 @@ test('filtros SQL do Detalhamento espelham populacoes positivas do Dashboard', a
   );
   assert.match(
     motivo.clauses.join(' '),
-    /coalesce\(a\.motivo_contato, 'Nao informado'\) = \$3/
+    /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$3/
   );
   assert.equal(motivo.values[2], 'Rede credenciada');
+
+  const motivoNaoInformado = buildDetalhamentoFilters(
+    atendimentosQuerySchema.parse({
+      inicio: '2025-01-01',
+      fim: '2025-01-31',
+      indicador: 'motivo',
+      motivo: 'Não informado'
+    })
+  );
+  assert.match(
+    motivoNaoInformado.clauses.join(' '),
+    /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$3/
+  );
+  assert.equal(motivoNaoInformado.values[2], 'Não informado');
+
+  const motivoSemAcentoNormalizado = buildDetalhamentoFilters(
+    atendimentosQuerySchema.parse({
+      motivo: 'Nao informado'
+    })
+  );
+  assert.match(
+    motivoSemAcentoNormalizado.clauses.join(' '),
+    /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$1/
+  );
+  assert.equal(motivoSemAcentoNormalizado.values[0], 'Não informado');
 
   const generalMotivo = buildDetalhamentoFilters(
     atendimentosQuerySchema.parse({
@@ -1022,7 +1047,7 @@ test('filtros SQL do Detalhamento espelham populacoes positivas do Dashboard', a
   );
   assert.match(
     generalMotivo.clauses.join(' '),
-    /coalesce\(a\.motivo_contato, 'Nao informado'\) = \$1/
+    /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$1/
   );
   assert.equal(generalMotivo.values[0], 'Financeiro/Boletos');
 
@@ -1281,5 +1306,42 @@ test('filtros SQL suportam curadoriaStatus e curadorId', async () => {
   assert.match(curador.clauses.join(' '), /cur\.autor_usuario_id = \$1/);
   assert.deepEqual(curador.values, ['11111111-1111-4111-8111-111111111111']);
 });
+
+test('filtros SQL suportam criteriosAtendidos e criteriosNaoAtendidos com conjuncao AND para IA', async () => {
+  const { buildDetalhamentoFilters } = await import(
+    '../../apps/api/src/modules/atendimentos/detalhamentoFilters.js'
+  );
+
+  const filtro = buildDetalhamentoFilters(
+    atendimentosQuerySchema.parse({
+      criteriosAtendidos: [
+        '11111111-1111-4111-8111-111111111111',
+        '22222222-2222-4222-8222-222222222222'
+      ],
+      criteriosNaoAtendidos: ['33333333-3333-4333-8333-333333333333']
+    }),
+    1
+  );
+
+  assert.equal(filtro.clauses.length, 3);
+  assert.match(
+    filtro.clauses[0]!,
+    /ac\.criterio_id = \$1::uuid\s+and\s+ac\.estado = 'atendido'/
+  );
+  assert.match(
+    filtro.clauses[1]!,
+    /ac\.criterio_id = \$2::uuid\s+and\s+ac\.estado = 'atendido'/
+  );
+  assert.match(
+    filtro.clauses[2]!,
+    /ac\.criterio_id = \$3::uuid\s+and\s+ac\.estado = 'nao_atendido'/
+  );
+  assert.deepEqual(filtro.values, [
+    '11111111-1111-4111-8111-111111111111',
+    '22222222-2222-4222-8222-222222222222',
+    '33333333-3333-4333-8333-333333333333'
+  ]);
+});
+
 
 

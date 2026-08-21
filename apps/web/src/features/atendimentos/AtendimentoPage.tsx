@@ -15,6 +15,7 @@ import {
   useAudioPlayer
 } from '../player';
 import { formatDuration, useAuthenticatedResource } from './api';
+import { formatMotivoContato } from './motivo-combobox-logic';
 
 const currency = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
@@ -98,7 +99,7 @@ export function AtendimentoPage() {
       </header>
 
       <section className="atendimento-facts" aria-label="Dados do Atendimento">
-        <div><span>Motivo de Contato</span><strong>{atendimento.motivoContato ?? 'Não informado'}</strong></div>
+        <div><span>Motivo de Contato</span><strong>{formatMotivoContato(atendimento.motivoContato)}</strong></div>
         <div><span>Duração</span><strong>{formatDuration(atendimento.duracaoSegundos)}</strong></div>
         <div><span>Transferência</span><strong>{atendimento.houveTransferencia ? 'Realizada' : 'Não realizada'}</strong></div>
         {atendimento.custo !== undefined ? <div><span>Custo</span><strong>{atendimento.custo === null ? 'Não disponível' : currency.format(atendimento.custo)}</strong></div> : null}

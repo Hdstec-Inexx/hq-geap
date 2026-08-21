@@ -1,9 +1,23 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import {
   criterioSchema,
   reguaAvaliacaoSchema
 } from '../../packages/contracts/src/criterios.js';
+
+const apiRoutesPath = new URL(
+  '../../apps/api/src/modules/criterios/routes.ts',
+  import.meta.url
+);
+const routerPath = new URL(
+  '../../apps/web/src/app/router.tsx',
+  import.meta.url
+);
+const pagePath = new URL(
+  '../../apps/web/src/features/admin/criterios/CriteriosPage.tsx',
+  import.meta.url
+);
 
 const reguaValida = {
   vigente: true,
@@ -134,3 +148,40 @@ test('rejeita Criterio com valor negativo', () => {
     false
   );
 });
+
+test('API routes de criterios autoriza todos os papeis autenticados (admin, gestao, curador)', async () => {
+  const content = await readFile(apiRoutesPath, 'utf8');
+
+  assert.match(content, /\/admin\/criterios/);
+  assert.match(content, /roles:\s*\[[^\]]*'admin'[^\]]*'gestao'[^\]]*'curador'[^\]]*\]/);
+});
+
+test('router.tsx registra /admin/criterios no nivel da casca autenticada para todos os papeis', async () => {
+  const content = await readFile(routerPath, 'utf8');
+
+  assert.match(content, /path:\s*'\/admin\/criterios',\s*element:\s*<CriteriosRoute\s*\/>/);
+  // Ensure it's not nested inside RequireRole roles={['admin']}
+  const adminSectionMatch = content.match(/RequireRole\s+roles=\{\['admin'\]\}[\s\S]*?<\/RequireRole>|RequireRole\s+roles=\{\['admin'\]\}[\s\S]*?children:\s*\[([\s\S]*?)\]\s*\}/);
+  if (adminSectionMatch && adminSectionMatch[1]) {
+    assert.doesNotMatch(adminSectionMatch[1], /\/admin\/criterios/);
+  }
+});
+
+test('CriteriosPage nao exibe mensagem tecnica de rodape sobre snapshots e alteracoes por codigo', async () => {
+  const content = await readFile(pagePath, 'utf8');
+
+  assert.doesNotMatch(content, /snapshots de Avaliações anteriores/);
+  assert.doesNotMatch(content, /criteria-footnote/);
+});
+
+test('criterioSchema aceita id uuid opcional', () => {
+  const parsed = criterioSchema.safeParse({
+    ...reguaValida.criterios[0]!,
+    id: '11111111-1111-4111-8111-111111111111'
+  });
+  assert.equal(parsed.success, true);
+  if (parsed.success) {
+    assert.equal(parsed.data.id, '11111111-1111-4111-8111-111111111111');
+  }
+});
+

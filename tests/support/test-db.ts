@@ -1,4 +1,5 @@
 import { readdir, readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { ensureMinioTestAudio } from './audio-fixture.js';
@@ -8,13 +9,13 @@ const { Client } = pg;
 const rootDirectory = fileURLToPath(new URL('../..', import.meta.url));
 
 async function runSqlDirectory(client: pg.Client, directory: string) {
-  const path = `${rootDirectory}/db/${directory}`;
-  const files = (await readdir(path))
+  const dirPath = path.join(rootDirectory, 'db', directory);
+  const files = (await readdir(dirPath))
     .filter((name) => name.endsWith('.sql'))
     .sort();
 
   for (const file of files) {
-    await client.query(await readFile(`${path}/${file}`, 'utf8'));
+    await client.query(await readFile(path.join(dirPath, file), 'utf8'));
   }
 }
 
@@ -34,8 +35,11 @@ export default async function prepareTestDatabase() {
       throw new Error('Refusing to reset a database whose name does not end in _test');
     }
 
-    await client.query('drop schema public cascade');
+    await client.query('drop extension if exists "pgcrypto" cascade');
+    await client.query('drop schema if exists public cascade');
     await client.query('create schema public');
+    await client.query('create extension if not exists "pgcrypto"');
+    await client.query('set search_path to public');
     await runSqlDirectory(client, 'migrations');
     await runSqlDirectory(client, 'seeds');
     for (const user of authUsers) {

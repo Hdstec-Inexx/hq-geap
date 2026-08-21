@@ -174,6 +174,21 @@ test.describe.serial('Dashboard da Gestao', () => {
       estadoCurador: 'nao_atendido'
     });
     await createDashboardAtendimento({
+      conversationId: 'conv-dashboard-3',
+      concluidoEm: '2025-01-25T12:00:00Z',
+      duracao: 60,
+      tme: 30,
+      toolsTotal: 1,
+      toolsSuccessful: 1,
+      motivo: 'Financeiro / Boletos',
+      transferencia: false,
+      custo: 1.5,
+      notaIa: 4,
+      notaCurador: 4,
+      estadoIa: 'nao_atendido',
+      estadoCurador: 'nao_atendido'
+    });
+    await createDashboardAtendimento({
       conversationId: 'conv-dashboard-fora-periodo',
       concluidoEm: '2025-02-01T12:00:00Z',
       duracao: 900,
@@ -199,53 +214,59 @@ test.describe.serial('Dashboard da Gestao', () => {
     const dashboard = await response.json();
     expect(dashboard.periodo).toEqual({ inicio: '2025-01-01', fim: '2025-01-31' });
     expect(dashboard.kpis).toEqual({
-      volume: 2,
-      tmaSegundos: 90,
-      taxaResolvidas: 50,
-      sla: 50,
+      volume: 3,
+      tmaSegundos: 80,
+      taxaResolvidas: 66.7,
+      sla: 66.7,
       slaMeta: 80,
-      notaMediaIa: 7,
-      notaMediaCurador: 6.5,
-      avaliadosIa: 2,
-      avaliadosCurador: 2,
-      taxaPromessasCumpridas: 66.7,
+      notaMediaIa: 6,
+      notaMediaCurador: 5.67,
+      avaliadosIa: 3,
+      avaliadosCurador: 3,
+      taxaPromessasCumpridas: 75,
       tempoMedioAteResolucao: 60
     });
     expect(dashboard.motivosContato).toEqual([
-      { motivo: 'Financeiro / Boletos', total: 1 },
+      { motivo: 'Financeiro / Boletos', total: 2 },
       { motivo: 'Rede credenciada', total: 1 }
     ]);
     expect(dashboard.criterios).toContainEqual(
       expect.objectContaining({
         chave: 'validou_email_por_extenso',
         atendidos: 1,
-        avaliados: 1,
-        percentualAcerto: 100
+        avaliados: 2,
+        percentualAcerto: 50
+      })
+    );
+    expect(dashboard.criteriosNaoConformidade).toContainEqual(
+      expect.objectContaining({
+        chave: 'validou_email_por_extenso',
+        total: 1
       })
     );
     expect(dashboard.concordancia.nota).toEqual({
-      concordantes: 1,
-      total: 2,
-      percentual: 50
+      concordantes: 2,
+      total: 3,
+      percentual: 66.7
     });
     expect(dashboard.concordancia.criterios).toEqual({
-      concordantes: 1,
-      total: 2,
-      percentual: 50
+      concordantes: 2,
+      total: 3,
+      percentual: 66.7
     });
     expect(dashboard.concordancia.porCriterio).toContainEqual(
       expect.objectContaining({
         chave: 'validou_email_por_extenso',
-        concordantes: 1,
-        total: 2,
-        percentual: 50
+        concordantes: 2,
+        total: 3,
+        percentual: 66.7
       })
     );
     expect(dashboard.pioresAtendimentos[0]).toEqual(
       expect.objectContaining({
-        conversationId: 'conv-dashboard-2',
-        notaIa: 6,
-        notaCurador: 5
+        conversationId: 'conv-dashboard-3',
+        notaIa: 4,
+        notaCurador: 4
       })
     );
   });
@@ -295,12 +316,14 @@ test.describe.serial('Dashboard da Gestao', () => {
     await expect(page.getByText('Tempo Médio até Resolução', { exact: true })).toBeVisible();
     await expect(page.getByText('Transferências')).toHaveCount(0);
     await expect(page.getByText('Custo total')).toHaveCount(0);
-    await expect(page.getByText('2', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('3', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Financeiro / Boletos').first()).toBeVisible();
     await expect(page.getByText('Concordância')).toBeVisible();
     await expect(page.getByLabel('Gráfico de Motivos de Contato')).toBeVisible();
     await expect(page.getByLabel('Gráfico de acerto por Critério')).toBeVisible();
     await expect(page.getByLabel('Gráfico de Concordância por Critério')).toBeVisible();
+    await expect(page.getByLabel('Gráfico de Critérios de Não Conformidade')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Critérios de Não Conformidade' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Piores Atendimentos' })).toBeVisible();
     await expect(page.locator('.piores-panel canvas')).toHaveCount(0);
     await expect(page.getByRole('button', { name: /salvar|editar|excluir/i })).toHaveCount(0);
@@ -330,7 +353,7 @@ test.describe.serial('Dashboard da Gestao', () => {
       /\/atendimentos\?.*inicio=2025-01-01.*fim=2025-01-31.*indicador=resolvidas/
     );
     await expect(page.getByText('Detalhamento do Indicador')).toBeVisible();
-    await expect(page.getByText('Financeiro / Boletos')).toBeVisible();
+    await expect(page.getByText('Financeiro / Boletos').first()).toBeVisible();
     await expect(page.getByText('Rede credenciada')).toHaveCount(0);
 
     const list = await request.get(
@@ -342,7 +365,7 @@ test.describe.serial('Dashboard da Gestao', () => {
       items: Array<{ motivoContato: string; houveTransferencia: boolean }>;
       total: number;
     };
-    expect(body.items).toHaveLength(1);
+    expect(body.items).toHaveLength(2);
     expect(body.items[0]!.motivoContato).toBe('Financeiro / Boletos');
     expect(body.items[0]!.houveTransferencia).toBe(false);
 
@@ -370,7 +393,7 @@ test.describe.serial('Dashboard da Gestao', () => {
     await page.getByRole('link', { name: 'Detalhar SLA' }).click();
     await expect(page).toHaveURL(/indicador=sla/);
     await expect(page.getByText('Detalhamento do Indicador')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Financeiro / Boletos' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Financeiro / Boletos' }).first()).toBeVisible();
     await expect(page.getByRole('link', { name: 'Rede credenciada' })).toHaveCount(0);
 
     const tmeQuery = await request.get(
@@ -384,7 +407,7 @@ test.describe.serial('Dashboard da Gestao', () => {
     expect(tmeQuery.status()).toBe(400);
     expect(slaList.status()).toBe(200);
     const slaBody = (await slaList.json()) as { items: unknown[] };
-    expect(slaBody.items).toHaveLength(1);
+    expect(slaBody.items).toHaveLength(2);
   });
 
   test('clique no Motivo de Contato navega com a populacao correta', async ({
@@ -426,6 +449,25 @@ test.describe.serial('Dashboard da Gestao', () => {
     await expect(page).toHaveURL(/inicio=2025-01-01/);
     await expect(page).toHaveURL(/fim=2025-01-31/);
     await expect(page.getByText('Detalhamento do Indicador')).toBeVisible();
+    await expect(page.locator('.atendimento-row')).toHaveCount(2);
+  });
+
+  test('clique no Critério de Não Conformidade navega com a populacao correta', async ({
+    page,
+    request
+  }) => {
+    const gestao = await loginApi(request, 'gestao');
+    await loginPage(page, 'gestao');
+    await page.goto('/gestao/dashboard?inicio=2025-01-01&fim=2025-01-31');
+
+    await page
+      .locator('.criterios-nao-conformidade-panel .motivos-legend a')
+      .first()
+      .click();
+    await expect(page).toHaveURL(/indicador=criterio_nao_atendido/);
+    await expect(page).toHaveURL(/criterioId=/);
+    await expect(page).toHaveURL(/inicio=2025-01-01/);
+    await expect(page.getByText('Detalhamento do Indicador')).toBeVisible();
     await expect(page.locator('.atendimento-row')).toHaveCount(1);
   });
 
@@ -447,7 +489,7 @@ test.describe.serial('Dashboard da Gestao', () => {
     );
     expect(iaList.status()).toBe(200);
     const iaBody = (await iaList.json()) as { total: number };
-    expect(iaBody.total).toBe(2);
+    expect(iaBody.total).toBe(3);
 
     await page.goto('/gestao/dashboard?inicio=2025-01-01&fim=2025-01-31');
     await page.getByRole('link', { name: 'Detalhar Atendimentos Avaliados Curador' }).click();
@@ -460,6 +502,6 @@ test.describe.serial('Dashboard da Gestao', () => {
     );
     expect(curadorList.status()).toBe(200);
     const curadorBody = (await curadorList.json()) as { total: number };
-    expect(curadorBody.total).toBe(2);
+    expect(curadorBody.total).toBe(3);
   });
 });

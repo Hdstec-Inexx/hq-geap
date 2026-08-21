@@ -55,11 +55,17 @@ export function AvaliacaoIaPanel({ atendimentoId }: { atendimentoId: string }) {
         </div>
         <div>
           <p className="panel-label">Falhas identificadas</p>
-          {avaliacao.falhasIdentificadas.length === 0 ? (
-            <p>Nenhuma falha identificada.</p>
-          ) : (
-            <ul>{avaliacao.falhasIdentificadas.map((falha) => <li key={falha}>{falha}</li>)}</ul>
-          )}
+          <div className="avaliacao-falhas-scroll">
+            {avaliacao.falhasIdentificadas.length === 0 ? (
+              <p>Nenhuma falha identificada.</p>
+            ) : (
+              <ul>
+                {avaliacao.falhasIdentificadas.map((falha) => (
+                  <li key={falha}>{falha}</li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       </div>
     </section>

@@ -621,6 +621,17 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       },
       headers: ingestionHeaders
     });
+    await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: {
+        ...atendimento,
+        conversation_id: 'conv-filtro-atend-3',
+        contact_reason: null,
+        status: 'concluido',
+        completed_at: '2026-08-18T16:00:00.000Z',
+        duration_seconds: 90
+      },
+      headers: ingestionHeaders
+    });
 
     await page.goto('/login');
     await page.getByLabel('E-mail').fill('gestao@hq.test');
@@ -643,6 +654,17 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await page.getByRole('button', { name: 'Filtrar' }).click();
     await expect(page).toHaveURL(/motivo=Rede\+Credenciada|motivo=Rede%20Credenciada/);
     await expect(page.getByText('Rede Credenciada')).toBeVisible();
+
+    // Filtro pelo motivo canônico Não informado
+    await motivoCombobox.click();
+    await motivoCombobox.fill('nao');
+    await expect(page.getByRole('option', { name: 'Não informado' })).toBeVisible();
+    await page.getByRole('option', { name: 'Não informado' }).click();
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page).toHaveURL(/motivo=N%C3%A3o(\+|%20)informado|motivo=Nao(\+|%20)informado/);
+    await expect(page.getByRole('link', { name: 'Não informado' })).toBeVisible();
+    await expect(page.getByText('Boleto/Pagamento')).toHaveCount(0);
+    await expect(page.getByText('Rede Credenciada')).toHaveCount(0);
 
     // Limpar filtros
     await page.getByRole('button', { name: 'Limpar filtros' }).click();
@@ -932,10 +954,10 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await queryDatabase(`
       insert into avaliacoes_curador (
         atendimento_id, avaliacao_ia_id, autor_usuario_id, autor_usuario_nome,
-        nota, falhas_identificadas, nota_avaliacao_ia, resumo_atendimento
+        nota, falhas_identificadas, nota_avaliacao_ia, resumo_atendimento, comentario
       )
       select
-        $1, $2, u.id, u.nome, 9.0, '[]'::jsonb, 9.5, 'Resumo do curador'
+        $1, $2, u.id, u.nome, 9.0, '["Falha de teste do curador"]'::jsonb, 9.5, 'Resumo do curador', 'Comentário da revisão detalhado pelo curador.'
       from usuarios u where u.email = 'curador@hq.test'
     `, [comCuradoriaId, avaliacaoIaId]);
 
@@ -951,12 +973,32 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toHaveCount(0);
     await expect(page.getByText('Avaliação do Curador ainda não disponível')).toHaveCount(0);
     await expect(page.locator('.avaliacoes-lado-a-lado > .avaliacao-panel')).toHaveCount(1);
+    await expect(page.locator('.avaliacao-resumo-scroll')).toBeVisible();
+    await expect(page.locator('.avaliacao-falhas-scroll')).toBeVisible();
 
     // 2. Atendimento com curadoria: renderiza IA e Curador lado a lado
     await page.goto(`/atendimentos/${comCuradoriaId}`);
     await expect(page.getByRole('heading', { name: 'Avaliação da IA' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toBeVisible();
     await expect(page.locator('.avaliacoes-lado-a-lado > .avaliacao-panel')).toHaveCount(2);
+
+    // Painel do Curador possui bloco superior delimitado e comentário renderizado abaixo da grade
+    const curadorPanel = page.locator('.avaliacao-panel', {
+      has: page.getByRole('heading', { name: 'Avaliação do Curador' })
+    });
+    await expect(curadorPanel.locator('.avaliacao-curador-top-scroll')).toBeVisible();
+    await expect(curadorPanel.getByText('Resumo do curador')).toBeVisible();
+    await expect(curadorPanel.getByText('Falha de teste do curador')).toBeVisible();
+    await expect(curadorPanel.locator('.avaliacao-curador-comentario')).toBeVisible();
+    await expect(curadorPanel.locator('.avaliacao-comentario-scroll')).toBeVisible();
+    await expect(curadorPanel.getByText('Comentário da revisão detalhado pelo curador.')).toBeVisible();
+
+    // Valida que o comentário da revisão está visualmente abaixo do checklist
+    const checklistBox = await curadorPanel.locator('.avaliacao-checklist').boundingBox();
+    const comentarioBox = await curadorPanel.locator('.avaliacao-curador-comentario').boundingBox();
+    expect(checklistBox).not.toBeNull();
+    expect(comentarioBox).not.toBeNull();
+    expect(comentarioBox!.y).toBeGreaterThan(checklistBox!.y + checklistBox!.height - 5);
   });
 
   test('botão de download de áudio com controle de acesso para Admin e Gestão, bloqueado para Curador e indisponível sem áudio', async ({
@@ -1040,7 +1082,8 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     expect(downloadCuradoria.suggestedFilename()).toBe(`atendimento-${conversationIdWithAudio}.mp3`);
 
     // 2. Gestão acessa detalhe do atendimento e revisão de curadoria: vê botão de download e dispara download
-    await page.goto('/login');
+    await page.getByRole('button', { name: 'Sair' }).click();
+    await expect(page).toHaveURL('/login');
     await page.getByLabel('E-mail').fill('gestao@hq.test');
     await page.getByLabel('Senha').fill('senha-gestao');
     await page.getByRole('button', { name: 'Entrar' }).click();
@@ -1059,7 +1102,8 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await expect(downloadBtnGestaoCuradoria).toBeVisible();
 
     // 3. Curador acessa detalhe do atendimento e revisão de curadoria: player visível, botão de download OCULTO
-    await page.goto('/login');
+    await page.getByRole('button', { name: 'Sair' }).click();
+    await expect(page).toHaveURL('/login');
     await page.getByLabel('E-mail').fill('curador@hq.test');
     await page.getByLabel('Senha').fill('senha-curador');
     await page.getByRole('button', { name: 'Entrar' }).click();
@@ -1072,5 +1116,79 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await page.goto(`/curadoria/${atendimentoComAudioId}`);
     await expect(page.getByTestId('audio-player')).toBeVisible();
     await expect(page.getByTestId('audio-download-btn')).toHaveCount(0);
+  });
+
+  test('filtra Atendimentos combinando multiplos criterios com logica AND', async ({
+    page
+  }) => {
+    const conv1 = 'conv-crit-and-1';
+    const conv2 = 'conv-crit-and-2';
+
+    const at1Id = await createAtendimentoComTranscricao(conv1, shortTranscript);
+    const at2Id = await createAtendimentoComTranscricao(conv2, shortTranscript);
+
+    await queryDatabase(`
+      select * from persistir_avaliacao_ia(
+        $1,
+        (select id from prompts_ia_avaliadora where ativo),
+        '{"saudacao_e_intencao": true, "solicitou_cpf": false, "informou_protocolo_email": true, "resolveu_solicitacao": true, "validou_email_por_extenso": true, "sem_diminutivos": true, "encerramento_geap": true, "uso_correto_ferramentas": true}'::jsonb,
+        '["solicitou_cpf"]'::jsonb,
+        'Atendimento com falha em CPF.',
+        false,
+        8.5
+      )
+    `, [at1Id]);
+
+    await queryDatabase(`
+      select * from persistir_avaliacao_ia(
+        $1,
+        (select id from prompts_ia_avaliadora where ativo),
+        '{"saudacao_e_intencao": true, "solicitou_cpf": true, "informou_protocolo_email": false, "resolveu_solicitacao": true, "validou_email_por_extenso": true, "sem_diminutivos": true, "encerramento_geap": true, "uso_correto_ferramentas": true}'::jsonb,
+        '["informou_protocolo_email"]'::jsonb,
+        'Atendimento com falha em protocolo.',
+        false,
+        7.5
+      )
+    `, [at2Id]);
+
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('gestao@hq.test');
+    await page.getByLabel('Senha').fill('senha-gestao');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto('/atendimentos');
+
+    const triggerNaoAtendidos = page.locator('#atendimentos-criterios-nao-atendidos-filtro');
+    await triggerNaoAtendidos.click();
+    await page.locator('label.criterios-multiselect-option').filter({ hasText: 'Coleta de CPF' }).click();
+    await triggerNaoAtendidos.click();
+
+    const triggerAtendidos = page.locator('#atendimentos-criterios-atendidos-filtro');
+    await triggerAtendidos.click();
+    await page.locator('label.criterios-multiselect-option').filter({ hasText: 'Informação de Protocolo' }).click();
+    await triggerAtendidos.click();
+
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+
+    await expect(page).toHaveURL(/criteriosNaoAtendidos=/);
+    await expect(page).toHaveURL(/criteriosAtendidos=/);
+
+    await expect(page.locator(`a[href*="/atendimentos/${at1Id}"]`)).toBeVisible();
+    await expect(page.locator(`a[href*="/atendimentos/${at2Id}"]`)).toHaveCount(0);
+
+    // Se inverter o filtro de Atendidos para Coleta de CPF, conv1 não deve aparecer mais
+    await triggerAtendidos.click();
+    await page.locator('label.criterios-multiselect-option').filter({ hasText: 'Informação de Protocolo' }).click();
+    await page.locator('label.criterios-multiselect-option').filter({ hasText: 'Coleta de CPF' }).click();
+    await triggerAtendidos.click();
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+
+    await expect(page.locator(`a[href*="/atendimentos/${at1Id}"]`)).toHaveCount(0);
+    await expect(page.locator(`a[href*="/atendimentos/${at2Id}"]`)).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Limpar filtros' }).click();
+    await expect(page).toHaveURL('/atendimentos');
+    await expect(page.locator(`a[href*="/atendimentos/${at1Id}"]`)).toBeVisible();
+    await expect(page.locator(`a[href*="/atendimentos/${at2Id}"]`)).toBeVisible();
   });
 });

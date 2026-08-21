@@ -24,6 +24,7 @@ export type CriterioConferencia = {
   criterioId: string;
   chave: string;
   nome: string;
+  descricao?: string | null;
   estado: EstadoCriterio;
   valor: string;
   critico: boolean;
@@ -84,6 +85,7 @@ export function calcularConferencia(
 function checklistValues(checklist: CriterioConferencia[]) {
   return checklist.map(({ criterioId: _criterioId, ...criterio }) => ({
     ...criterio,
+    descricao: criterio.descricao ?? null,
     valor: Number(criterio.valor)
   }));
 }

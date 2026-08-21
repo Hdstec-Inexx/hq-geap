@@ -1,4 +1,8 @@
-import type { AtendimentosQuery } from '@hq-geap/contracts/atendimentos';
+import {
+  MOTIVO_NAO_INFORMADO,
+  normalizeMotivo,
+  type AtendimentosQuery
+} from '@hq-geap/contracts/atendimentos';
 import { SLA_TME_LIMITE_SEGUNDOS } from '@hq-geap/contracts/dashboards';
 
 export type DetalhamentoSql = {
@@ -6,10 +10,26 @@ export type DetalhamentoSql = {
   values: unknown[];
 };
 
+export function canonicalMotivoSql(column = 'a.motivo_contato'): string {
+  return `coalesce(nullif(nullif(trim(${column}), ''), 'Nao informado'), '${MOTIVO_NAO_INFORMADO}')`;
+}
+
 /**
  * Constrói cláusulas SQL parametrizadas para o Detalhamento do Indicador.
  * Espelha as populações do Dashboard (lado positivo nas taxas).
  */
+function buildIaCriterioClause(criterioPlaceholder: string, estado: 'atendido' | 'nao_atendido'): string {
+  return `exists (
+    select 1
+    from avaliacoes ia
+    join avaliacao_criterios ac on ac.avaliacao_id = ia.id
+    where ia.atendimento_id = a.id
+      and ia.autor = 'ia'
+      and ac.criterio_id = ${criterioPlaceholder}::uuid
+      and ac.estado = '${estado}'
+  )`;
+}
+
 export function buildDetalhamentoFilters(
   query: AtendimentosQuery,
   startIndex = 1
@@ -34,8 +54,8 @@ export function buildDetalhamentoFilters(
   }
 
   if (query.motivo && query.indicador !== 'motivo') {
-    const motivo = param(query.motivo);
-    clauses.push(`coalesce(a.motivo_contato, 'Nao informado') = ${motivo}`);
+    const motivo = param(normalizeMotivo(query.motivo));
+    clauses.push(`${canonicalMotivoSql('a.motivo_contato')} = ${motivo}`);
   }
 
   if (query.curadoriaStatus === 'realizada') {
@@ -47,6 +67,18 @@ export function buildDetalhamentoFilters(
   if (query.curadorId) {
     const curadorId = param(query.curadorId);
     clauses.push(`cur.autor_usuario_id = ${curadorId}::uuid`);
+  }
+
+  if (query.criteriosAtendidos && query.criteriosAtendidos.length > 0) {
+    for (const criterioId of query.criteriosAtendidos) {
+      clauses.push(buildIaCriterioClause(param(criterioId), 'atendido'));
+    }
+  }
+
+  if (query.criteriosNaoAtendidos && query.criteriosNaoAtendidos.length > 0) {
+    for (const criterioId of query.criteriosNaoAtendidos) {
+      clauses.push(buildIaCriterioClause(param(criterioId), 'nao_atendido'));
+    }
   }
 
   switch (query.indicador) {
@@ -88,8 +120,8 @@ export function buildDetalhamentoFilters(
       clauses.push('a.tools_sucesso > 0');
       break;
     case 'motivo': {
-      const motivo = param(query.motivo!);
-      clauses.push(`coalesce(a.motivo_contato, 'Nao informado') = ${motivo}`);
+      const motivo = param(normalizeMotivo(query.motivo!));
+      clauses.push(`${canonicalMotivoSql('a.motivo_contato')} = ${motivo}`);
       break;
     }
     case 'criterio': {
@@ -102,6 +134,19 @@ export function buildDetalhamentoFilters(
             and ia.autor = 'ia'
             and ac.criterio_id = ${criterioId}::uuid
             and ac.estado = 'atendido'
+        )`);
+      break;
+    }
+    case 'criterio_nao_atendido': {
+      const criterioId = param(query.criterioId!);
+      clauses.push(`exists (
+          select 1
+          from avaliacoes ia
+          join avaliacao_criterios ac on ac.avaliacao_id = ia.id
+          where ia.atendimento_id = a.id
+            and ia.autor = 'ia'
+            and ac.criterio_id = ${criterioId}::uuid
+            and ac.estado = 'nao_atendido'
         )`);
       break;
     }

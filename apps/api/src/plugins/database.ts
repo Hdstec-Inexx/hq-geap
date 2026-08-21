@@ -12,6 +12,9 @@ declare module 'fastify' {
 export default fp(
   async (app) => {
     const pool = new Pool({ connectionString: app.config.DATABASE_URL });
+    pool.on('error', (error) => {
+      app.log.error(error, 'Unexpected PostgreSQL idle client error');
+    });
     app.decorate('db', pool);
     app.addHook('onClose', async () => {
       await pool.end();
