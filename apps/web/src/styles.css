@@ -3662,6 +3662,10 @@ h1 {
   background: var(--dashboard-ink);
 }
 
+.criterios-nao-conformidade-panel {
+  align-self: start;
+}
+
 .concordancia-panel .dashboard-panel-kicker {
   color: var(--dashboard-mint);
 }
