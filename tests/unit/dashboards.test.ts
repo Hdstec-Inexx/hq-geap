@@ -409,11 +409,11 @@ test('styles.css mantem comparacoes de KPIs duplos lado a lado e legenda de moti
     'legenda de motivos deve usar scrollbar fina'
   );
 
-  // Valida que o painel de concordância ocupa a largura total no grid (Linha 2)
+  // Valida que o painel de critérios ocupa 2 linhas no grid ao lado de Motivos e Concordância
   assert.match(
     css,
-    /\.concordancia-panel\s*\{[^}]*grid-column:\s*(1\s*\/\s*-1|span\s+2)/i,
-    'concordancia-panel deve ocupar as 2 colunas para permitir a Linha 3 com Não Conformidades e Piores'
+    /\.criterios-panel\s*\{[^}]*grid-row:\s*span\s+2/i,
+    'criterios-panel deve ocupar 2 linhas no grid ao lado de Motivos e Concordância'
   );
 });
 

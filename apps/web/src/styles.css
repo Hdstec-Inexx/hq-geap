@@ -2074,8 +2074,8 @@ h1 {
   flex: 1 1 auto;
 }
 
-.curadoria-filters-fields label,
-.atendimentos-filters-fields label {
+.curadoria-filters-fields > label,
+.atendimentos-filters-fields > label {
   display: grid;
   gap: 6px;
   color: #45636d;
@@ -2355,11 +2355,15 @@ h1 {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 12px;
-  font-size: 0.85rem;
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 0.78rem;
+  letter-spacing: normal;
+  text-transform: none;
   color: #123b4a;
   cursor: pointer;
   user-select: none;
+  line-height: 1.3;
 }
 
 .criterios-multiselect-option:hover {
@@ -2373,19 +2377,24 @@ h1 {
 
 .criterios-multiselect-checkbox {
   margin: 0;
+  flex-shrink: 0;
   cursor: pointer;
   accent-color: #16816f;
 }
 
 .criterios-multiselect-option-name {
   flex: 1 1 auto;
+  font-size: 0.78rem;
+  white-space: normal;
+  word-break: normal;
 }
 
 .criterio-critico-tag {
+  flex-shrink: 0;
   display: inline-block;
   padding: 1px 4px;
   font-family: Consolas, monospace;
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   color: #8c261e;
@@ -3640,8 +3649,11 @@ h1 {
   font-size: 0.68rem;
 }
 
+.criterios-panel {
+  grid-row: span 2;
+}
+
 .concordancia-panel {
-  grid-column: 1 / -1;
   color: #eff9f5;
   background: var(--dashboard-ink);
 }
@@ -3769,6 +3781,10 @@ h1 {
   .dashboard-heading,
   .dashboard-grid {
     grid-template-columns: 1fr;
+  }
+
+  .criterios-panel {
+    grid-row: auto;
   }
 
   .period-filter {
