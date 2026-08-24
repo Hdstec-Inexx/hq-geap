@@ -3,25 +3,27 @@ import {
   comentariosFilaPageSchema,
   type Comentario,
   type ComentarioFila,
-  type FiltroStatusComentario,
   type StatusComentario
 } from '@hq-geap/contracts/comentarios';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { apiUrl, getSession } from '../../auth/session';
 import { ComentarioCard } from '../../comentarios/ComentarioCard';
-import { formatComentarioAtendimentoHeader } from './comentarios-fila-logic';
+import {
+  buildFilaAtendimentoHref,
+  formatComentarioAtendimentoHeader,
+  type QueueFilters
+} from './comentarios-fila-logic';
 
-export type QueueFilters = Pick<
-  FiltroStatusComentario,
-  'status' | 'inicio' | 'fim' | 'conversationId'
->;
+export type { QueueFilters };
 
 function FilaItem({
   comentario,
+  searchParams,
   onResolved
 }: {
   comentario: ComentarioFila;
+  searchParams: URLSearchParams;
   onResolved: (comentario: Comentario) => void;
 }) {
   const [saving, setSaving] = useState(false);
@@ -61,7 +63,12 @@ function FilaItem({
         <div className="manutencao-item-heading">
           <div>
             <p className="panel-label">{headerLabel}</p>
-            <Link to={`/atendimentos/${comentario.atendimento.id}`}>
+            <Link
+              to={buildFilaAtendimentoHref(
+                comentario.atendimento.id,
+                searchParams
+              )}
+            >
               {comentario.atendimento.conversationId}
             </Link>
           </div>
@@ -360,6 +367,7 @@ export function ComentariosPendentesPage() {
               comentario={comentario}
               key={comentario.id}
               onResolved={removeResolved}
+              searchParams={searchParams}
             />
           ))}
           {nextCursor ? (

@@ -1632,6 +1632,7 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     expect(realData.items.some((i) => i.conversationId === convPendente1)).toBe(true);
 
     // 5. Curadorias Realizadas via UI
+    await page.evaluate(() => window.sessionStorage.clear());
     await loginUi(page, 'gestao');
     await page.goto('/curadorias-realizadas');
 
