@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { normalizeTranscricao } from '@hq-geap/contracts/atendimentos';
 import {
   fetchElevenLabsConversation,
   findInconsistentConversationIdsQuery,
@@ -51,14 +52,25 @@ test('fetchElevenLabsConversation retorna null quando a API responde 404 ou erro
   assert.equal(result, null);
 });
 
-test('findInconsistentConversationIdsQuery gera SQL que filtra atendimentos concluidos com transcricoes invalidas ou nulas', () => {
+test('findInconsistentConversationIdsQuery gera SQL que filtra atendimentos concluidos com transcricoes invalidas, nulas ou tempos zerados em multiplos turnos', () => {
   const query = findInconsistentConversationIdsQuery();
   assert.match(query, /status = 'concluido'/i);
   assert.match(query, /transcricao is null/i);
-  assert.match(query, /historico/i);
+  assert.match(query, /jsonb_typeof\(transcricao\) != 'object'/i);
+  assert.match(query, /transcricao->'historico' is null/i);
+  assert.match(query, /jsonb_typeof\(transcricao->'historico'\) != 'array'/i);
   assert.match(query, /elevenlabs_conversation_id/i);
-  assert.match(query, /duracao_segundos/i);
   assert.match(query, /tempo_segundos/i);
+  assert.match(query, /tempo_formatado/i);
+  assert.match(query, /speaker/i);
+  assert.match(query, /message/i);
+  assert.match(query, /jsonb_array_length/i);
+  assert.match(query, /limit \$1/i);
+
+  const forceQuery = findInconsistentConversationIdsQuery({ force: true });
+  assert.match(forceQuery, /status = 'concluido'/i);
+  assert.doesNotMatch(forceQuery, /transcricao is null/i);
+  assert.match(forceQuery, /limit \$1/i);
 });
 
 test('reprocessConversation transforma transcript e atualiza banco de dados de forma transacional', async () => {
@@ -267,6 +279,76 @@ test('runPass executa selecao em lote parametrizada quando nao ha IDs especifico
   assert.ok(selectQuery);
   assert.deepEqual(selectQuery.values, [100]);
   assert.match(selectQuery.text, /limit \$1/i);
+});
+
+test('reprocessConversation substitui transcricoes legadas zeradas persistindo timestamps por turno normalizados', async () => {
+  // Transcrição legada inconsistente com tempos zerados generalizados
+  const legacyInconsistentTranscript = {
+    historico: [
+      { speaker: 'IA', message: 'Olá, sou a Lívia da GEAP.', tempo_segundos: 0, tempo_formatado: '00:00' },
+      { speaker: 'Cliente', message: 'Gostaria de emitir minha segunda via.', tempo_segundos: 0, tempo_formatado: '00:00' },
+      { speaker: 'IA', message: 'Vou consultar para você.', tempo_segundos: 0, tempo_formatado: '00:00' },
+      { speaker: 'IA', message: 'Aqui está seu boleto.', tempo_segundos: 0, tempo_formatado: '00:00' }
+    ]
+  };
+
+  const normalizedLegacy = normalizeTranscricao(legacyInconsistentTranscript);
+  assert.equal(normalizedLegacy.every((turn) => turn.time_in_call_secs === 0), true);
+
+  // Reprocessamento contra a API ElevenLabs obtém os timestamps reais
+  let updatedPayload: string | undefined;
+  const mockDb = {
+    query: async (text: string, values?: unknown[]) => {
+      if (text.includes('update atendimentos')) {
+        updatedPayload = values?.[0] as string;
+      }
+      return { rowCount: 1, rows: [] };
+    }
+  };
+
+  const mockElevenLabsApi = async () => {
+    return new Response(
+      JSON.stringify({
+        conversation_id: 'conv-legacy-fix',
+        status: 'done',
+        transcript: [
+          { role: 'agent', message: 'Olá, sou a Lívia da GEAP.', time_in_call_secs: 0 },
+          { role: 'user', message: 'Gostaria de emitir minha segunda via.', time_in_call_secs: 6 },
+          { role: 'agent', message: 'Vou consultar para você.', time_in_call_secs: 14 },
+          { role: 'agent', message: 'Aqui está seu boleto.', time_in_call_secs: 32 }
+        ]
+      }),
+      { status: 200 }
+    );
+  };
+
+  const outcome = await reprocessConversation(mockDb as any, 'conv-legacy-fix', {
+    apiUrl: 'https://api.elevenlabs.io',
+    apiKey: 'test-key',
+    fetchFn: mockElevenLabsApi
+  });
+
+  assert.equal(outcome.success, true);
+  assert.ok(updatedPayload);
+
+  // Normaliza o payload persistido no Postgres pós-reprocessamento
+  const reprocessedJson = JSON.parse(updatedPayload);
+  const normalizedReprocessed = normalizeTranscricao(reprocessedJson);
+
+  assert.equal(normalizedReprocessed.length, 4);
+  assert.deepEqual(
+    normalizedReprocessed.map((turn) => ({
+      role: turn.role,
+      message: turn.message,
+      time_in_call_secs: turn.time_in_call_secs
+    })),
+    [
+      { role: 'agent', message: 'Olá, sou a Lívia da GEAP.', time_in_call_secs: 0 },
+      { role: 'user', message: 'Gostaria de emitir minha segunda via.', time_in_call_secs: 6 },
+      { role: 'agent', message: 'Vou consultar para você.', time_in_call_secs: 14 },
+      { role: 'agent', message: 'Aqui está seu boleto.', time_in_call_secs: 32 }
+    ]
+  );
 });
 
 
