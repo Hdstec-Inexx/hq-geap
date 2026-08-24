@@ -90,7 +90,10 @@ export function findInconsistentConversationIdsQuery(options?: { force?: boolean
                 else '[]'::jsonb
               end
             ) as elem
-            where coalesce((elem->>'tempo_segundos')::numeric, 0) <= 0
+            where case
+              when (elem->>'tempo_segundos') ~ '^-?[0-9]+(\\.[0-9]+)?$' then (elem->>'tempo_segundos')::numeric <= 0
+              else true
+            end
           ) > 1
         )
       )
