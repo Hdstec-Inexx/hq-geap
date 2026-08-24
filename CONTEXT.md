@@ -82,8 +82,11 @@ A medida de alinhamento entre a Avaliação da IA e a do Curador num mesmo Atend
 
 ### Manutenção
 
+**Fila de Manutenção**:
+A lista de Comentários (pendentes ou resolvidos) agrupados para apoiar a melhoria contínua do Agente de Voz. Permite ao Admin filtrar por status e data de criação do comentário, além de navegar de forma contínua entre os Atendimentos associados até zerar os itens pendentes da fila.
+
 **Comentário**:
-Anotação sobre um Atendimento, usada como insumo para ajustes e melhorias do Agente de Voz ou para explicar correções feitas na avaliação da IA. Escrita por Curador ou Admin; lida por Admin e Gestão. Tem status `Pendente` → `Resolvido`, alterável apenas pelo Admin.
+Anotação sobre um Atendimento, usada como insumo para ajustes e melhorias do Agente de Voz ou para explicar correções feitas na avaliação da IA. Escrita por Curador ou Admin; lida por Admin e Gestão. Tem status `Pendente` → `Resolvido`, alterável apenas pelo Admin. Cada comentário exibe o autor, status, data de criação e metadados do Atendimento de origem (incluindo nome do Agente de Voz, ID da conversa e data do Atendimento).
 
 ### Operação
 
