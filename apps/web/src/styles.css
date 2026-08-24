@@ -2087,6 +2087,8 @@ h1 {
 
 .curadoria-filters-fields input[type="date"],
 .atendimentos-filters-fields input[type="date"],
+.curadoria-filters-fields input[type="text"],
+.atendimentos-filters-fields input[type="text"],
 .curadoria-filters-fields select,
 .atendimentos-filters-fields select {
   padding: 8px 10px;

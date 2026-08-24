@@ -141,6 +141,7 @@ export type FilaCuradoriaFilters = {
   inicio?: string;
   fim?: string;
   motivo?: string;
+  conversationId?: string;
 };
 
 export type CuradoriasRealizadasFilters = {
@@ -150,6 +151,7 @@ export type CuradoriasRealizadasFilters = {
   curadorId?: string;
   criteriosNaoAtendidos?: string[];
   criteriosAtendidos?: string[];
+  conversationId?: string;
 };
 
 export function buildFilaCuradoriaFilters(
@@ -180,6 +182,11 @@ export function buildFilaCuradoriaFilters(
   if (filters.motivo) {
     const motivo = param(normalizeMotivo(filters.motivo));
     clauses.push(`${canonicalMotivoSql('a.motivo_contato')} = ${motivo}`);
+  }
+
+  if (filters.conversationId) {
+    const conversationId = param(filters.conversationId);
+    clauses.push(`a.elevenlabs_conversation_id ilike '%' || ${conversationId} || '%'`);
   }
 
   return { clauses, values };
@@ -236,7 +243,7 @@ export function buildCuradoriasRealizadasFilters(
 export function createCuradoriaRepository(db: pg.Pool) {
   return {
     async listPending(
-      query: { limit: number; offset: number; inicio?: string; fim?: string; motivo?: string }
+      query: FilaCuradoriaFilters & { limit: number; offset: number }
     ): Promise<{ items: FilaCuradoriaRow[]; total: number }> {
       const selectFilters = buildFilaCuradoriaFilters(query, 3);
       const countFilters = buildFilaCuradoriaFilters(query, 1);
