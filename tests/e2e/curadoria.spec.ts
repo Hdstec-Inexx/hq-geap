@@ -1563,5 +1563,89 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.locator('article.curadoria-row').filter({ hasText: 'conv-realizada-crit-1' })).toBeVisible();
     await expect(page.locator('article.curadoria-row').filter({ hasText: 'conv-realizada-crit-2' })).toBeVisible();
   });
+
+  test('filtra Fila de Curadoria e Curadorias Realizadas por ID da conversa via API e UI', async ({
+    request,
+    page
+  }) => {
+    const curador = await login(request, 'curador');
+    const gestao = await login(request, 'gestao');
+
+    const convPendente1 = `conv-fila-target-${Date.now()}`;
+    const convPendente2 = `conv-fila-other-${Date.now()}`;
+    const at1Id = await createAtendimento(convPendente1, 'concluido');
+    const at2Id = await createAtendimento(convPendente2, 'concluido');
+    await persistirAvaliacaoIa(at1Id);
+    await persistirAvaliacaoIa(at2Id);
+
+    // 1. Fila de Curadoria via API
+    const filaRes = await request.get(`${apiUrl}/curadoria?conversationId=target`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    });
+    expect(filaRes.status()).toBe(200);
+    const filaData = (await filaRes.json()) as { items: Array<{ conversationId: string }> };
+    expect(filaData.items.some((i) => i.conversationId === convPendente1)).toBe(true);
+    expect(filaData.items.some((i) => i.conversationId === convPendente2)).toBe(false);
+
+    // 2. Fila de Curadoria via UI
+    await loginUi(page, 'curador');
+    await page.goto('/curadoria');
+
+    const filaInput = page.locator('#curadoria-conversation-id-filtro');
+    await expect(filaInput).toBeVisible();
+    await filaInput.fill('target');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+
+    await expect(page).toHaveURL(/conversationId=target/);
+    await expect(page.locator('article.curadoria-row').filter({ hasText: convPendente1 })).toBeVisible();
+    await expect(page.locator('article.curadoria-row').filter({ hasText: convPendente2 })).toHaveCount(0);
+
+    // Limpar filtros na Fila
+    await page.getByRole('button', { name: 'Limpar filtros' }).click();
+    await expect(page).toHaveURL('/curadoria');
+    await expect(filaInput).toHaveValue('');
+
+    // 3. Realizar conferência em at1 para aparecer em Curadorias Realizadas
+    const detail = (await (await request.get(`${apiUrl}/curadoria/${at1Id}`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    })).json()) as { avaliacaoIa: { checklist: Array<{ chave: string; estado: string }> } };
+
+    await request.post(`${apiUrl}/curadoria/${at1Id}/avaliacoes`, {
+      headers: { authorization: `Bearer ${curador.token}` },
+      data: {
+        checklist: detail.avaliacaoIa.checklist.map((c) => ({
+          chave: c.chave,
+          estado: 'atendido'
+        })),
+        notaAvaliacaoIa: 9.0,
+        falhasIdentificadas: [],
+        resumoAtendimento: 'Conferido'
+      }
+    });
+
+    // 4. Curadorias Realizadas via API
+    const realRes = await request.get(`${apiUrl}/curadorias-realizadas?conversationId=target`, {
+      headers: { authorization: `Bearer ${gestao.token}` }
+    });
+    expect(realRes.status()).toBe(200);
+    const realData = (await realRes.json()) as { items: Array<{ conversationId: string }> };
+    expect(realData.items.some((i) => i.conversationId === convPendente1)).toBe(true);
+
+    // 5. Curadorias Realizadas via UI
+    await loginUi(page, 'gestao');
+    await page.goto('/curadorias-realizadas');
+
+    const realInput = page.locator('#curadorias-realizadas-conversation-id-filtro');
+    await expect(realInput).toBeVisible();
+    await realInput.fill('target');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+
+    await expect(page).toHaveURL(/conversationId=target/);
+    await expect(page.locator('article.curadoria-row').filter({ hasText: convPendente1 })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Limpar filtros' }).click();
+    await expect(page).toHaveURL('/curadorias-realizadas');
+    await expect(realInput).toHaveValue('');
+  });
 });
 

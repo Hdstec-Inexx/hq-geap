@@ -1191,4 +1191,69 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await expect(page.locator(`a[href*="/atendimentos/${at1Id}"]`)).toBeVisible();
     await expect(page.locator(`a[href*="/atendimentos/${at2Id}"]`)).toBeVisible();
   });
+
+  test('filtra atendimentos por ID da conversa via API e UI com submissao e limpeza', async ({
+    request,
+    page
+  }) => {
+    const { token } = await login(request, 'admin');
+    const headers = { Authorization: `Bearer ${token}` };
+
+    const convAlpha = `conv-filt-alpha-${Date.now()}`;
+    const convBeta = `conv-filt-beta-${Date.now()}`;
+
+    await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: {
+        ...atendimento,
+        conversation_id: convAlpha,
+        status: 'concluido',
+        contact_reason: 'Alpha Reason',
+        completed_at: '2026-08-10T12:00:00.000Z'
+      },
+      headers: ingestionHeaders
+    });
+
+    await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: {
+        ...atendimento,
+        conversation_id: convBeta,
+        status: 'concluido',
+        contact_reason: 'Beta Reason',
+        completed_at: '2026-08-10T12:05:00.000Z'
+      },
+      headers: ingestionHeaders
+    });
+
+    // 1. Consulta via API com filtro parcial case-insensitive
+    const apiRes = await request.get(
+      `${apiUrl}/atendimentos?conversationId=filt-alpha`,
+      { headers }
+    );
+    expect(apiRes.status()).toBe(200);
+    const apiData = (await apiRes.json()) as { items: Array<{ conversationId: string }> };
+    expect(apiData.items.some((i) => i.conversationId === convAlpha)).toBe(true);
+    expect(apiData.items.some((i) => i.conversationId === convBeta)).toBe(false);
+
+    // 2. Consulta via UI
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('admin@hq.test');
+    await page.getByLabel('Senha').fill('senha-admin');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto('/atendimentos');
+
+    const idInput = page.locator('#atendimentos-conversation-id-filtro');
+    await expect(idInput).toBeVisible();
+    await idInput.fill('filt-alpha');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+
+    await expect(page).toHaveURL(/conversationId=filt-alpha/);
+    await expect(page.getByText('Alpha Reason').first()).toBeVisible();
+    await expect(page.getByText('Beta Reason')).not.toBeVisible();
+
+    // 3. Limpeza de filtros
+    await page.getByRole('button', { name: 'Limpar filtros' }).click();
+    await expect(page).toHaveURL('/atendimentos');
+    await expect(idInput).toHaveValue('');
+  });
 });
