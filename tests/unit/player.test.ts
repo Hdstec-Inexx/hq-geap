@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { normalizeTranscricao } from '@hq-geap/contracts/atendimentos';
 import {
   canDownloadAudio,
   clampSeekTime,
@@ -118,6 +119,29 @@ test('getActiveTurnIndex tolera itens nulos, undefined ou time negativo', () => 
 
   assert.equal(getActiveTurnIndex(malformed, 5), 1);
   assert.equal(getActiveTurnIndex(malformed, 15), 4);
+});
+
+test('getActiveTurnIndex sincroniza com precisao turnos normalizados de historico reprocessado', () => {
+  const reprocessedHistorico = {
+    historico: [
+      { speaker: 'IA', message: 'Olá, sou a Lívia da GEAP.', tempo_segundos: 0, tempo_formatado: '00:00' },
+      { speaker: 'Cliente', message: 'Gostaria de emitir minha segunda via.', tempo_segundos: 6, tempo_formatado: '00:06' },
+      { speaker: 'IA', message: 'Vou consultar para você.', tempo_segundos: 14, tempo_formatado: '00:14' },
+      { speaker: 'IA', message: 'Aqui está seu boleto.', tempo_segundos: 32, tempo_formatado: '00:32' }
+    ]
+  };
+
+  const normalized = normalizeTranscricao(reprocessedHistorico);
+  assert.equal(normalized.length, 4);
+
+  assert.equal(getActiveTurnIndex(normalized, 0), 0);
+  assert.equal(getActiveTurnIndex(normalized, 5.9), 0);
+  assert.equal(getActiveTurnIndex(normalized, 6), 1);
+  assert.equal(getActiveTurnIndex(normalized, 13.9), 1);
+  assert.equal(getActiveTurnIndex(normalized, 14), 2);
+  assert.equal(getActiveTurnIndex(normalized, 30), 2);
+  assert.equal(getActiveTurnIndex(normalized, 32), 3);
+  assert.equal(getActiveTurnIndex(normalized, 50), 3);
 });
 
 test('shouldShowMiniplayer requer audioUrl, scroll alem do player e audio nao finalizado', () => {
