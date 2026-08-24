@@ -73,25 +73,28 @@ export function findInconsistentConversationIdsQuery(options?: { force?: boolean
              or elem->>'tempo_formatado' is null
              or elem->>'speaker' is null
              or elem->>'message' is null
+             or (elem->>'tempo_segundos') !~ '^-?[0-9]+(\\.[0-9]+)?$'
         )
         or (
-          coalesce(duracao_segundos, 0) > 5
-          and jsonb_array_length(
+          jsonb_array_length(
             case
               when jsonb_typeof(transcricao->'historico') = 'array' then transcricao->'historico'
               else '[]'::jsonb
             end
           ) > 1
-          and not exists (
-            select 1
+          and (
+            select count(1)
             from jsonb_array_elements(
               case
                 when jsonb_typeof(transcricao->'historico') = 'array' then transcricao->'historico'
                 else '[]'::jsonb
               end
             ) as elem
-            where coalesce((elem->>'tempo_segundos')::numeric, 0) > 0
-          )
+            where case
+              when (elem->>'tempo_segundos') ~ '^-?[0-9]+(\\.[0-9]+)?$' then (elem->>'tempo_segundos')::numeric <= 0
+              else true
+            end
+          ) > 1
         )
       )
     order by concluido_em desc nulls last

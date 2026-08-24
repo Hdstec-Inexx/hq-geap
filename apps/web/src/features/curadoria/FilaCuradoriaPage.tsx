@@ -30,22 +30,27 @@ export function FilaCuradoriaPage() {
 
   const inicioParam = searchParams.get('inicio') ?? '';
   const fimParam = searchParams.get('fim') ?? '';
+  const conversationIdParam = searchParams.get('conversationId') ?? '';
   const motivoParam = searchParams.get('motivo') ?? '';
 
   const [draftInicio, setDraftInicio] = useState(inicioParam);
   const [draftFim, setDraftFim] = useState(fimParam);
+  const [draftConversationId, setDraftConversationId] = useState(conversationIdParam);
   const [draftMotivo, setDraftMotivo] = useState(motivoParam);
 
-  const hasDraftFilters = Boolean(draftInicio || draftFim || draftMotivo);
+  const hasDraftFilters = Boolean(
+    draftInicio || draftFim || draftConversationId || draftMotivo
+  );
   const hasActiveFilters = Boolean(
-    inicioParam || fimParam || motivoParam || hasDraftFilters
+    inicioParam || fimParam || conversationIdParam || motivoParam || hasDraftFilters
   );
 
   useEffect(() => {
     setDraftInicio(inicioParam);
     setDraftFim(fimParam);
+    setDraftConversationId(conversationIdParam);
     setDraftMotivo(motivoParam);
-  }, [inicioParam, fimParam, motivoParam]);
+  }, [inicioParam, fimParam, conversationIdParam, motivoParam]);
 
   const query = new URLSearchParams({
     limit: String(FILA_PAGE_SIZE),
@@ -53,6 +58,7 @@ export function FilaCuradoriaPage() {
   });
   if (inicioParam) query.set('inicio', inicioParam);
   if (fimParam) query.set('fim', fimParam);
+  if (conversationIdParam) query.set('conversationId', conversationIdParam);
   if (motivoParam) query.set('motivo', motivoParam);
 
   const requestPath = `/curadoria?${query.toString()}`;
@@ -86,6 +92,7 @@ export function FilaCuradoriaPage() {
         next.set('fim', draftFim);
       }
     }
+    if (draftConversationId.trim()) next.set('conversationId', draftConversationId.trim());
     if (draftMotivo.trim()) next.set('motivo', draftMotivo.trim());
     navigate(filaHref(next, 1));
   }
@@ -93,6 +100,7 @@ export function FilaCuradoriaPage() {
   function handleClearFilters() {
     setDraftInicio('');
     setDraftFim('');
+    setDraftConversationId('');
     setDraftMotivo('');
     navigate('/curadoria');
   }
@@ -146,6 +154,17 @@ export function FilaCuradoriaPage() {
               onChange={(event) => setDraftFim(event.target.value)}
               type="date"
               value={draftInicio ? draftFim : ''}
+            />
+          </label>
+          <label>
+            ID da conversa
+            <input
+              id="curadoria-conversation-id-filtro"
+              name="conversationId"
+              onChange={(event) => setDraftConversationId(event.target.value)}
+              placeholder="Buscar por ID..."
+              type="text"
+              value={draftConversationId}
             />
           </label>
           <label>

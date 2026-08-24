@@ -54,6 +54,7 @@ test('curadoriasRealizadasQuerySchema valida limites de paginação e datas', ()
   const query = curadoriasRealizadasQuerySchema.parse({
     inicio: '2025-01-01',
     fim: '2025-01-31',
+    conversationId: 'conv-real-123',
     motivo: 'Rede credenciada',
     curadorId: '22222222-2222-4222-8222-222222222222',
     limit: 25,
@@ -64,6 +65,7 @@ test('curadoriasRealizadasQuerySchema valida limites de paginação e datas', ()
   assert.equal(query.offset, 50);
   assert.equal(query.inicio, '2025-01-01');
   assert.equal(query.fim, '2025-01-31');
+  assert.equal(query.conversationId, 'conv-real-123');
   assert.equal(query.curadorId, '22222222-2222-4222-8222-222222222222');
 });
 
@@ -74,6 +76,7 @@ test('CuradoriasRealizadasPage integra com /curadorias-realizadas, schema e filt
   assert.match(pageContent, /curadoriasRealizadasPageSchema/);
   assert.match(pageContent, /Minhas Curadorias/);
   assert.match(pageContent, /Curadorias Realizadas/);
+  assert.match(pageContent, /conversationId/);
   assert.match(pageContent, /MotivoCombobox/);
   assert.match(pageContent, /curadorId/);
   assert.match(pageContent, /reviewHref/);

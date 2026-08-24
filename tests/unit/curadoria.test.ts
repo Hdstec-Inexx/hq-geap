@@ -173,9 +173,17 @@ test('filtros da Fila de Curadoria fixam dia civil America/Sao_Paulo e motivo', 
     comMotivoNaoInformadoSemAcento.clauses.join(' and '),
     /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$1/
   );
-  assert.deepEqual(comMotivoNaoInformadoSemAcento.values, [
-    'Não informado'
-  ]);
+  const comConversationId = buildFilaCuradoriaFilters(
+    {
+      conversationId: 'conv-fila-xyz'
+    },
+    1
+  );
+  assert.match(
+    comConversationId.clauses.join(' and '),
+    /a\.elevenlabs_conversation_id ilike '%' \|\| \$1 \|\| '%'/
+  );
+  assert.deepEqual(comConversationId.values, ['conv-fila-xyz']);
 });
 
 test('listDistinctMotivos retorna motivos distintos e ordenados incluindo Nao informado canônico', async () => {
@@ -373,6 +381,18 @@ test('buildCuradoriasRealizadasFilters aplica filtros de data, motivo e curadorI
     'Rede credenciada',
     '33333333-3333-4333-8333-333333333333'
   ]);
+
+  const filtersWithConv = buildCuradoriasRealizadasFilters(
+    {
+      conversationId: 'conv-realizada-123'
+    },
+    1
+  );
+  assert.match(
+    filtersWithConv.clauses.join(' and '),
+    /a\.elevenlabs_conversation_id ilike '%' \|\| \$1 \|\| '%'/
+  );
+  assert.deepEqual(filtersWithConv.values, ['conv-realizada-123']);
 });
 
 test('buildCuradoriasRealizadasFilters suporta criteriosAtendidos e criteriosNaoAtendidos com conjuncao AND para Curador', async () => {

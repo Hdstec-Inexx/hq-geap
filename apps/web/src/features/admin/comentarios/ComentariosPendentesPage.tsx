@@ -6,19 +6,34 @@ import {
   type StatusComentario
 } from '@hq-geap/contracts/comentarios';
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { apiUrl, getSession } from '../../auth/session';
 import { ComentarioCard } from '../../comentarios/ComentarioCard';
+import {
+  buildFilaAtendimentoHref,
+  formatComentarioAtendimentoHeader,
+  type QueueFilters
+} from './comentarios-fila-logic';
+
+export type { QueueFilters };
 
 function FilaItem({
   comentario,
+  searchParams,
   onResolved
 }: {
   comentario: ComentarioFila;
+  searchParams: URLSearchParams;
   onResolved: (comentario: Comentario) => void;
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(false);
+
+  const headerLabel = formatComentarioAtendimentoHeader(
+    comentario.atendimento.agenteVozNome,
+    comentario.atendimento.iniciadoEm,
+    comentario.atendimento.concluidoEm
+  );
 
   async function resolve() {
     const session = getSession();
@@ -47,8 +62,13 @@ function FilaItem({
       cabecalho={
         <div className="manutencao-item-heading">
           <div>
-            <p className="panel-label">{comentario.atendimento.agenteVozNome}</p>
-            <Link to={`/atendimentos/${comentario.atendimento.id}`}>
+            <p className="panel-label">{headerLabel}</p>
+            <Link
+              to={buildFilaAtendimentoHref(
+                comentario.atendimento.id,
+                searchParams
+              )}
+            >
               {comentario.atendimento.conversationId}
             </Link>
           </div>
@@ -77,15 +97,19 @@ function FilaItem({
 }
 
 async function fetchQueuePage(
-  status: StatusComentario,
+  filters: QueueFilters,
   cursor?: string,
   signal?: AbortSignal
 ) {
   const session = getSession();
   if (!session) throw new Error('Authentication required');
-  const query = new URLSearchParams({ status, limite: '50' });
+  const query = new URLSearchParams({ status: filters.status, limite: '50' });
+  if (filters.inicio) query.set('inicio', filters.inicio);
+  if (filters.fim) query.set('fim', filters.fim);
+  if (filters.conversationId) query.set('conversationId', filters.conversationId);
   if (cursor) query.set('cursor', cursor);
-  const response = await fetch(`${apiUrl}/comentarios?${query}`, {
+
+  const response = await fetch(`${apiUrl}/comentarios?${query.toString()}`, {
     headers: { authorization: `Bearer ${session.token}` },
     signal
   });
@@ -94,20 +118,69 @@ async function fetchQueuePage(
 }
 
 export function ComentariosPendentesPage() {
-  const [status, setStatus] = useState<StatusComentario>('pendente');
-  const statusRef = useRef(status);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawStatus = searchParams.get('status');
+  const activeStatus: StatusComentario =
+    rawStatus === 'resolvido' ? 'resolvido' : 'pendente';
+  const inicioParam = searchParams.get('inicio') ?? '';
+  const fimParam = searchParams.get('fim') ?? '';
+  const conversationIdParam = searchParams.get('conversationId') ?? '';
+
+  const [draftStatus, setDraftStatus] = useState<StatusComentario>(activeStatus);
+  const [draftInicio, setDraftInicio] = useState(inicioParam);
+  const [draftFim, setDraftFim] = useState(fimParam);
+  const [draftConversationId, setDraftConversationId] =
+    useState(conversationIdParam);
+
   const [items, setItems] = useState<ComentarioFila[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>(
     'loading'
   );
 
+  const activeFiltersRef = useRef<QueueFilters>({
+    status: activeStatus,
+    inicio: inicioParam || undefined,
+    fim: fimParam || undefined,
+    conversationId: conversationIdParam || undefined
+  });
+
+  const hasDraftFilters = Boolean(
+    draftInicio ||
+      draftFim ||
+      draftConversationId ||
+      draftStatus !== 'pendente'
+  );
+
+  const hasActiveFilters = Boolean(
+    inicioParam ||
+      fimParam ||
+      conversationIdParam ||
+      activeStatus === 'resolvido' ||
+      hasDraftFilters
+  );
+
   useEffect(() => {
+    setDraftStatus(activeStatus);
+    setDraftInicio(inicioParam);
+    setDraftFim(fimParam);
+    setDraftConversationId(conversationIdParam);
+  }, [activeStatus, inicioParam, fimParam, conversationIdParam]);
+
+  useEffect(() => {
+    const currentFilters: QueueFilters = {
+      status: activeStatus,
+      inicio: inicioParam || undefined,
+      fim: inicioParam && fimParam ? fimParam : inicioParam || undefined,
+      conversationId: conversationIdParam || undefined
+    };
+    activeFiltersRef.current = currentFilters;
+
     const controller = new AbortController();
     setItems([]);
     setNextCursor(null);
     setLoadState('loading');
-    fetchQueuePage(status, undefined, controller.signal)
+    fetchQueuePage(currentFilters, undefined, controller.signal)
       .then((page) => {
         setItems(page.items);
         setNextCursor(page.nextCursor);
@@ -119,20 +192,20 @@ export function ComentariosPendentesPage() {
         }
       });
     return () => controller.abort();
-  }, [status]);
+  }, [activeStatus, inicioParam, fimParam, conversationIdParam]);
 
   async function loadMore() {
     if (!nextCursor) return;
-    const requestedStatus = status;
+    const filtersToUse = activeFiltersRef.current;
     setLoadState('loading');
     try {
-      const page = await fetchQueuePage(requestedStatus, nextCursor);
-      if (statusRef.current !== requestedStatus) return;
+      const page = await fetchQueuePage(filtersToUse, nextCursor);
+      if (activeFiltersRef.current !== filtersToUse) return;
       setItems((current) => [...current, ...page.items]);
       setNextCursor(page.nextCursor);
       setLoadState('ready');
     } catch {
-      if (statusRef.current === requestedStatus) {
+      if (activeFiltersRef.current === filtersToUse) {
         setLoadState('error');
       }
     }
@@ -144,9 +217,41 @@ export function ComentariosPendentesPage() {
     );
   }
 
-  function changeStatus(nextStatus: StatusComentario) {
-    statusRef.current = nextStatus;
-    setStatus(nextStatus);
+  function handleFilterSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    const next = new URLSearchParams();
+    if (draftStatus !== 'pendente') {
+      next.set('status', draftStatus);
+    }
+    if (draftInicio) {
+      next.set('inicio', draftInicio);
+      if (draftFim && draftFim >= draftInicio) {
+        next.set('fim', draftFim);
+      }
+    }
+    if (draftConversationId.trim()) {
+      next.set('conversationId', draftConversationId.trim());
+    }
+    setSearchParams(next);
+  }
+
+  function handleClearFilters() {
+    setDraftStatus('pendente');
+    setDraftInicio('');
+    setDraftFim('');
+    setDraftConversationId('');
+    setSearchParams(new URLSearchParams());
+  }
+
+  function handleStatusChange(nextStatus: StatusComentario) {
+    setDraftStatus(nextStatus);
+    const next = new URLSearchParams(searchParams);
+    if (nextStatus === 'pendente') {
+      next.delete('status');
+    } else {
+      next.set('status', nextStatus);
+    }
+    setSearchParams(next);
   }
 
   return (
@@ -160,19 +265,82 @@ export function ComentariosPendentesPage() {
             Voltar ao início
           </Link>
         </div>
-        <label className="manutencao-filter">
-          Status
-          <select
-            onChange={(event) =>
-              changeStatus(event.target.value as StatusComentario)
-            }
-            value={status}
-          >
-            <option value="pendente">Pendente</option>
-            <option value="resolvido">Resolvido</option>
-          </select>
-        </label>
       </header>
+
+      <form
+        className="curadoria-filters manutencao-filters"
+        onSubmit={handleFilterSubmit}
+      >
+        <div className="curadoria-filters-fields">
+          <label className="manutencao-filter">
+            Status
+            <select
+              aria-label="Status"
+              name="status"
+              onChange={(event) =>
+                handleStatusChange(event.target.value as StatusComentario)
+              }
+              value={draftStatus}
+            >
+              <option value="pendente">Pendente</option>
+              <option value="resolvido">Resolvido</option>
+            </select>
+          </label>
+          <label>
+            Data inicial
+            <input
+              name="inicio"
+              onChange={(event) => {
+                const nextInicio = event.target.value;
+                setDraftInicio(nextInicio);
+                if (!nextInicio) {
+                  setDraftFim('');
+                }
+              }}
+              type="date"
+              value={draftInicio}
+            />
+          </label>
+          <span aria-hidden="true" className="curadoria-filters-arrow">
+            →
+          </span>
+          <label>
+            Data final (opcional)
+            <input
+              disabled={!draftInicio}
+              min={draftInicio || undefined}
+              name="fim"
+              onChange={(event) => setDraftFim(event.target.value)}
+              type="date"
+              value={draftInicio ? draftFim : ''}
+            />
+          </label>
+          <label>
+            ID da conversa
+            <input
+              name="conversationId"
+              onChange={(event) => setDraftConversationId(event.target.value)}
+              placeholder="Buscar por ID..."
+              type="text"
+              value={draftConversationId}
+            />
+          </label>
+        </div>
+        <div className="curadoria-filters-actions">
+          <button className="primary-action" type="submit">
+            Filtrar
+          </button>
+          {hasActiveFilters ? (
+            <button
+              className="curadoria-filter-clear"
+              onClick={handleClearFilters}
+              type="button"
+            >
+              Limpar filtros
+            </button>
+          ) : null}
+        </div>
+      </form>
 
       {loadState === 'loading' && items.length === 0 ? (
         <p>Carregando fila...</p>
@@ -180,8 +348,16 @@ export function ComentariosPendentesPage() {
       {loadState === 'error' ? <p>Não foi possível carregar a fila.</p> : null}
       {loadState === 'ready' && items.length === 0 && !nextCursor ? (
         <section className="manutencao-empty">
-          <h2>Nenhum comentário {status}</h2>
-          <p>A fila está em dia para este status.</p>
+          <h2>
+            {hasActiveFilters && (inicioParam || fimParam || conversationIdParam)
+              ? 'Nenhum comentário encontrado'
+              : `Nenhum comentário ${activeStatus}`}
+          </h2>
+          <p>
+            {hasActiveFilters && (inicioParam || fimParam || conversationIdParam)
+              ? 'Não há comentários para os filtros selecionados.'
+              : 'A fila está em dia para este status.'}
+          </p>
         </section>
       ) : null}
       {items.length > 0 || nextCursor ? (
@@ -191,6 +367,7 @@ export function ComentariosPendentesPage() {
               comentario={comentario}
               key={comentario.id}
               onResolved={removeResolved}
+              searchParams={searchParams}
             />
           ))}
           {nextCursor ? (

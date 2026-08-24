@@ -4,6 +4,7 @@ import {
   type AtendimentoDetail
 } from '@hq-geap/contracts/atendimentos';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { getAtendimentoBackLink } from '../admin/comentarios/comentarios-fila-logic';
 import { AvaliacaoCuradorPanel } from '../avaliacoes/AvaliacaoCuradorPanel';
 import { AvaliacaoIaPanel } from '../avaliacoes/AvaliacaoIaPanel';
 import { ComentariosPanel } from '../comentarios/ComentariosPanel';
@@ -82,6 +83,7 @@ export function AtendimentoPage() {
   }
 
   const atendimento: AtendimentoDetail = state.data;
+  const backLink = getAtendimentoBackLink(searchParams);
   return (
     <main className="atendimentos-page atendimento-detail">
       <header className="atendimentos-heading">
@@ -90,11 +92,8 @@ export function AtendimentoPage() {
           <h1>Atendimento</h1>
           <p className="atendimento-id">{atendimento.conversationId}</p>
         </div>
-        <Link
-          className="back-link"
-          to={searchParams.toString() ? `/atendimentos?${searchParams}` : '/atendimentos'}
-        >
-          Voltar à lista
+        <Link className="back-link" to={backLink.to}>
+          {backLink.label}
         </Link>
       </header>
 
@@ -121,7 +120,10 @@ export function AtendimentoPage() {
       ) : null}
 
       <AtendimentoMedia atendimento={atendimento} />
-      <ComentariosPanel atendimentoId={atendimento.id} />
+      <ComentariosPanel
+        atendimentoId={atendimento.id}
+        from={searchParams.get('from')}
+      />
     </main>
   );
 }

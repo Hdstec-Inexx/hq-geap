@@ -53,6 +53,11 @@ export function buildDetalhamentoFilters(
     );
   }
 
+  if (query.conversationId) {
+    const conversationId = param(query.conversationId);
+    clauses.push(`a.elevenlabs_conversation_id ilike '%' || ${conversationId} || '%'`);
+  }
+
   if (query.motivo && query.indicador !== 'motivo') {
     const motivo = param(normalizeMotivo(query.motivo));
     clauses.push(`${canonicalMotivoSql('a.motivo_contato')} = ${motivo}`);

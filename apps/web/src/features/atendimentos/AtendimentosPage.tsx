@@ -63,6 +63,7 @@ export function AtendimentosPage() {
 
   const inicioParam = searchParams.get('inicio') ?? '';
   const fimParam = searchParams.get('fim') ?? '';
+  const conversationIdParam = searchParams.get('conversationId') ?? '';
   const motivoParam = searchParams.get('motivo') ?? '';
   const curadoriaStatusParam = searchParams.get('curadoriaStatus') ?? '';
   const curadorIdParam = searchParams.get('curadorId') ?? '';
@@ -78,6 +79,7 @@ export function AtendimentosPage() {
   const isDetalhamento = Boolean(indicador && inicioParam && fimParam);
   const [draftInicio, setDraftInicio] = useState(inicioParam);
   const [draftFim, setDraftFim] = useState(fimParam);
+  const [draftConversationId, setDraftConversationId] = useState(conversationIdParam);
   const [draftMotivo, setDraftMotivo] = useState(motivoParam);
   const [draftCuradoriaStatus, setDraftCuradoriaStatus] = useState(curadoriaStatusParam);
   const [draftCuradorId, setDraftCuradorId] = useState(curadorIdParam);
@@ -89,6 +91,7 @@ export function AtendimentosPage() {
   const hasDraftFilters = Boolean(
     draftInicio ||
       draftFim ||
+      draftConversationId ||
       draftMotivo ||
       draftCuradoriaStatus ||
       draftCuradorId ||
@@ -100,6 +103,7 @@ export function AtendimentosPage() {
     !isDetalhamento &&
       (inicioParam ||
         fimParam ||
+        conversationIdParam ||
         motivoParam ||
         curadoriaStatusParam ||
         curadorIdParam ||
@@ -114,6 +118,7 @@ export function AtendimentosPage() {
   useEffect(() => {
     setDraftInicio(inicioParam);
     setDraftFim(fimParam);
+    setDraftConversationId(conversationIdParam);
     setDraftMotivo(motivoParam);
     setDraftCuradoriaStatus(curadoriaStatusParam);
     setDraftCuradorId(curadorIdParam);
@@ -122,6 +127,7 @@ export function AtendimentosPage() {
   }, [
     inicioParam,
     fimParam,
+    conversationIdParam,
     motivoParam,
     curadoriaStatusParam,
     curadorIdParam,
@@ -139,6 +145,7 @@ export function AtendimentosPage() {
   } else {
     if (inicioParam) listQuery.set('inicio', inicioParam);
     if (fimParam) listQuery.set('fim', fimParam);
+    if (conversationIdParam) listQuery.set('conversationId', conversationIdParam);
     if (motivoParam) listQuery.set('motivo', motivoParam);
     if (curadoriaStatusParam) listQuery.set('curadoriaStatus', curadoriaStatusParam);
     if (curadorIdParam) listQuery.set('curadorId', curadorIdParam);
@@ -174,6 +181,7 @@ export function AtendimentosPage() {
         next.set('fim', draftFim);
       }
     }
+    if (draftConversationId.trim()) next.set('conversationId', draftConversationId.trim());
     if (draftMotivo.trim()) next.set('motivo', draftMotivo.trim());
     if (draftCuradoriaStatus) next.set('curadoriaStatus', draftCuradoriaStatus);
     if (draftCuradorId) next.set('curadorId', draftCuradorId);
@@ -189,6 +197,7 @@ export function AtendimentosPage() {
   function handleClearFilters() {
     setDraftInicio('');
     setDraftFim('');
+    setDraftConversationId('');
     setDraftMotivo('');
     setDraftCuradoriaStatus('');
     setDraftCuradorId('');
@@ -260,6 +269,17 @@ export function AtendimentosPage() {
                 onChange={(event) => setDraftFim(event.target.value)}
                 type="date"
                 value={draftInicio ? draftFim : ''}
+              />
+            </label>
+            <label>
+              ID da conversa
+              <input
+                id="atendimentos-conversation-id-filtro"
+                name="conversationId"
+                onChange={(event) => setDraftConversationId(event.target.value)}
+                placeholder="Buscar por ID..."
+                type="text"
+                value={draftConversationId}
               />
             </label>
             <label>
