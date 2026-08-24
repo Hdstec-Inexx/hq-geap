@@ -303,4 +303,135 @@ test.describe.serial('Comentarios e fila de manutencao', () => {
     await page.getByLabel('Status').selectOption('resolvido');
     await expect(page.getByText('Item pendente para a fila administrativa.')).toBeVisible();
   });
+
+  test('navegacao contextual da Fila de Manutencao, resolucao sequencial e avanco de fila', async ({
+    page,
+    request
+  }) => {
+    const atendimento1 = await createAtendimento('conv-seq-atendimento-1');
+    const atendimento2 = await createAtendimento('conv-seq-atendimento-2');
+    await persistirAvaliacaoIa(atendimento1);
+    await persistirAvaliacaoIa(atendimento2);
+
+    const admin = await login(request, 'admin');
+    const headers = { authorization: `Bearer ${admin.token}` };
+
+    // Atendimento 1 tem 2 comentários
+    await request.post(`${apiUrl}/atendimentos/${atendimento1}/comentarios`, {
+      headers,
+      data: { texto: 'Atendimento 1 - Comentario 1' }
+    });
+    await request.post(`${apiUrl}/atendimentos/${atendimento1}/comentarios`, {
+      headers,
+      data: { texto: 'Atendimento 1 - Comentario 2' }
+    });
+
+    // Atendimento 2 tem 1 comentário
+    await request.post(`${apiUrl}/atendimentos/${atendimento2}/comentarios`, {
+      headers,
+      data: { texto: 'Atendimento 2 - Comentario 1' }
+    });
+
+    // Login como admin
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('admin@hq.test');
+    await page.getByLabel('Senha').fill('senha-admin');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+
+    // Acessar Fila de Manutenção com filtro de conversationId
+    await page.goto('/admin/comentarios?status=pendente&conversationId=conv-seq');
+    await expect(page.getByRole('heading', { name: 'Fila de manutenção' })).toBeVisible();
+
+    // Clicar no link do Atendimento 1
+    const linkAtendimento1 = page.getByRole('link', { name: 'conv-seq-atendimento-1' }).first();
+    await expect(linkAtendimento1).toBeVisible();
+    await linkAtendimento1.click();
+
+    // Verificar URL e botão superior "Voltar à Fila de Manutenção"
+    await expect(page).toHaveURL(new RegExp(`/atendimentos/${atendimento1}`));
+    const backLink = page.getByRole('link', { name: 'Voltar à Fila de Manutenção' });
+    await expect(backLink).toBeVisible();
+    expect(await backLink.getAttribute('href')).toBe(
+      '/admin/comentarios?status=pendente&conversationId=conv-seq'
+    );
+
+    // Verificar que os 2 comentários estão visíveis
+    await expect(page.getByText('Atendimento 1 - Comentario 1')).toBeVisible();
+    await expect(page.getByText('Atendimento 1 - Comentario 2')).toBeVisible();
+
+    // Resolver o 1º comentário no ComentariosPanel
+    const cardComentario1 = page.getByRole('article').filter({
+      hasText: 'Atendimento 1 - Comentario 1'
+    });
+    await cardComentario1
+      .getByRole('button', { name: 'Marcar como resolvido' })
+      .click();
+
+    // Como ainda há o Comentário 2 pendente, deve permanecer na página do Atendimento 1
+    await expect(page).toHaveURL(new RegExp(`/atendimentos/${atendimento1}`));
+    await expect(cardComentario1.getByText('Resolvido por Ana Admin')).toBeVisible();
+
+    // Resolver o 2º comentário (último pendente do Atendimento 1)
+    const cardComentario2 = page.getByRole('article').filter({
+      hasText: 'Atendimento 1 - Comentario 2'
+    });
+    await cardComentario2
+      .getByRole('button', { name: 'Marcar como resolvido' })
+      .click();
+
+    // Deve avançar automaticamente para o Atendimento 2 na fila
+    await expect(page).toHaveURL(new RegExp(`/atendimentos/${atendimento2}`));
+    await expect(page.getByText('Atendimento 2 - Comentario 1')).toBeVisible();
+    const backLink2 = page.getByRole('link', { name: 'Voltar à Fila de Manutenção' });
+    await expect(backLink2).toBeVisible();
+
+    // Resolver o comentário do Atendimento 2 (último da fila ativa)
+    const cardComentario3 = page.getByRole('article').filter({
+      hasText: 'Atendimento 2 - Comentario 1'
+    });
+    await cardComentario3
+      .getByRole('button', { name: 'Marcar como resolvido' })
+      .click();
+
+    // Fila zerada -> deve redirecionar de volta para a Fila de Manutenção exibindo fila em dia
+    await expect(page).toHaveURL(
+      /\/admin\/comentarios\?status=pendente&conversationId=conv-seq/
+    );
+    await expect(page.getByRole('heading', { name: 'Nenhum comentário encontrado' })).toBeVisible();
+  });
+
+  test('resolucao em acesso direto a Atendimento sem contexto de fila nao dispara navegacao automatica', async ({
+    page,
+    request
+  }) => {
+    const atendimentoDireto = await createAtendimento('conv-direto-sem-fila');
+    await persistirAvaliacaoIa(atendimentoDireto);
+    const admin = await login(request, 'admin');
+
+    await request.post(`${apiUrl}/atendimentos/${atendimentoDireto}/comentarios`, {
+      headers: { authorization: `Bearer ${admin.token}` },
+      data: { texto: 'Comentario de acesso direto.' }
+    });
+
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('admin@hq.test');
+    await page.getByLabel('Senha').fill('senha-admin');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+
+    // Acesso direto sem parâmetro from
+    await page.goto(`/atendimentos/${atendimentoDireto}`);
+    await expect(page.getByRole('link', { name: 'Voltar à lista' })).toBeVisible();
+
+    const card = page.getByRole('article').filter({
+      hasText: 'Comentario de acesso direto.'
+    });
+    await expect(card).toBeVisible();
+    await card.getByRole('button', { name: 'Marcar como resolvido' }).click();
+
+    // Permanece na mesma página do Atendimento
+    await expect(page).toHaveURL(`/atendimentos/${atendimentoDireto}`);
+    await expect(card.getByText('Resolvido por Ana Admin')).toBeVisible();
+  });
 });
