@@ -75,6 +75,15 @@ test('query da Fila de Curadoria aceita dia unico com default fim=inicio e perio
       motivo: 'Financeiro/Boletos'
     }
   );
+
+  assert.deepEqual(
+    filaCuradoriaQuerySchema.parse({ conversationId: '  conv-fila-test  ' }),
+    {
+      limit: 50,
+      offset: 0,
+      conversationId: 'conv-fila-test'
+    }
+  );
 });
 
 test('query da Fila de Curadoria valida consistencia de datas e fuso', () => {

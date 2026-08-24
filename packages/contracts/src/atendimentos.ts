@@ -408,6 +408,7 @@ export const atendimentosQuerySchema = z
     status: z.enum(['em_andamento', 'concluido']).optional(),
     inicio: isoDateSchema.optional(),
     fim: isoDateSchema.optional(),
+    conversationId: z.string().trim().min(1).max(200).optional(),
     indicador: detalhamentoIndicadorSchema.optional(),
     motivo: z.string().trim().min(1).max(200).optional(),
     criterioId: z.uuid().optional(),

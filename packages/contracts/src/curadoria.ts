@@ -81,6 +81,7 @@ export const filaCuradoriaQuerySchema = z
     offset: z.coerce.number().int().min(0).max(10_000).default(0),
     inicio: isoDateSchema.optional(),
     fim: isoDateSchema.optional(),
+    conversationId: z.string().trim().min(1).max(200).optional(),
     motivo: z.string().trim().min(1).max(200).optional()
   })
   .superRefine(refinePeriodo)
@@ -144,6 +145,7 @@ export const curadoriasRealizadasQuerySchema = z
     offset: z.coerce.number().int().min(0).max(10_000).default(0),
     inicio: isoDateSchema.optional(),
     fim: isoDateSchema.optional(),
+    conversationId: z.string().trim().min(1).max(200).optional(),
     motivo: z.string().trim().min(1).max(200).optional(),
     curadorId: z.uuid().optional(),
     criteriosNaoAtendidos: criteriosQueryFilterSchema,

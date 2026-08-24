@@ -1343,5 +1343,26 @@ test('filtros SQL suportam criteriosAtendidos e criteriosNaoAtendidos com conjun
   ]);
 });
 
+test('filtros SQL suportam conversationId com ILIKE', async () => {
+  const { buildDetalhamentoFilters } = await import(
+    '../../apps/api/src/modules/atendimentos/detalhamentoFilters.js'
+  );
+
+  const filtro = buildDetalhamentoFilters(
+    atendimentosQuerySchema.parse({
+      conversationId: 'conv-abc-123'
+    }),
+    1
+  );
+
+  assert.equal(filtro.clauses.length, 1);
+  assert.match(
+    filtro.clauses[0]!,
+    /a\.elevenlabs_conversation_id ilike '%' \|\| \$1 \|\| '%'/
+  );
+  assert.deepEqual(filtro.values, ['conv-abc-123']);
+});
+
+
 
 

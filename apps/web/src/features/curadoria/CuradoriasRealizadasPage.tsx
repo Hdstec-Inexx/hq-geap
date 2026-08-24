@@ -39,6 +39,7 @@ export function CuradoriasRealizadasPage() {
 
   const inicioParam = searchParams.get('inicio') ?? '';
   const fimParam = searchParams.get('fim') ?? '';
+  const conversationIdParam = searchParams.get('conversationId') ?? '';
   const motivoParam = searchParams.get('motivo') ?? '';
   const curadorIdParam = searchParams.get('curadorId') ?? '';
   const criteriosNaoAtendidosParam = parseCriteriaParam(
@@ -51,6 +52,7 @@ export function CuradoriasRealizadasPage() {
   );
   const [draftInicio, setDraftInicio] = useState(inicioParam);
   const [draftFim, setDraftFim] = useState(fimParam);
+  const [draftConversationId, setDraftConversationId] = useState(conversationIdParam);
   const [draftMotivo, setDraftMotivo] = useState(motivoParam);
   const [draftCuradorId, setDraftCuradorId] = useState(curadorIdParam);
   const [draftCriteriosNaoAtendidos, setDraftCriteriosNaoAtendidos] =
@@ -61,6 +63,7 @@ export function CuradoriasRealizadasPage() {
   const hasDraftFilters = Boolean(
     draftInicio ||
       draftFim ||
+      draftConversationId ||
       draftMotivo ||
       (!isMinhas && draftCuradorId) ||
       draftCriteriosNaoAtendidos.length > 0 ||
@@ -70,6 +73,7 @@ export function CuradoriasRealizadasPage() {
   const hasActiveFilters = Boolean(
     inicioParam ||
       fimParam ||
+      conversationIdParam ||
       motivoParam ||
       (!isMinhas && curadorIdParam) ||
       criteriosNaoAtendidosParam.length > 0 ||
@@ -83,6 +87,7 @@ export function CuradoriasRealizadasPage() {
   useEffect(() => {
     setDraftInicio(inicioParam);
     setDraftFim(fimParam);
+    setDraftConversationId(conversationIdParam);
     setDraftMotivo(motivoParam);
     setDraftCuradorId(curadorIdParam);
     setDraftCriteriosNaoAtendidos(criteriosNaoAtendidosParam);
@@ -90,6 +95,7 @@ export function CuradoriasRealizadasPage() {
   }, [
     inicioParam,
     fimParam,
+    conversationIdParam,
     motivoParam,
     curadorIdParam,
     searchParams
@@ -101,6 +107,7 @@ export function CuradoriasRealizadasPage() {
   });
   if (inicioParam) query.set('inicio', inicioParam);
   if (fimParam) query.set('fim', fimParam);
+  if (conversationIdParam) query.set('conversationId', conversationIdParam);
   if (motivoParam) query.set('motivo', motivoParam);
   if (!isMinhas && curadorIdParam) query.set('curadorId', curadorIdParam);
   if (criteriosNaoAtendidosParam.length > 0) {
@@ -140,6 +147,7 @@ export function CuradoriasRealizadasPage() {
         next.set('fim', draftFim);
       }
     }
+    if (draftConversationId.trim()) next.set('conversationId', draftConversationId.trim());
     if (draftMotivo.trim()) next.set('motivo', draftMotivo.trim());
     if (!isMinhas && draftCuradorId) next.set('curadorId', draftCuradorId);
     if (draftCriteriosNaoAtendidos.length > 0) {
@@ -154,6 +162,7 @@ export function CuradoriasRealizadasPage() {
   function handleClearFilters() {
     setDraftInicio('');
     setDraftFim('');
+    setDraftConversationId('');
     setDraftMotivo('');
     setDraftCuradorId('');
     setDraftCriteriosNaoAtendidos([]);
@@ -213,6 +222,17 @@ export function CuradoriasRealizadasPage() {
               onChange={(event) => setDraftFim(event.target.value)}
               type="date"
               value={draftInicio ? draftFim : ''}
+            />
+          </label>
+          <label>
+            ID da conversa
+            <input
+              id="curadorias-realizadas-conversation-id-filtro"
+              name="conversationId"
+              onChange={(event) => setDraftConversationId(event.target.value)}
+              placeholder="Buscar por ID..."
+              type="text"
+              value={draftConversationId}
             />
           </label>
           <label>
