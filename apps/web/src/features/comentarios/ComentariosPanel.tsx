@@ -4,7 +4,7 @@ import {
   comentariosSchema,
   type Comentario
 } from '@hq-geap/contracts/comentarios';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiUrl, getSession } from '../auth/session';
 import { canWriteAsCurador, usePerfil } from '../auth/perfil-context';
@@ -35,6 +35,7 @@ export function ComentariosPanel({
   const [localComentarios, setLocalComentarios] = useState<Comentario[] | null>(null);
   const [resolvingIds, setResolvingIds] = useState<Record<string, boolean>>({});
   const [resolveErrors, setResolveErrors] = useState<Record<string, boolean>>({});
+  const isNavigatingRef = useRef(false);
 
   const perfil = usePerfil();
   const canWrite = canWriteAsCurador(perfil?.role);
@@ -49,7 +50,7 @@ export function ComentariosPanel({
     if (state.status === 'ready') {
       setLocalComentarios(state.data);
     }
-  }, [state]);
+  }, [state.status, state.path]);
 
   const comentarios = localComentarios ?? (state.status === 'ready' ? state.data : []);
 
@@ -99,14 +100,20 @@ export function ComentariosPanel({
       if (!response.ok) throw new Error(`Request failed with ${response.status}`);
       const resolved = comentarioSchema.parse(await response.json());
 
-      const updatedList = comentarios.map((c) =>
+      const base = localComentarios ?? (state.status === 'ready' ? state.data : []);
+      const updatedList = base.map((c) =>
         c.id === comentarioId ? resolved : c
       );
       setLocalComentarios(updatedList);
       setResolvingIds((prev) => ({ ...prev, [comentarioId]: false }));
 
       const remainingPending = countPendingComentarios(updatedList);
-      if (remainingPending === 0 && isMaintenanceQueueOrigin(fromContext)) {
+      if (
+        remainingPending === 0 &&
+        isMaintenanceQueueOrigin(fromContext) &&
+        !isNavigatingRef.current
+      ) {
+        isNavigatingRef.current = true;
         const filters = extractQueueFiltersFromFromParam(fromContext!);
         const query = new URLSearchParams({
           status: 'pendente',

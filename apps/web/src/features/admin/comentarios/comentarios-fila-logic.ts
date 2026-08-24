@@ -22,8 +22,7 @@ export function isMaintenanceQueueOrigin(from: string | null | undefined): boole
   if (!from) return false;
   return (
     from === '/admin/comentarios' ||
-    from.startsWith('/admin/comentarios?') ||
-    from.startsWith('/admin/comentarios/')
+    from.startsWith('/admin/comentarios?')
   );
 }
 
