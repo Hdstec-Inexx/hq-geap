@@ -1,4 +1,7 @@
-import type { StatusComentario } from '@hq-geap/contracts/comentarios';
+import type {
+  FiltroStatusComentario,
+  StatusComentario
+} from '@hq-geap/contracts/comentarios';
 import type pg from 'pg';
 
 export type ComentarioRow = {
@@ -17,7 +20,61 @@ export type ComentarioRow = {
 export type ComentarioFilaRow = ComentarioRow & {
   conversationId: string;
   agenteVozNome: string;
+  iniciadoEm: Date | null;
+  concluidoEm: Date | null;
 };
+
+export type ComentariosFilaFilters = Pick<
+  FiltroStatusComentario,
+  'status' | 'cursor' | 'inicio' | 'fim' | 'conversationId'
+>;
+
+export function buildComentariosFilaFilters(
+  filters: ComentariosFilaFilters,
+  startIndex = 1
+) {
+  const clauses: string[] = [];
+  const values: unknown[] = [];
+  let next = startIndex;
+
+  const param = (value: unknown) => {
+    values.push(value);
+    const placeholder = `$${next}`;
+    next += 1;
+    return placeholder;
+  };
+
+  const statusPlaceholder = param(filters.status);
+  clauses.push(`c.status = ${statusPlaceholder}`);
+
+  if (filters.cursor) {
+    const cursorPlaceholder = param(filters.cursor);
+    clauses.push(`(c.criado_em, c.id) > (
+      select cursor.criado_em, cursor.id
+      from comentarios cursor
+      where cursor.id = ${cursorPlaceholder}::uuid
+    )`);
+  }
+
+  const inicio = filters.inicio;
+  const fim = filters.fim ?? filters.inicio;
+  if (inicio && fim) {
+    const inicioPlaceholder = param(inicio);
+    const fimPlaceholder = param(fim);
+    clauses.push(
+      `c.criado_em at time zone 'America/Sao_Paulo' >= ${inicioPlaceholder}::date and c.criado_em at time zone 'America/Sao_Paulo' < ${fimPlaceholder}::date + interval '1 day'`
+    );
+  }
+
+  if (filters.conversationId && filters.conversationId.trim()) {
+    const convPlaceholder = param(filters.conversationId.trim());
+    clauses.push(
+      `a.elevenlabs_conversation_id ilike '%' || ${convPlaceholder} || '%'`
+    );
+  }
+
+  return { clauses, values };
+}
 
 const comentarioColumns = `
   c.id,
@@ -81,29 +138,25 @@ export function createComentariosRepository(db: pg.Pool) {
     },
 
     async listByStatus(
-      status: StatusComentario,
-      cursor: string | undefined,
-      limite: number
+      params: FiltroStatusComentario
     ): Promise<ComentarioFilaRow[]> {
+      const { clauses, values } = buildComentariosFilaFilters(params, 1);
+      const limitPlaceholder = `$${values.length + 1}`;
+      values.push(params.limite + 1);
+
       const result = await db.query<ComentarioFilaRow>(`
         select ${comentarioColumns},
         a.elevenlabs_conversation_id as "conversationId",
-        agente.nome as "agenteVozNome"
+        agente.nome as "agenteVozNome",
+        a.iniciado_em as "iniciadoEm",
+        a.concluido_em as "concluidoEm"
         ${comentarioFrom}
         join atendimentos a on a.id = c.atendimento_id
         join agentes_voz agente on agente.id = a.agente_voz_id
-        where c.status = $1
-          and (
-            $2::uuid is null
-            or (c.criado_em, c.id) > (
-              select cursor.criado_em, cursor.id
-              from comentarios cursor
-              where cursor.id = $2
-            )
-          )
+        where ${clauses.join(' and ')}
         order by c.criado_em, c.id
-        limit $3
-      `, [status, cursor ?? null, limite + 1]);
+        limit ${limitPlaceholder}
+      `, values);
       return result.rows;
     },
 

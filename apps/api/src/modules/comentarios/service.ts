@@ -34,7 +34,9 @@ export function toComentarioFila(row: ComentarioFilaRow): ComentarioFila {
     atendimento: {
       id: row.atendimentoId,
       conversationId: row.conversationId,
-      agenteVozNome: row.agenteVozNome
+      agenteVozNome: row.agenteVozNome,
+      iniciadoEm: row.iniciadoEm ? row.iniciadoEm.toISOString() : null,
+      concluidoEm: row.concluidoEm ? row.concluidoEm.toISOString() : null
     }
   };
 }

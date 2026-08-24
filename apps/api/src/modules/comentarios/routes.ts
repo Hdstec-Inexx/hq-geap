@@ -56,18 +56,21 @@ const routes: FastifyPluginAsync = async (app) => {
   );
 
   app.get<{
-    Querystring: { status?: string; cursor?: string; limite?: string };
+    Querystring: {
+      status?: string;
+      cursor?: string;
+      limite?: string;
+      inicio?: string;
+      fim?: string;
+      conversationId?: string;
+    };
   }>(
     '/comentarios',
     adminAuth,
     async (request): Promise<ComentariosFilaPage> => {
       const parsed = filtroStatusComentarioSchema.safeParse(request.query);
       if (!parsed.success) throw app.httpErrors.badRequest('Status invalido');
-      const rows = await repository.listByStatus(
-        parsed.data.status,
-        parsed.data.cursor,
-        parsed.data.limite
-      );
+      const rows = await repository.listByStatus(parsed.data);
       const items = rows.slice(0, parsed.data.limite).map(toComentarioFila);
       return {
         items,
