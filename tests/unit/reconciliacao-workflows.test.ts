@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { ingestAtendimentoSchema } from '@hq-geap/contracts/atendimentos';
 
 const reconciliacaoPath = new URL(
   '../../n8n/workflows/reconciliacao-atendimentos.json',
@@ -543,3 +544,175 @@ test('os tres workflows sincronizam transcricao com tool_calls, tool_results e t
     assert.deepEqual(transcript[3]?.tool_calls, rawTranscript[3]?.tool_calls);
   }
 });
+
+test('no Postgres de reconciliacao filtra Atendimentos sem audio ou com transcricao inconsistente', async () => {
+  const workflow = await loadWorkflow(reconciliacaoPath);
+  const filter = node(workflow, 'Manter somente ausentes');
+  const query = String(filter?.parameters.query ?? '');
+
+  assert.equal(filter?.credentials?.postgres?.name, 'HQ GEAP PostgreSQL');
+  assert.match(query, /unnest\(\$1::text\[\]\)/i);
+  assert.match(query, /not exists/i);
+  assert.match(query, /elevenlabs_conversation_id\s*=\s*c\.conversation_id/i);
+  assert.match(query, /audio_url\s+is\s+not\s+null/i);
+  assert.match(query, /audio_url\s*<>\s*''/i);
+  assert.match(query, /transcricao/i);
+  assert.match(query, /jsonb_array_elements/i);
+  assert.match(query, /jsonb_typeof/i);
+  assert.match(query, /count\(1\)/i);
+  assert.match(query, /<=\s*1/i);
+});
+
+test('Contrato normalizado em reconciliacao e reprocessar valida contrato canonico contra ingestAtendimentoSchema', async () => {
+  const [reconciliacao, reprocessamento] = await Promise.all([
+    loadWorkflow(reconciliacaoPath),
+    loadWorkflow(reprocessamentoPath)
+  ]);
+
+  const rawData = {
+    conversation_id: 'conv-canonical-001',
+    agent_id: 'agent-livia-test',
+    status: 'done',
+    transcript: [
+      { role: 'agent', message: 'Olá, sou a Lívia.', time_in_call_secs: 0 },
+      { role: 'user', message: 'Quero emitir segunda via.', time_in_call_secs: 4 },
+      {
+        role: 'agent',
+        message: 'Transferindo para o atendente.',
+        time_in_call_secs: 10,
+        tool_calls: [
+          { tool_name: 'transfer_to_human', tool_call_id: 'tc-01', tool_has_been_called: true }
+        ],
+        tool_results: [
+          { tool_call_id: 'tc-01', tool_name: 'transfer_to_human', is_error: false }
+        ]
+      }
+    ],
+    metadata: {
+      start_time_unix_secs: 1785330000,
+      call_duration_secs: 120,
+      cost_fiat: 0.15
+    },
+    analysis: {
+      data_collection_results: {
+        'Classificação': { value: 'Financeiro/Boletos' }
+      }
+    },
+    has_audio: true
+  };
+
+  for (const workflow of [reconciliacao, reprocessamento]) {
+    const normalizar = contratoNormalizado(workflow);
+    const result = normalizar(rawData, {
+      ELEVENLABS_TRANSFER_TOOL_NAME: 'transfer_to_human'
+    }) as Array<{ json: Record<string, unknown> }>;
+
+    assert.equal(result.length, 1);
+    const item = result[0]!.json;
+
+    // Deve ser válido segundo ingestAtendimentoSchema
+    const parsed = ingestAtendimentoSchema.parse(item);
+    assert.equal(parsed.conversation_id, 'conv-canonical-001');
+    assert.equal(parsed.agent_id, 'agent-livia-test');
+    assert.equal(parsed.status, 'concluido');
+    assert.equal(parsed.transferred, true);
+    assert.equal(parsed.tme_seconds, 6);
+    assert.deepEqual(parsed.tool_executions, { total: 1, successful: 1 });
+    assert.equal(parsed.contact_reason, 'Financeiro/Boletos');
+    assert.equal(parsed.duration_seconds, 120);
+    assert.equal(item.has_audio, true);
+    assert.equal(item.audio_object_key, 'conv-canonical-001.mp3');
+  }
+});
+
+test('Contrato normalizado em reconciliacao e reprocessar mapeia execucoes de ferramentas e transferencia dinamica', async () => {
+  const [reconciliacao, reprocessamento] = await Promise.all([
+    loadWorkflow(reconciliacaoPath),
+    loadWorkflow(reprocessamentoPath)
+  ]);
+
+  const rawData = {
+    conversation_id: 'conv-tools-002',
+    agent_id: 'agent-livia-test',
+    status: 'done',
+    transcript: [
+      { role: 'agent', message: 'Olá.', time_in_call_secs: 0 },
+      { role: 'user', message: 'Consulta.', time_in_call_secs: 5 },
+      {
+        role: 'agent',
+        message: 'Consultando.',
+        time_in_call_secs: 12,
+        tool_calls: [
+          { tool_name: 'consultar_status', tool_call_id: 't-1', tool_has_been_called: true },
+          { tool_name: 'tool_nao_chamada', tool_call_id: 't-2', tool_has_been_called: false },
+          { tool_name: 'transfer_custom_tool', tool_call_id: 't-3', tool_has_been_called: true }
+        ],
+        tool_results: [
+          { tool_call_id: 't-1', is_error: true },
+          { tool_call_id: 't-3', is_error: false }
+        ]
+      }
+    ],
+    metadata: {
+      start_time_unix_secs: 1785330000,
+      call_duration_secs: 60,
+      cost_fiat: 0.05
+    },
+    analysis: { data_collection_results: {} },
+    has_audio: false
+  };
+
+  for (const workflow of [reconciliacao, reprocessamento]) {
+    const normalizar = contratoNormalizado(workflow);
+    const result = (
+      normalizar(rawData, {
+        ELEVENLABS_TRANSFER_TOOL_NAME: 'transfer_custom_tool'
+      }) as Array<{ json: Record<string, unknown> }>
+    )[0]!.json;
+
+    assert.equal(result.transferred, true);
+    assert.deepEqual(result.tool_executions, { total: 2, successful: 1 });
+  }
+});
+
+test('Contrato normalizado deriva tme_seconds e role mesmo quando o payload usa speaker e tempo_segundos', async () => {
+  const [reconciliacao, reprocessamento] = await Promise.all([
+    loadWorkflow(reconciliacaoPath),
+    loadWorkflow(reprocessamentoPath)
+  ]);
+
+  const rawData = {
+    conversation_id: 'conv-speaker-format-001',
+    agent_id: 'agent-livia-test',
+    status: 'done',
+    transcript: [
+      { speaker: 'IA', message: 'Olá, sou a Lívia.', tempo_segundos: '0' },
+      { speaker: 'Cliente', message: 'Preciso de ajuda.', tempo_segundos: '5' },
+      { speaker: 'IA', message: 'Como posso ajudar?', tempo_segundos: '12' }
+    ],
+    metadata: {
+      start_time_unix_secs: 1785330000,
+      call_duration_secs: 60,
+      cost_fiat: 0.1
+    },
+    analysis: { data_collection_results: {} },
+    has_audio: false
+  };
+
+  for (const workflow of [reconciliacao, reprocessamento]) {
+    const normalizar = contratoNormalizado(workflow);
+    const result = (
+      normalizar(rawData, {
+        ELEVENLABS_TRANSFER_TOOL_NAME: 'transfer_to_number'
+      }) as Array<{ json: Record<string, unknown> }>
+    )[0]!.json;
+
+    assert.equal(result.tme_seconds, 7);
+    const transcript = result.transcript as Array<Record<string, unknown>>;
+    assert.equal(transcript[0]?.role, 'agent');
+    assert.equal(transcript[1]?.role, 'user');
+    assert.equal(transcript[2]?.role, 'agent');
+  }
+});
+
+
