@@ -1256,4 +1256,138 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await expect(page).toHaveURL('/atendimentos');
     await expect(idInput).toHaveValue('');
   });
+
+  test('reconciliação de atendimento inconsistente enriquece transcrição, atualiza duração e Tempo de Espera e preserva imutabilidade da avaliação da IA', async ({
+    request
+  }) => {
+    const convId = `conv-reconciliacao-e2e-${Date.now()}`;
+    const admin = await login(request, 'admin');
+    const headers = { authorization: `Bearer ${admin.token}` };
+
+    // 1. Ingestão inicial com transcrição inconsistente (múltiplos turnos em 00:00)
+    const initialRes = await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: {
+        conversation_id: convId,
+        agent_id: 'agent-livia-test',
+        event_timestamp: 1785330000,
+        status: 'concluido',
+        started_at: '2026-08-10T10:00:00.000Z',
+        completed_at: '2026-08-10T10:02:00.000Z',
+        duration_seconds: 0,
+        transferred: false,
+        contact_reason: 'Reconciliação e Imutabilidade',
+        transcript: [
+          { role: 'agent', message: 'Olá, sou a Lívia da GEAP.', time_in_call_secs: 0 },
+          { role: 'user', message: 'Gostaria de emitir boleto.', time_in_call_secs: 0 },
+          { role: 'agent', message: 'Localizei seu cadastro.', time_in_call_secs: 0 }
+        ]
+      },
+      headers: ingestionHeaders
+    });
+    expect(initialRes.status()).toBe(201);
+    const initialData = (await initialRes.json()) as { id: string };
+    const atendimentoId = initialData.id;
+
+    // 2. Persistir avaliação da IA
+    const avaliacaoResult = await queryDatabase<{ avaliacao_id: string }>(`
+      select * from persistir_avaliacao_ia(
+        $1,
+        (select id from prompts_ia_avaliadora where ativo),
+        $2::jsonb,
+        $3::jsonb,
+        $4,
+        $5,
+        $6
+      )
+    `, [
+      atendimentoId,
+      JSON.stringify(aprovada.checklist),
+      JSON.stringify(aprovada.falhas_identificadas),
+      aprovada.resumo_atendimento,
+      aprovada.atendimento_aprovado,
+      aprovada.nota_qualidade
+    ]);
+    const avaliacaoId = avaliacaoResult.rows[0]!.avaliacao_id;
+
+    const avaliacaoBefore = await queryDatabase<pg.QueryResultRow>(
+      'select * from avaliacoes where id = $1',
+      [avaliacaoId]
+    );
+
+    // 3. Executar POST /atendimentos/ingestao com o payload reconciliado
+    const reconciledRes = await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: {
+        conversation_id: convId,
+        agent_id: 'agent-livia-test',
+        event_timestamp: 1785330060,
+        status: 'concluido',
+        started_at: '2026-08-10T10:00:00.000Z',
+        completed_at: '2026-08-10T10:02:00.000Z',
+        duration_seconds: 120,
+        transferred: false,
+        contact_reason: 'Reconciliação e Imutabilidade',
+        tme_seconds: 6,
+        tool_executions: { total: 1, successful: 1 },
+        transcript: [
+          { role: 'agent', message: 'Olá, sou a Lívia da GEAP.', time_in_call_secs: 0 },
+          { role: 'user', message: 'Gostaria de emitir boleto.', time_in_call_secs: 5 },
+          { role: 'agent', message: 'Localizei seu cadastro.', time_in_call_secs: 11 }
+        ]
+      },
+      headers: ingestionHeaders
+    });
+    expect(reconciledRes.status()).toBe(200);
+
+    // 4. Verificar atualização na tabela atendimentos e no detalhe
+    const dbAtendimento = await queryDatabase<{
+      duracao_segundos: number;
+      tme_segundos: number;
+      tools_executados: number;
+      tools_sucesso: number;
+      transcricao: unknown;
+    }>(
+      'select duracao_segundos, tme_segundos, tools_executados, tools_sucesso, transcricao from atendimentos where id = $1',
+      [atendimentoId]
+    );
+    expect(dbAtendimento.rows[0]).toMatchObject({
+      duracao_segundos: 120,
+      tme_segundos: 6,
+      tools_executados: 1,
+      tools_sucesso: 1
+    });
+
+    const detailRes = await request.get(`${apiUrl}/atendimentos/${atendimentoId}`, { headers });
+    expect(detailRes.status()).toBe(200);
+    const detailData = await detailRes.json();
+    expect(detailData).toMatchObject({
+      id: atendimentoId,
+      conversationId: convId,
+      duracaoSegundos: 120,
+      transcricao: [
+        { role: 'agent', message: 'Olá, sou a Lívia da GEAP.', time_in_call_secs: 0 },
+        { role: 'user', message: 'Gostaria de emitir boleto.', time_in_call_secs: 5 },
+        { role: 'agent', message: 'Localizei seu cadastro.', time_in_call_secs: 11 }
+      ]
+    });
+
+    // 5. Verificar que a avaliação associada na tabela avaliacoes permanece estritamente idêntica
+    const avaliacaoAfter = await queryDatabase<pg.QueryResultRow>(
+      'select * from avaliacoes where atendimento_id = $1',
+      [atendimentoId]
+    );
+    expect(avaliacaoAfter.rows).toHaveLength(1);
+    expect(avaliacaoAfter.rows[0]).toEqual(avaliacaoBefore.rows[0]);
+
+    // Verificar via endpoint GET /atendimentos/:id/avaliacao-ia
+    const avaliacaoApiRes = await request.get(`${apiUrl}/atendimentos/${atendimentoId}/avaliacao-ia`, { headers });
+    expect(avaliacaoApiRes.status()).toBe(200);
+    const avaliacaoApiData = await avaliacaoApiRes.json();
+    expect(avaliacaoApiData).toMatchObject({
+      nota: 9.5,
+      atendimentoAprovado: true,
+      resumoAtendimento: aprovada.resumo_atendimento,
+      falhasIdentificadas: aprovada.falhas_identificadas,
+      checklist: aprovada.checklist
+    });
+  });
 });
