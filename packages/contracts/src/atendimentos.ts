@@ -255,6 +255,32 @@ export function transformToHistoricoTranscricao(raw: unknown): HistoricoTranscri
   return { historico };
 }
 
+function parseNumericSeconds(raw: unknown): number | null {
+  if (raw === undefined || raw === null) {
+    return null;
+  }
+  if (typeof raw === 'number') {
+    return Number.isFinite(raw) ? raw : null;
+  }
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (trimmed === '' || !/^-?[0-9]+(\.[0-9]+)?$/.test(trimmed)) {
+      return null;
+    }
+    const num = Number(trimmed);
+    return Number.isFinite(num) ? num : null;
+  }
+  return null;
+}
+
+function extractTurnSeconds(record: Record<string, unknown>): number | null {
+  const rawTime =
+    record.time_in_call_secs !== undefined && record.time_in_call_secs !== null
+      ? record.time_in_call_secs
+      : record.tempo_segundos;
+  return parseNumericSeconds(rawTime);
+}
+
 export function isTranscricaoInconsistente(raw: unknown): boolean {
   if (raw === null || raw === undefined) {
     return true;
@@ -272,37 +298,97 @@ export function isTranscricaoInconsistente(raw: unknown): boolean {
       continue;
     }
     const record = item as Record<string, unknown>;
-    const rawTime =
-      record.time_in_call_secs !== undefined && record.time_in_call_secs !== null
-        ? record.time_in_call_secs
-        : record.tempo_segundos;
-
-    if (rawTime === undefined || rawTime === null) {
-      invalidOrNonPositiveCount++;
-      continue;
-    }
-
-    let time: number;
-    if (typeof rawTime === 'number') {
-      time = rawTime;
-    } else if (typeof rawTime === 'string') {
-      const trimmed = rawTime.trim();
-      if (trimmed === '' || !/^-?[0-9]+(\.[0-9]+)?$/.test(trimmed)) {
-        invalidOrNonPositiveCount++;
-        continue;
-      }
-      time = Number(trimmed);
-    } else {
-      invalidOrNonPositiveCount++;
-      continue;
-    }
-
-    if (!Number.isFinite(time) || time <= 0) {
+    const time = extractTurnSeconds(record);
+    if (time === null || time <= 0) {
       invalidOrNonPositiveCount++;
     }
   }
 
   return invalidOrNonPositiveCount > 1;
+}
+
+export function extractCallDuration(raw: unknown): number | null {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+  const record = raw as Record<string, unknown>;
+  const metadata =
+    record.metadata && typeof record.metadata === 'object'
+      ? (record.metadata as Record<string, unknown>)
+      : null;
+  const data =
+    record.data && typeof record.data === 'object'
+      ? (record.data as Record<string, unknown>)
+      : null;
+  const dataMetadata =
+    data?.metadata && typeof data.metadata === 'object'
+      ? (data.metadata as Record<string, unknown>)
+      : null;
+
+  const rawDuration =
+    metadata?.call_duration_secs ??
+    record.call_duration_secs ??
+    record.duracao_segundos ??
+    record.duration_seconds ??
+    dataMetadata?.call_duration_secs ??
+    data?.call_duration_secs ??
+    data?.duration_seconds;
+
+  const durationNum = parseNumericSeconds(rawDuration);
+  if (durationNum === null || durationNum < 0) {
+    return null;
+  }
+  return Math.round(durationNum);
+}
+
+export function calculateTempoEspera(raw: unknown): number | null {
+  const items = parseTranscriptPayload(raw);
+  if (items.length === 0) {
+    return null;
+  }
+
+  const agentSpeeches: Array<{ time: number }> = [];
+  let firstClientSpeech: { time: number } | null = null;
+
+  for (const item of items) {
+    if (!item || typeof item !== 'object') continue;
+    const entry = item as Record<string, unknown>;
+    const resolvedRole =
+      entry.role === 'agent' || entry.role === 'user'
+        ? entry.role
+        : (roleFromSpeaker(entry.role) ?? roleFromSpeaker(entry.speaker));
+
+    if (!resolvedRole) continue;
+
+    const verbalText = typeof entry.message === 'string' ? entry.message.trim() : '';
+    if (!verbalText) continue;
+
+    const time = extractTurnSeconds(entry) ?? Number.NaN;
+
+    if (resolvedRole === 'agent') {
+      agentSpeeches.push({ time });
+    } else if (resolvedRole === 'user' && !firstClientSpeech) {
+      firstClientSpeech = { time };
+    }
+  }
+
+  if (agentSpeeches.length < 2 || !firstClientSpeech) {
+    return null;
+  }
+
+  const clientAt = firstClientSpeech.time;
+  const secondAgentAt = agentSpeeches[1]!.time;
+
+  if (!Number.isFinite(clientAt) || !Number.isFinite(secondAgentAt) || clientAt < 0 || secondAgentAt < 0) {
+    return null;
+  }
+
+  const delta = secondAgentAt - clientAt;
+  if (delta < 0) {
+    return null;
+  }
+
+  return Math.round(delta);
 }
 
 export const transcriptEntrySchema = z
