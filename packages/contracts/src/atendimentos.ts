@@ -255,6 +255,80 @@ export function transformToHistoricoTranscricao(raw: unknown): HistoricoTranscri
   return { historico };
 }
 
+export function isTranscricaoInconsistente(raw: unknown): boolean {
+  if (raw === null || raw === undefined) {
+    return true;
+  }
+
+  let items: unknown[];
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed === null || typeof parsed !== 'object') {
+        return true;
+      }
+      items = asTranscriptEntries(parsed);
+      if (
+        items.length === 0 &&
+        !Array.isArray(parsed) &&
+        !('historico' in parsed) &&
+        !('transcript' in parsed)
+      ) {
+        return true;
+      }
+    } catch {
+      return true;
+    }
+  } else if (typeof raw === 'object') {
+    items = asTranscriptEntries(raw);
+  } else {
+    return true;
+  }
+
+  if (items.length === 0) {
+    return true;
+  }
+
+  let invalidOrNonPositiveCount = 0;
+  for (const item of items) {
+    if (!item || typeof item !== 'object') {
+      invalidOrNonPositiveCount++;
+      continue;
+    }
+    const record = item as Record<string, unknown>;
+    const rawTime =
+      record.time_in_call_secs !== undefined && record.time_in_call_secs !== null
+        ? record.time_in_call_secs
+        : record.tempo_segundos;
+
+    if (rawTime === undefined || rawTime === null) {
+      invalidOrNonPositiveCount++;
+      continue;
+    }
+
+    let time: number;
+    if (typeof rawTime === 'number') {
+      time = rawTime;
+    } else if (typeof rawTime === 'string') {
+      const trimmed = rawTime.trim();
+      if (trimmed === '' || !/^-?[0-9]+(\.[0-9]+)?$/.test(trimmed)) {
+        invalidOrNonPositiveCount++;
+        continue;
+      }
+      time = Number(trimmed);
+    } else {
+      invalidOrNonPositiveCount++;
+      continue;
+    }
+
+    if (!Number.isFinite(time) || time <= 0) {
+      invalidOrNonPositiveCount++;
+    }
+  }
+
+  return invalidOrNonPositiveCount > 1;
+}
+
 export const transcriptEntrySchema = z
   .object({
     role: z.string().optional(),
