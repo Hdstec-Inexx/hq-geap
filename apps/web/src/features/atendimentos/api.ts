@@ -41,10 +41,3 @@ export function useAuthenticatedResource<T>(path: string, schema: z.ZodType<T>) 
 
   return state;
 }
-
-export function formatDuration(seconds: number | null) {
-  if (seconds === null) {
-    return 'Não disponível';
-  }
-  return `${Math.floor(seconds / 60)}min ${seconds % 60}s`;
-}

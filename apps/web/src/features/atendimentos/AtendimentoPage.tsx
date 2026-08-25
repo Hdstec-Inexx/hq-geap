@@ -15,7 +15,8 @@ import {
   TranscriptPanel,
   useAudioPlayer
 } from '../player';
-import { formatDuration, useAuthenticatedResource } from './api';
+import { formatAtendimentoDate, formatDuration } from './atendimento-facts-logic';
+import { useAuthenticatedResource } from './api';
 import { formatMotivoContato } from './motivo-combobox-logic';
 
 const currency = new Intl.NumberFormat('pt-BR', {
@@ -102,6 +103,7 @@ export function AtendimentoPage() {
         <div><span>Duração</span><strong>{formatDuration(atendimento.duracaoSegundos)}</strong></div>
         <div><span>Transferência</span><strong>{atendimento.houveTransferencia ? 'Realizada' : 'Não realizada'}</strong></div>
         {atendimento.custo !== undefined ? <div><span>Custo</span><strong>{atendimento.custo === null ? 'Não disponível' : currency.format(atendimento.custo)}</strong></div> : null}
+        <div><span>Data</span><strong>{formatAtendimentoDate(atendimento)}</strong></div>
       </section>
 
       {atendimento.status === 'em_andamento' ? (

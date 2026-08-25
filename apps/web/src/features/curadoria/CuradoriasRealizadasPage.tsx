@@ -6,7 +6,8 @@ import {
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { usePerfil } from '../auth/perfil-context';
-import { formatDuration, useAuthenticatedResource } from '../atendimentos/api';
+import { formatDuration } from '../atendimentos/atendimento-facts-logic';
+import { useAuthenticatedResource } from '../atendimentos/api';
 import { formatMotivoContato } from '../atendimentos/motivo-combobox-logic';
 import { MotivoCombobox } from '../atendimentos/MotivoCombobox';
 import { CriteriosMultiSelect } from '../atendimentos/CriteriosMultiSelect';

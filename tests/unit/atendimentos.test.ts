@@ -1363,6 +1363,47 @@ test('filtros SQL suportam conversationId com ILIKE', async () => {
   assert.deepEqual(filtro.values, ['conv-abc-123']);
 });
 
+test('formatDate formata datas ISO no fuso oficial e trata nulos e invalidos', async () => {
+  const { formatDate, formatAtendimentoDate } = await import(
+    '../../apps/web/src/features/atendimentos/atendimento-facts-logic.js'
+  );
+
+  assert.equal(formatDate(null), 'Não informado');
+  assert.equal(formatDate(undefined), 'Não informado');
+  assert.equal(formatDate(''), 'Não informado');
+  assert.equal(formatDate('invalid-date'), 'Data inválida');
+
+  // Teste com data UTC fixa e verificação do padrão DD/MM/AAAA, HH:mm
+  const formatted = formatDate('2026-08-25T20:09:00.000Z');
+  // 20:09 UTC -> 17:09 America/Sao_Paulo (UTC-3)
+  assert.match(formatted, /25\/08\/2026[,\s]+17:09/);
+
+  // formatAtendimentoDate usa concluidoEm com prioridade e fallback para iniciadoEm
+  assert.match(
+    formatAtendimentoDate({
+      concluidoEm: '2026-08-25T20:09:00.000Z',
+      iniciadoEm: '2026-08-25T20:00:00.000Z'
+    }),
+    /25\/08\/2026[,\s]+17:09/
+  );
+
+  assert.match(
+    formatAtendimentoDate({
+      concluidoEm: null,
+      iniciadoEm: '2026-08-25T20:00:00.000Z'
+    }),
+    /25\/08\/2026[,\s]+17:00/
+  );
+
+  assert.equal(
+    formatAtendimentoDate({
+      concluidoEm: null,
+      iniciadoEm: null
+    }),
+    'Não informado'
+  );
+});
+
 
 
 
