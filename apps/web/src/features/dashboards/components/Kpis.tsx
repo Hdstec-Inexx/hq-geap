@@ -5,7 +5,7 @@ import {
 } from '@hq-geap/contracts/dashboards';
 import { type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { formatDuration } from '../../atendimentos/api';
+import { formatDuration } from '../../atendimentos/atendimento-facts-logic';
 import { detalhamentoListPath } from '../detalhamento';
 
 function valueOrDash(value: number | null, format: (value: number) => string) {

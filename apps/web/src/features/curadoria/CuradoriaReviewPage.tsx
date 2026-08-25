@@ -10,7 +10,8 @@ import { curadoriasRealizadasHref, filaHref, pageFromSearch } from './pagination
 import { apiUrl, getSession } from '../auth/session';
 
 import { canWriteAsCurador, usePerfil } from '../auth/perfil-context';
-import { formatDuration, useAuthenticatedResource } from '../atendimentos/api';
+import { formatAtendimentoDate, formatDuration } from '../atendimentos/atendimento-facts-logic';
+import { useAuthenticatedResource } from '../atendimentos/api';
 import { formatMotivoContato } from '../atendimentos/motivo-combobox-logic';
 import { ComentariosPanel } from '../comentarios/ComentariosPanel';
 import {
@@ -378,6 +379,7 @@ function ReviewContent({
         <div><span>Duração</span><strong>{formatDuration(atendimento.duracaoSegundos)}</strong></div>
         <div><span>Nota da IA</span><strong>{detail.avaliacaoIa.nota.toLocaleString('pt-BR')}</strong></div>
         <div><span>Resultado IA</span><strong>{detail.avaliacaoIa.aprovacao === 'aprovado' ? 'Aprovado' : 'Reprovado'}</strong></div>
+        <div><span>Data</span><strong>{formatAtendimentoDate(atendimento)}</strong></div>
       </section>
 
       <section className="ia-review-context">

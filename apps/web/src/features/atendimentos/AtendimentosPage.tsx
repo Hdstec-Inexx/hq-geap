@@ -4,7 +4,8 @@ import {
 import { curadoresListSchema } from '@hq-geap/contracts/curadoria';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { formatDuration, useAuthenticatedResource } from './api';
+import { formatDuration } from './atendimento-facts-logic';
+import { useAuthenticatedResource } from './api';
 import { formatMotivoContato } from './motivo-combobox-logic';
 import { MotivoCombobox } from './MotivoCombobox';
 import { CriteriosMultiSelect } from './CriteriosMultiSelect';
