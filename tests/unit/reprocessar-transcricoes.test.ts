@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   normalizeTranscricao,
-  isTranscricaoInconsistente
+  isTranscricaoInconsistente,
+  calculateTempoEspera,
+  extractCallDuration
 } from '@hq-geap/contracts/atendimentos';
 import {
   buildInconsistentTranscriptionSqlPredicate,
@@ -231,7 +233,7 @@ test('isTranscricaoInconsistente NAO seleciona atendimentos legitimos com apenas
   assert.equal(isTranscricaoInconsistente(transcriptBrutoValido), false);
 });
 
-test('reprocessConversation transforma transcript e atualiza banco de dados de forma transacional', async () => {
+test('reprocessConversation transforma transcript, recalcula duracao e tme e atualiza banco de forma transacional', async () => {
   const executedQueries: Array<{ text: string; values?: unknown[] }> = [];
 
   const mockDb = {
@@ -246,6 +248,9 @@ test('reprocessConversation transforma transcript e atualiza banco de dados de f
       JSON.stringify({
         conversation_id: 'conv-abc',
         status: 'done',
+        metadata: {
+          call_duration_secs: 145.8
+        },
         transcript: [
           { role: 'agent', message: 'Olá Lívia', time_in_call_secs: 0 },
           { role: 'user', message: 'Segunda via', time_in_call_secs: 4 },
@@ -259,8 +264,8 @@ test('reprocessConversation transforma transcript e atualiza banco de dados de f
           },
           {
             role: 'agent',
-            message: null,
-            time_in_call_secs: 10,
+            message: 'Aqui está sua fatura.',
+            time_in_call_secs: 15,
             tool_results: [
               { tool_call_id: 'call-1', is_error: false }
             ]
@@ -285,7 +290,23 @@ test('reprocessConversation transforma transcript e atualiza banco de dados de f
 
   const updateQuery = executedQueries.find((q) => q.text.includes('update atendimentos'));
   assert.ok(updateQuery);
-  assert.equal(updateQuery.values?.[1], 'conv-abc');
+  assert.match(updateQuery.text, /transcricao\s*=\s*\$1::jsonb/i);
+  assert.match(updateQuery.text, /duracao_segundos\s*=\s*\$2/i);
+  assert.match(updateQuery.text, /tme_segundos\s*=\s*\$3/i);
+  assert.match(updateQuery.text, /atualizado_em\s*=\s*now\(\)/i);
+  assert.match(updateQuery.text, /elevenlabs_conversation_id\s*=\s*\$4/i);
+  assert.match(updateQuery.text, /status\s*=\s*'concluido'/i);
+
+  // Garante que duracao_segundos e tme_segundos foram recalculados corretamente
+  assert.equal(updateQuery.values?.[1], 146); // Math.round(145.8)
+  assert.equal(updateQuery.values?.[2], 11);  // 15 - 4 = 11
+  assert.equal(updateQuery.values?.[3], 'conv-abc');
+
+  // Garante que a tabela avaliacoes nunca é alterada
+  assert.equal(
+    executedQueries.some((q) => q.text.toLowerCase().includes('avaliacoes')),
+    false
+  );
 
   const savedTranscricao = JSON.parse(updateQuery.values?.[0] as string);
   assert.deepEqual(savedTranscricao, {
@@ -310,9 +331,9 @@ test('reprocessConversation transforma transcript e atualiza banco de dados de f
       },
       {
         speaker: 'IA',
-        message: '[Resultado da Ferramenta: consultar_boleto - Sucesso]',
-        tempo_segundos: 10,
-        tempo_formatado: '00:10'
+        message: 'Aqui está sua fatura.\n[Resultado da Ferramenta: consultar_boleto - Sucesso]',
+        tempo_segundos: 15,
+        tempo_formatado: '00:15'
       }
     ]
   });
@@ -326,7 +347,7 @@ test('runPass suporta lista pontual de conversation IDs e executa em lote com me
     end: async () => {},
     query: async (text: string, values?: unknown[]) => {
       if (text.includes('update atendimentos')) {
-        executedUpdates.push(values?.[1] as string);
+        executedUpdates.push(values?.[3] as string);
       }
       return { rowCount: 1, rows: [] };
     }
@@ -509,4 +530,226 @@ test('reprocessConversation substitui transcricoes legadas zeradas persistindo t
   );
 });
 
+test('extractCallDuration extrai a duracao em segundos inteiros de diferentes formatos de payload', () => {
+  // Formato padrao ElevenLabs com metadata
+  assert.equal(extractCallDuration({ metadata: { call_duration_secs: 252.4 } }), 252);
+  assert.equal(extractCallDuration({ metadata: { call_duration_secs: 0 } }), 0);
+
+  // Formato aninhado sob data
+  assert.equal(extractCallDuration({ data: { metadata: { call_duration_secs: 180 } } }), 180);
+  assert.equal(extractCallDuration({ data: { call_duration_secs: 65 } }), 65);
+
+  // Formato direto no root
+  assert.equal(extractCallDuration({ call_duration_secs: 42 }), 42);
+  assert.equal(extractCallDuration({ duracao_segundos: 120 }), 120);
+  assert.equal(extractCallDuration({ duration_seconds: 300 }), 300);
+
+  // Casos invalidos ou nulos
+  assert.equal(extractCallDuration(null), null);
+  assert.equal(extractCallDuration(undefined), null);
+  assert.equal(extractCallDuration({}), null);
+  assert.equal(extractCallDuration({ metadata: {} }), null);
+  assert.equal(extractCallDuration({ metadata: { call_duration_secs: null } }), null);
+  assert.equal(extractCallDuration({ metadata: { call_duration_secs: -10 } }), null);
+  assert.equal(extractCallDuration({ metadata: { call_duration_secs: 'invalid' } }), null);
+});
+
+test('calculateTempoEspera deriva o intervalo entre 1a fala do cliente e 2a fala do agente', () => {
+  // Caso de sucesso padrao: 1a fala cliente (5s), 2a fala agente (9s) -> 4s
+  const standardConv = {
+    transcript: [
+      { role: 'agent', message: 'Olá, sou a Lívia.', time_in_call_secs: 0 },
+      { role: 'user', message: 'Preciso de boleto.', time_in_call_secs: 5 },
+      { role: 'agent', message: 'Vou emitir para você.', time_in_call_secs: 9 }
+    ]
+  };
+  assert.equal(calculateTempoEspera(standardConv), 4);
+
+  // Com timestamps fracionarios arredondados
+  const fractionalConv = [
+    { role: 'agent', message: 'Olá.', time_in_call_secs: 0 },
+    { role: 'user', message: 'Oi.', time_in_call_secs: 5.5 },
+    { role: 'agent', message: 'Como posso ajudar?', time_in_call_secs: 9 }
+  ];
+  assert.equal(calculateTempoEspera(fractionalConv), 4);
+
+  // Formato historico (speaker IA / Cliente, tempo_segundos)
+  const historicoConv = {
+    historico: [
+      { speaker: 'IA', message: 'Olá', tempo_segundos: 0 },
+      { speaker: 'Cliente', message: 'Boleto', tempo_segundos: 8 },
+      { speaker: 'IA', message: 'Consultando', tempo_segundos: 19 }
+    ]
+  };
+  assert.equal(calculateTempoEspera(historicoConv), 11);
+
+  // String JSON
+  assert.equal(calculateTempoEspera(JSON.stringify(standardConv)), 4);
+
+  // Ausente primeira fala do cliente -> null
+  const noClient = [
+    { role: 'agent', message: 'Olá.', time_in_call_secs: 0 },
+    { role: 'agent', message: 'Ainda está aí?', time_in_call_secs: 10 }
+  ];
+  assert.equal(calculateTempoEspera(noClient), null);
+
+  // Ausente segunda fala do agente (apenas apresentacao) -> null
+  const onlyPresentation = [
+    { role: 'agent', message: 'Olá, sou a Lívia.', time_in_call_secs: 0 },
+    { role: 'user', message: 'Oi.', time_in_call_secs: 5 }
+  ];
+  assert.equal(calculateTempoEspera(onlyPresentation), null);
+
+  // Ausente apresentacao do agente (só 1 fala do agente após o cliente) -> null
+  const noPresentation = [
+    { role: 'user', message: 'Oi.', time_in_call_secs: 5 },
+    { role: 'agent', message: 'Olá!', time_in_call_secs: 9 }
+  ];
+  assert.equal(calculateTempoEspera(noPresentation), null);
+
+  // Intervalo negativo (anomalia de timestamp) -> null
+  const negativeDelta = [
+    { role: 'agent', message: 'Olá.', time_in_call_secs: 0 },
+    { role: 'user', message: 'Oi.', time_in_call_secs: 15 },
+    { role: 'agent', message: 'Resposta.', time_in_call_secs: 10 }
+  ];
+  assert.equal(calculateTempoEspera(negativeDelta), null);
+
+  // Turnos intermediarios de ferramentas sem mensagem verbal nao interferem na contagem de falas verbais
+  const withToolCalls = [
+    { role: 'agent', message: 'Olá, sou a Lívia.', time_in_call_secs: 0 },
+    { role: 'user', message: 'Gostaria do boleto.', time_in_call_secs: 6 },
+    { role: 'agent', message: '', time_in_call_secs: 10, tool_calls: [{ tool_name: 'buscar' }] },
+    { role: 'agent', message: 'Aqui está seu boleto.', time_in_call_secs: 18 }
+  ];
+  assert.equal(calculateTempoEspera(withToolCalls), 12);
+});
+
+test('reprocessConversation grava tme_segundos como null quando o atendimento nao possui a segunda fala do agente', async () => {
+  let executedUpdate: { text: string; values?: unknown[] } | undefined;
+
+  const mockDb = {
+    query: async (text: string, values?: unknown[]) => {
+      if (text.includes('update atendimentos')) {
+        executedUpdate = { text, values };
+      }
+      return { rowCount: 1, rows: [] };
+    }
+  };
+
+  const mockFetch: typeof fetch = async () => {
+    return new Response(
+      JSON.stringify({
+        conversation_id: 'conv-only-pres',
+        status: 'done',
+        metadata: { call_duration_secs: 30 },
+        transcript: [
+          { role: 'agent', message: 'Olá, sou a Lívia da GEAP.', time_in_call_secs: 0 }
+        ]
+      }),
+      { status: 200 }
+    );
+  };
+
+  const outcome = await reprocessConversation(mockDb as any, 'conv-only-pres', {
+    fetchFn: mockFetch
+  });
+
+  assert.equal(outcome.success, true);
+  assert.ok(executedUpdate);
+  assert.equal(executedUpdate.values?.[1], 30);   // duracao_segundos
+  assert.equal(executedUpdate.values?.[2], null); // tme_segundos is null
+  assert.equal(executedUpdate.values?.[3], 'conv-only-pres');
+});
+
+test('reprocessConversation garante rollback e preserva imutabilidade de avaliacoes quando ocorre erro no banco', async () => {
+  const executedStatements: string[] = [];
+
+  const mockDb = {
+    query: async (text: string) => {
+      executedStatements.push(text.trim().toLowerCase());
+      if (text.includes('update atendimentos')) {
+        throw new Error('database connection timeout');
+      }
+      return { rowCount: 1, rows: [] };
+    }
+  };
+
+  const mockFetch: typeof fetch = async () => {
+    return new Response(
+      JSON.stringify({
+        conversation_id: 'conv-db-err',
+        status: 'done',
+        metadata: { call_duration_secs: 50 },
+        transcript: [{ role: 'agent', message: 'Olá', time_in_call_secs: 0 }]
+      }),
+      { status: 200 }
+    );
+  };
+
+  const outcome = await reprocessConversation(mockDb as any, 'conv-db-err', {
+    fetchFn: mockFetch
+  });
+
+  assert.equal(outcome.success, false);
+  assert.match(outcome.error ?? '', /database connection timeout/i);
+  assert.ok(executedStatements.includes('begin'));
+  assert.ok(executedStatements.includes('rollback'));
+  assert.equal(executedStatements.includes('commit'), false);
+  assert.equal(executedStatements.some((s) => s.includes('avaliacoes')), false);
+});
+
+test('runPass tolera falhas parciais e mantem isolamento transacional por item', async () => {
+  const rolledBackConversations: string[] = [];
+  const committedConversations: string[] = [];
+
+  let currentConvId = '';
+  const mockDb = {
+    connect: async () => {},
+    end: async () => {},
+    query: async (text: string, values?: unknown[]) => {
+      if (text.includes('update atendimentos')) {
+        currentConvId = values?.[3] as string;
+        if (currentConvId === 'conv-fail-db') {
+          throw new Error('simulated db failure');
+        }
+      }
+      if (text.toLowerCase() === 'commit') {
+        committedConversations.push(currentConvId);
+      }
+      if (text.toLowerCase() === 'rollback') {
+        rolledBackConversations.push(currentConvId);
+      }
+      return { rowCount: 1, rows: [] };
+    }
+  };
+
+  const mockFetch: typeof fetch = async (input) => {
+    const url = String(input);
+    if (url.includes('conv-fail-404')) {
+      return new Response(JSON.stringify({ detail: 'Not found' }), { status: 404 });
+    }
+    return new Response(
+      JSON.stringify({
+        conversation_id: url.split('/').pop(),
+        status: 'done',
+        metadata: { call_duration_secs: 60 },
+        transcript: [{ role: 'agent', message: 'Oi', time_in_call_secs: 0 }]
+      }),
+      { status: 200 }
+    );
+  };
+
+  const result = await runPass({
+    specificIds: ['conv-ok-1', 'conv-fail-db', 'conv-fail-404', 'conv-ok-2'],
+    dbClient: mockDb as any,
+    fetchFn: mockFetch
+  });
+
+  assert.equal(result.processed, 4);
+  assert.equal(result.success, 2);
+  assert.equal(result.failed, 2);
+  assert.deepEqual(committedConversations, ['conv-ok-1', 'conv-ok-2']);
+  assert.ok(rolledBackConversations.includes('conv-fail-db'));
+});
 

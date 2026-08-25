@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { loadEnvironment } from './environment.js';
 import {
   transformToHistoricoTranscricao,
+  extractCallDuration,
+  calculateTempoEspera,
   type HistoricoTranscricao
 } from '@hq-geap/contracts/atendimentos';
 
@@ -162,17 +164,22 @@ export async function reprocessConversation(
 
   const historicoTranscricao = transformToHistoricoTranscricao(conversationData);
   const serialized = JSON.stringify(historicoTranscricao);
+  const duracaoSegundos = extractCallDuration(conversationData);
+  const tempoEsperaSegundos = calculateTempoEspera(conversationData);
 
   await db.query('begin');
   try {
     const result = await db.query(
       `
       update atendimentos
-      set transcricao = $1::jsonb, atualizado_em = now()
-      where elevenlabs_conversation_id = $2
+      set transcricao = $1::jsonb,
+          duracao_segundos = $2,
+          tme_segundos = $3,
+          atualizado_em = now()
+      where elevenlabs_conversation_id = $4
         and status = 'concluido'
     `,
-      [serialized, conversationId]
+      [serialized, duracaoSegundos, tempoEsperaSegundos, conversationId]
     );
 
     if ((result.rowCount ?? 0) === 0) {
