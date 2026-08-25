@@ -273,6 +273,14 @@ function parseNumericSeconds(raw: unknown): number | null {
   return null;
 }
 
+function extractTurnSeconds(record: Record<string, unknown>): number | null {
+  const rawTime =
+    record.time_in_call_secs !== undefined && record.time_in_call_secs !== null
+      ? record.time_in_call_secs
+      : record.tempo_segundos;
+  return parseNumericSeconds(rawTime);
+}
+
 export function isTranscricaoInconsistente(raw: unknown): boolean {
   if (raw === null || raw === undefined) {
     return true;
@@ -290,12 +298,7 @@ export function isTranscricaoInconsistente(raw: unknown): boolean {
       continue;
     }
     const record = item as Record<string, unknown>;
-    const rawTime =
-      record.time_in_call_secs !== undefined && record.time_in_call_secs !== null
-        ? record.time_in_call_secs
-        : record.tempo_segundos;
-
-    const time = parseNumericSeconds(rawTime);
+    const time = extractTurnSeconds(record);
     if (time === null || time <= 0) {
       invalidOrNonPositiveCount++;
     }
@@ -338,8 +341,6 @@ export function extractCallDuration(raw: unknown): number | null {
   return Math.round(durationNum);
 }
 
-export const extractDuracaoAtendimento = extractCallDuration;
-
 export function calculateTempoEspera(raw: unknown): number | null {
   const items = parseTranscriptPayload(raw);
   if (items.length === 0) {
@@ -362,13 +363,7 @@ export function calculateTempoEspera(raw: unknown): number | null {
     const verbalText = typeof entry.message === 'string' ? entry.message.trim() : '';
     if (!verbalText) continue;
 
-    const rawTime =
-      entry.time_in_call_secs !== undefined && entry.time_in_call_secs !== null
-        ? entry.time_in_call_secs
-        : entry.tempo_segundos;
-
-    const parsedTime = parseNumericSeconds(rawTime);
-    const time = parsedTime ?? Number.NaN;
+    const time = extractTurnSeconds(entry) ?? Number.NaN;
 
     if (resolvedRole === 'agent') {
       agentSpeeches.push({ time });
