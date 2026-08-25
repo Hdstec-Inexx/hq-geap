@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { loadEnvironment } from './environment.js';
 import {
   transformToHistoricoTranscricao,
+  extractCallDuration,
+  calculateTempoEspera,
   type HistoricoTranscricao
 } from '@hq-geap/contracts/atendimentos';
 
@@ -41,63 +43,71 @@ export interface RunPassOptions extends ReprocessOptions {
   limit?: number;
 }
 
-export function findInconsistentConversationIdsQuery(options?: { force?: boolean }): string {
+function assertSafeSqlIdentifier(identifier: string): void {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(identifier)) {
+    throw new Error(`Identificador SQL inválido: ${identifier}`);
+  }
+}
+
+export function buildInconsistentTranscriptionSqlPredicate(columnName = 'transcricao'): string {
+  assertSafeSqlIdentifier(columnName);
+
+  const arrayExpr = `case
+    when jsonb_typeof(${columnName}) = 'array' then ${columnName}
+    when jsonb_typeof(${columnName}->'historico') = 'array' then ${columnName}->'historico'
+    when jsonb_typeof(${columnName}->'transcript') = 'array' then ${columnName}->'transcript'
+    when jsonb_typeof(${columnName}->'data'->'transcript') = 'array' then ${columnName}->'data'->'transcript'
+    else '[]'::jsonb
+  end`;
+
+  return `(
+    ${columnName} is null
+    or jsonb_typeof(${columnName}) not in ('array', 'object')
+    or jsonb_array_length(${arrayExpr}) = 0
+    or (
+      select count(1)
+      from jsonb_array_elements(${arrayExpr}) as elem
+      where case
+        when trim(elem->>'time_in_call_secs') ~ '^-?[0-9]+(\\.[0-9]+)?$'
+          then (trim(elem->>'time_in_call_secs'))::numeric <= 0
+        when trim(elem->>'tempo_segundos') ~ '^-?[0-9]+(\\.[0-9]+)?$'
+          then (trim(elem->>'tempo_segundos'))::numeric <= 0
+        else true
+      end
+    ) > 1
+  )`.trim();
+}
+
+export function findInconsistentConversationIdsQuery(options?: {
+  force?: boolean;
+  tableAlias?: string;
+}): string {
+  if (options?.tableAlias) {
+    assertSafeSqlIdentifier(options.tableAlias);
+  }
+
+  const col = options?.tableAlias ? `${options.tableAlias}.transcricao` : 'transcricao';
+  const table = options?.tableAlias ? `atendimentos ${options.tableAlias}` : 'atendimentos';
+  const prefix = options?.tableAlias ? `${options.tableAlias}.` : '';
+
   if (options?.force) {
     return `
-      select elevenlabs_conversation_id as "conversationId"
-      from atendimentos
-      where status = 'concluido'
-      order by concluido_em desc nulls last
+      select ${prefix}elevenlabs_conversation_id as "conversationId"
+      from ${table}
+      where ${prefix}status = 'concluido'
+      order by ${prefix}concluido_em desc nulls last
       limit $1
     `.trim();
   }
 
+  const predicate = buildInconsistentTranscriptionSqlPredicate(col);
+
   return `
-    select elevenlabs_conversation_id as "conversationId"
-    from atendimentos
-    where status = 'concluido'
-      and (
-        transcricao is null
-        or jsonb_typeof(transcricao) != 'object'
-        or transcricao->'historico' is null
-        or jsonb_typeof(transcricao->'historico') != 'array'
-        or exists (
-          select 1
-          from jsonb_array_elements(
-            case
-              when jsonb_typeof(transcricao->'historico') = 'array' then transcricao->'historico'
-              else '[]'::jsonb
-            end
-          ) as elem
-          where elem->>'tempo_segundos' is null
-             or elem->>'tempo_formatado' is null
-             or elem->>'speaker' is null
-             or elem->>'message' is null
-             or (elem->>'tempo_segundos') !~ '^-?[0-9]+(\\.[0-9]+)?$'
-        )
-        or (
-          jsonb_array_length(
-            case
-              when jsonb_typeof(transcricao->'historico') = 'array' then transcricao->'historico'
-              else '[]'::jsonb
-            end
-          ) > 1
-          and (
-            select count(1)
-            from jsonb_array_elements(
-              case
-                when jsonb_typeof(transcricao->'historico') = 'array' then transcricao->'historico'
-                else '[]'::jsonb
-              end
-            ) as elem
-            where case
-              when (elem->>'tempo_segundos') ~ '^-?[0-9]+(\\.[0-9]+)?$' then (elem->>'tempo_segundos')::numeric <= 0
-              else true
-            end
-          ) > 1
-        )
-      )
-    order by concluido_em desc nulls last
+    select ${prefix}elevenlabs_conversation_id as "conversationId"
+    from ${table}
+    where ${prefix}status = 'concluido'
+      and ${predicate}
+    order by ${prefix}concluido_em desc nulls last
     limit $1
   `.trim();
 }
@@ -154,17 +164,22 @@ export async function reprocessConversation(
 
   const historicoTranscricao = transformToHistoricoTranscricao(conversationData);
   const serialized = JSON.stringify(historicoTranscricao);
+  const duracaoSegundos = extractCallDuration(conversationData);
+  const tempoEsperaSegundos = calculateTempoEspera(conversationData);
 
   await db.query('begin');
   try {
     const result = await db.query(
       `
       update atendimentos
-      set transcricao = $1::jsonb, atualizado_em = now()
-      where elevenlabs_conversation_id = $2
+      set transcricao = $1::jsonb,
+          duracao_segundos = $2,
+          tme_segundos = $3,
+          atualizado_em = now()
+      where elevenlabs_conversation_id = $4
         and status = 'concluido'
     `,
-      [serialized, conversationId]
+      [serialized, duracaoSegundos, tempoEsperaSegundos, conversationId]
     );
 
     if ((result.rowCount ?? 0) === 0) {

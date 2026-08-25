@@ -33,6 +33,14 @@ _Avoid_: shell, sidebar (vocabulário de implementação, não de domínio)
 Uma interação completa entre o Agente de Voz e um cliente, do início ao fim do contato. Carrega áudio, transcrição e metadados. Ciclo de vida: `Em andamento` → `Concluído`. Pertence a um Agente de Voz.
 _Avoid_: Conversa, ligação, chamada
 
+**Transcrição**:
+A sequência ordenada dos turnos de fala entre o Agente de Voz e o cliente, com mensagem, ferramentas e marcação temporal individual de cada turno. É inconsistente quando mais de um turno apresenta tempo zerado ou ausente.
+_Avoid_: Linha do tempo, log de mensagens, chat
+
+**Reprocessamento de Transcrição**:
+A sincronização da transcrição completa com marcação temporal válida a partir da ElevenLabs para Atendimentos concluídos com transcrição inconsistente. Atualiza o texto, a duração e recalcula o Tempo de Espera, mantendo a Avaliação da IA inalterada.
+_Avoid_: Reavaliação, reanálise
+
 **Agente de Voz**:
 O agente conversacional (ElevenLabs) que atende os clientes. É o "avaliado" do sistema: configurado na ElevenLabs, observado aqui.
 
