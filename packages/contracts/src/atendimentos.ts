@@ -260,31 +260,7 @@ export function isTranscricaoInconsistente(raw: unknown): boolean {
     return true;
   }
 
-  let items: unknown[];
-  if (typeof raw === 'string') {
-    try {
-      const parsed = JSON.parse(raw);
-      if (parsed === null || typeof parsed !== 'object') {
-        return true;
-      }
-      items = asTranscriptEntries(parsed);
-      if (
-        items.length === 0 &&
-        !Array.isArray(parsed) &&
-        !('historico' in parsed) &&
-        !('transcript' in parsed)
-      ) {
-        return true;
-      }
-    } catch {
-      return true;
-    }
-  } else if (typeof raw === 'object') {
-    items = asTranscriptEntries(raw);
-  } else {
-    return true;
-  }
-
+  const items = parseTranscriptPayload(raw);
   if (items.length === 0) {
     return true;
   }

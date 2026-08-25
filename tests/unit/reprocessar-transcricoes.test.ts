@@ -99,6 +99,16 @@ test('findInconsistentConversationIdsQuery gera SQL que filtra atendimentos conc
   assert.match(forceQuery, /status = 'concluido'/i);
   assert.doesNotMatch(forceQuery, /transcricao is null/i);
   assert.match(forceQuery, /limit \$1/i);
+
+  // Validação de segurança de identificadores SQL contra injeção
+  assert.throws(
+    () => buildInconsistentTranscriptionSqlPredicate('transcricao; drop table atendimentos; --'),
+    /Identificador SQL inválido/
+  );
+  assert.throws(
+    () => findInconsistentConversationIdsQuery({ tableAlias: 'a; drop table atendimentos; --' }),
+    /Identificador SQL inválido/
+  );
 });
 
 test('isTranscricaoInconsistente identifica atendimentos concluidos com transcricao nula ou vazia', () => {

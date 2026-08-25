@@ -41,7 +41,15 @@ export interface RunPassOptions extends ReprocessOptions {
   limit?: number;
 }
 
+function assertSafeSqlIdentifier(identifier: string): void {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(identifier)) {
+    throw new Error(`Identificador SQL inválido: ${identifier}`);
+  }
+}
+
 export function buildInconsistentTranscriptionSqlPredicate(columnName = 'transcricao'): string {
+  assertSafeSqlIdentifier(columnName);
+
   const arrayExpr = `case
     when jsonb_typeof(${columnName}) = 'array' then ${columnName}
     when jsonb_typeof(${columnName}->'historico') = 'array' then ${columnName}->'historico'
@@ -72,6 +80,10 @@ export function findInconsistentConversationIdsQuery(options?: {
   force?: boolean;
   tableAlias?: string;
 }): string {
+  if (options?.tableAlias) {
+    assertSafeSqlIdentifier(options.tableAlias);
+  }
+
   const col = options?.tableAlias ? `${options.tableAlias}.transcricao` : 'transcricao';
   const table = options?.tableAlias ? `atendimentos ${options.tableAlias}` : 'atendimentos';
   const prefix = options?.tableAlias ? `${options.tableAlias}.` : '';
