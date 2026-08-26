@@ -19,12 +19,91 @@ async function runSqlDirectory(client: pg.Client, directory: string) {
   }
 }
 
+export const TEST_DATABASE_CONNECTION_STRING =
+  process.env.TEST_DATABASE_URL ??
+  'postgres://hq_geap:hq_geap@127.0.0.1:5432/hq_geap_test';
+
+process.env.DATABASE_URL = TEST_DATABASE_CONNECTION_STRING;
+
+export const TEST_DATABASE_ADVISORY_LOCK_ID = 888999;
+
+export async function createConnectedClient(): Promise<pg.Client> {
+  const client = new Client({ connectionString: TEST_DATABASE_CONNECTION_STRING });
+  await client.connect();
+  return client;
+}
+
+export async function insertTestAgenteVoz(
+  client: pg.Client,
+  nome = 'Lívia Teste',
+  elevenlabsAgentId = 'agent-test-default'
+): Promise<string> {
+  const result = await client.query<{ id: string }>(
+    `
+    insert into agentes_voz (nome, elevenlabs_agent_id)
+    values ($1, $2)
+    returning id
+  `,
+    [nome, elevenlabsAgentId]
+  );
+  const id = result.rows[0]?.id;
+  if (!id) {
+    throw new Error('Falha ao inserir agente de voz no banco de teste');
+  }
+  return id;
+}
+
+export async function insertSnapshotAvaliacaoIa(
+  client: pg.Client,
+  atendimentoId: string,
+  nota = 9.5,
+  resumo = 'Resumo da avaliação da IA para o atendimento'
+): Promise<void> {
+  await client.query(
+    `
+    insert into avaliacoes (
+      atendimento_id, autor, prompt_id, nota, nota_qualidade, resumo_atendimento,
+      saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
+      resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
+      encerramento_geap, uso_correto_ferramentas, falhas_identificadas, atendimento_aprovado
+    )
+    select $1, 'ia', p.id, $2, $2, $3,
+      true, true, true, true, true, false, true, true,
+      '["Utilizou diminutivo no atendimento"]'::jsonb, true
+    from prompts_ia_avaliadora p
+    where p.ativo
+    limit 1
+  `,
+    [atendimentoId, nota, resumo]
+  );
+}
+
+export async function withTestDatabaseLock<T>(fn: () => Promise<T>): Promise<T> {
+  const lockClient = new Client({ connectionString: TEST_DATABASE_CONNECTION_STRING });
+  await lockClient.connect();
+  await lockClient.query('select pg_advisory_lock($1)', [TEST_DATABASE_ADVISORY_LOCK_ID]);
+  try {
+    return await fn();
+  } finally {
+    try {
+      await lockClient.query('select pg_advisory_unlock($1)', [TEST_DATABASE_ADVISORY_LOCK_ID]);
+    } catch {
+      // ignora se a conexao ja encerrou
+    }
+    await lockClient.end();
+  }
+}
+
+export async function withPreparedTestDatabase<T>(fn: () => Promise<T>): Promise<T> {
+  return withTestDatabaseLock(async () => {
+    await prepareTestDatabase();
+    return fn();
+  });
+}
+
 export default async function prepareTestDatabase() {
   await ensureMinioTestAudio().catch(() => {});
-  const connectionString =
-    process.env.TEST_DATABASE_URL ??
-    'postgres://hq_geap:hq_geap@127.0.0.1:5432/hq_geap_test';
-  const client = new Client({ connectionString });
+  const client = new Client({ connectionString: TEST_DATABASE_CONNECTION_STRING });
   await client.connect();
 
   try {

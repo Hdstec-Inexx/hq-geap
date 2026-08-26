@@ -138,6 +138,7 @@ export interface ReprocessamentoPluginOptions {
   runImmediately?: boolean;
   lockId?: number;
   limit?: number;
+  fetchFn?: typeof fetch;
   reprocessFn?: (
     options?: RunPassOptions
   ) => Promise<{ processed: number; success: number; failed: number }>;
@@ -195,6 +196,7 @@ export default fp<ReprocessamentoPluginOptions>(
             lockId,
             apiUrl: app.config.ELEVENLABS_API_URL,
             apiKey: app.config.ELEVENLABS_API_KEY,
+            fetchFn: options?.fetchFn,
             limit: options?.limit,
             log: app.log,
             reprocessFn: options?.reprocessFn
