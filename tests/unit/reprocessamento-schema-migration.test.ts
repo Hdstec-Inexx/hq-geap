@@ -6,6 +6,13 @@ import prepareTestDatabase from '../support/test-db.js';
 
 const { Client } = pg;
 
+type ReprocessamentoRastreamentoRow = {
+  id?: string;
+  reprocessamento_tentativas: number;
+  reprocessamento_ignorado: boolean;
+  reprocessamento_ultimo_erro: string | null;
+};
+
 const migrationsDir = new URL('../../db/migrations/', import.meta.url);
 const migrationPath = new URL(
   '../../db/migrations/0016_reprocessamento_tentativas_e_descarte.sql',
@@ -52,12 +59,7 @@ test('tabela atendimentos aplica defaults retrocompativeis e restricoes de rastr
     assert.ok(agenteVozId);
 
     // 2. Insere atendimento SEM informar as novas colunas (compatibilidade retroativa tipo n8n)
-    const insertResult = await client.query<{
-      id: string;
-      reprocessamento_tentativas: number;
-      reprocessamento_ignorado: boolean;
-      reprocessamento_ultimo_erro: string | null;
-    }>(`
+    const insertResult = await client.query<ReprocessamentoRastreamentoRow>(`
       insert into atendimentos (
         agente_voz_id, elevenlabs_conversation_id, status, iniciado_em, concluido_em
       ) values (
@@ -81,11 +83,7 @@ test('tabela atendimentos aplica defaults retrocompativeis e restricoes de rastr
       where id = $1
     `, [row.id]);
 
-    const updatedResult = await client.query<{
-      reprocessamento_tentativas: number;
-      reprocessamento_ignorado: boolean;
-      reprocessamento_ultimo_erro: string | null;
-    }>(`
+    const updatedResult = await client.query<ReprocessamentoRastreamentoRow>(`
       select reprocessamento_tentativas, reprocessamento_ignorado, reprocessamento_ultimo_erro
       from atendimentos
       where id = $1
