@@ -13,6 +13,15 @@ type ReprocessamentoRastreamentoRow = {
   reprocessamento_ultimo_erro: string | null;
 };
 
+async function createConnectedClient(): Promise<pg.Client> {
+  const connectionString =
+    process.env.TEST_DATABASE_URL ??
+    'postgres://hq_geap:hq_geap@127.0.0.1:5432/hq_geap_test';
+  const client = new Client({ connectionString });
+  await client.connect();
+  return client;
+}
+
 const migrationsDir = new URL('../../db/migrations/', import.meta.url);
 const migrationPath = new URL(
   '../../db/migrations/0016_reprocessamento_tentativas_e_descarte.sql',
@@ -41,12 +50,7 @@ test('migration 0016 vem depois da 0015 e adiciona colunas e indice para reproce
 
 test('tabela atendimentos aplica defaults retrocompativeis e restricoes de rastreamento', async () => {
   await prepareTestDatabase();
-
-  const connectionString =
-    process.env.TEST_DATABASE_URL ??
-    'postgres://hq_geap:hq_geap@127.0.0.1:5432/hq_geap_test';
-  const client = new Client({ connectionString });
-  await client.connect();
+  const client = await createConnectedClient();
 
   try {
     // 1. Cria um agente de voz para vincular atendimentos
@@ -127,12 +131,7 @@ test('tabela atendimentos aplica defaults retrocompativeis e restricoes de rastr
 
 test('indice parcial idx_atendimentos_reprocessamento_pendente e selecionado pelo query planner', async () => {
   await prepareTestDatabase();
-
-  const connectionString =
-    process.env.TEST_DATABASE_URL ??
-    'postgres://hq_geap:hq_geap@127.0.0.1:5432/hq_geap_test';
-  const client = new Client({ connectionString });
-  await client.connect();
+  const client = await createConnectedClient();
 
   try {
     // Força uso de index scan pelo planner durante o teste de plano
@@ -168,6 +167,3 @@ test('preparacao e execucao de migrations eh idempotente com a migration 0016', 
     await prepareTestDatabase();
   });
 });
-
-
-
