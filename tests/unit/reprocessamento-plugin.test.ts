@@ -8,6 +8,7 @@ import {
   REPROCESSAMENTO_LOCK_ID
 } from '../../apps/api/src/plugins/reprocessamento-transcricao.js';
 import { buildApp } from '../../apps/api/src/app.js';
+import { withTestDatabaseLock } from '../support/test-db.js';
 
 const apiRequire = createRequire(new URL('../../apps/api/package.json', import.meta.url));
 
@@ -251,64 +252,66 @@ test('plugin fastify realiza graceful shutdown no onClose limpando timers sem tr
 });
 
 test('controle de concorrencia com pg_try_advisory_xact_lock impede execucao simultanea em banco real', async () => {
-  const connectionString =
-    process.env.TEST_DATABASE_URL ??
-    'postgres://hq_geap:hq_geap@127.0.0.1:5432/hq_geap_test';
+  await withTestDatabaseLock(async () => {
+    const connectionString =
+      process.env.TEST_DATABASE_URL ??
+      'postgres://hq_geap:hq_geap@127.0.0.1:5432/hq_geap_test';
 
-  const pgModule = apiRequire('pg') as typeof import('pg');
-  const pool = new pgModule.Pool({ connectionString });
+    const pgModule = apiRequire('pg') as typeof import('pg');
+    const pool = new pgModule.Pool({ connectionString });
 
-  try {
-    let replica1Ran = false;
-    let replica2Ran = false;
+    try {
+      let replica1Ran = false;
+      let replica2Ran = false;
 
-    let signalReplica1Started!: () => void;
-    const replica1Started = new Promise<void>((resolve) => {
-      signalReplica1Started = resolve;
-    });
+      let signalReplica1Started!: () => void;
+      const replica1Started = new Promise<void>((resolve) => {
+        signalReplica1Started = resolve;
+      });
 
-    let signalReplica1CanFinish!: () => void;
-    const replica1CanFinish = new Promise<void>((resolve) => {
-      signalReplica1CanFinish = resolve;
-    });
+      let signalReplica1CanFinish!: () => void;
+      const replica1CanFinish = new Promise<void>((resolve) => {
+        signalReplica1CanFinish = resolve;
+      });
 
-    // Replica 1 inicia e segura o lock até sinalização
-    const replica1Promise = executeReprocessamentoCycle(pool, {
-      lockId: 90421,
-      reprocessFn: async () => {
-        replica1Ran = true;
-        signalReplica1Started();
-        await replica1CanFinish;
-        return { processed: 5, success: 5, failed: 0 };
-      }
-    });
+      // Replica 1 inicia e segura o lock até sinalização
+      const replica1Promise = executeReprocessamentoCycle(pool, {
+        lockId: 90421,
+        reprocessFn: async () => {
+          replica1Ran = true;
+          signalReplica1Started();
+          await replica1CanFinish;
+          return { processed: 5, success: 5, failed: 0 };
+        }
+      });
 
-    // Aguarda Replica 1 de fato adquirir o lock no PostgreSQL
-    await replica1Started;
+      // Aguarda Replica 1 de fato adquirir o lock no PostgreSQL
+      await replica1Started;
 
-    // Replica 2 tenta executar concorrentemente com o lock retido pela Replica 1
-    const res2 = await executeReprocessamentoCycle(pool, {
-      lockId: 90421,
-      reprocessFn: async () => {
-        replica2Ran = true;
-        return { processed: 5, success: 5, failed: 0 };
-      }
-    });
+      // Replica 2 tenta executar concorrentemente com o lock retido pela Replica 1
+      const res2 = await executeReprocessamentoCycle(pool, {
+        lockId: 90421,
+        reprocessFn: async () => {
+          replica2Ran = true;
+          return { processed: 5, success: 5, failed: 0 };
+        }
+      });
 
-    // Libera a Replica 1 para concluir e commitar a transação
-    signalReplica1CanFinish();
-    const res1 = await replica1Promise;
+      // Libera a Replica 1 para concluir e commitar a transação
+      signalReplica1CanFinish();
+      const res1 = await replica1Promise;
 
-    assert.equal(res1.locked, true, 'Replica 1 deveria adquirir o lock');
-    assert.equal(res1.executed, true, 'Replica 1 deveria executar o lote');
-    assert.equal(replica1Ran, true);
+      assert.equal(res1.locked, true, 'Replica 1 deveria adquirir o lock');
+      assert.equal(res1.executed, true, 'Replica 1 deveria executar o lote');
+      assert.equal(replica1Ran, true);
 
-    assert.equal(res2.locked, false, 'Replica 2 nao deveria adquirir o lock concorrente');
-    assert.equal(res2.executed, false, 'Replica 2 deveria ignorar execucao concorrente');
-    assert.equal(replica2Ran, false, 'Replica 2 nao deveria chamar o reprocessFn');
-  } finally {
-    await pool.end();
-  }
+      assert.equal(res2.locked, false, 'Replica 2 nao deveria adquirir o lock concorrente');
+      assert.equal(res2.executed, false, 'Replica 2 deveria ignorar execucao concorrente');
+      assert.equal(replica2Ran, false, 'Replica 2 nao deveria chamar o reprocessFn');
+    } finally {
+      await pool.end();
+    }
+  });
 });
 
 test('buildApp registra o plugin de reprocessamentoTranscricao na aplicacao Fastify', async () => {

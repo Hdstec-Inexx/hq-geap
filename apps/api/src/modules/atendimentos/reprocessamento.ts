@@ -317,7 +317,11 @@ export async function reprocessAtendimento(
       );
 
       if ((result.rowCount ?? 0) === 0) {
-        await client.query('rollback');
+        try {
+          await client.query('rollback');
+        } catch {
+          // ignora falha de rollback secundária
+        }
         return {
           conversationId,
           success: false,
@@ -328,7 +332,11 @@ export async function reprocessAtendimento(
       await client.query('commit');
       return { conversationId, success: true };
     } catch (error) {
-      await client.query('rollback');
+      try {
+        await client.query('rollback');
+      } catch {
+        // ignora falha de rollback secundária
+      }
       return {
         conversationId,
         success: false,
