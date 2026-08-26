@@ -33,6 +33,26 @@ export async function createConnectedClient(): Promise<pg.Client> {
   return client;
 }
 
+export async function insertTestAgenteVoz(
+  client: pg.Client,
+  nome = 'Lívia Teste',
+  elevenlabsAgentId = 'agent-test-default'
+): Promise<string> {
+  const result = await client.query<{ id: string }>(
+    `
+    insert into agentes_voz (nome, elevenlabs_agent_id)
+    values ($1, $2)
+    returning id
+  `,
+    [nome, elevenlabsAgentId]
+  );
+  const id = result.rows[0]?.id;
+  if (!id) {
+    throw new Error('Falha ao inserir agente de voz no banco de teste');
+  }
+  return id;
+}
+
 export async function insertSnapshotAvaliacaoIa(
   client: pg.Client,
   atendimentoId: string,

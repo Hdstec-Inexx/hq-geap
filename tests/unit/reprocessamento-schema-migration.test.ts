@@ -5,6 +5,7 @@ import pg from 'pg';
 import prepareTestDatabase, {
   createConnectedClient,
   insertSnapshotAvaliacaoIa,
+  insertTestAgenteVoz,
   withPreparedTestDatabase,
   withTestDatabaseLock
 } from '../support/test-db.js';
@@ -55,13 +56,11 @@ test('tabela atendimentos aplica defaults retrocompativeis e restricoes de rastr
 
     try {
       // 1. Cria um agente de voz para vincular atendimentos
-      const agenteResult = await client.query<{ id: string }>(`
-        insert into agentes_voz (nome, elevenlabs_agent_id)
-        values ('Lívia Teste Rastreamento', 'agent-rastreamento-test-001')
-        returning id
-      `);
-      const agenteVozId = agenteResult.rows[0]?.id;
-      assert.ok(agenteVozId);
+      const agenteVozId = await insertTestAgenteVoz(
+        client,
+        'Lívia Teste Rastreamento',
+        'agent-rastreamento-test-001'
+      );
 
       // 2. Insere atendimento SEM informar as novas colunas (compatibilidade retroativa tipo n8n)
       const insertResult = await client.query<ReprocessamentoRastreamentoRow>(`
@@ -169,13 +168,11 @@ test('selecao em lote respeita corte temporal (< 19/08), ordenacao asc, limite d
     const client = await createConnectedClient();
 
     try {
-      const agenteResult = await client.query<{ id: string }>(`
-        insert into agentes_voz (nome, elevenlabs_agent_id)
-        values ('Lívia Teste Selecao Lote', 'agent-selecao-lote-001')
-        returning id
-      `);
-      const agenteVozId = agenteResult.rows[0]?.id;
-      assert.ok(agenteVozId);
+      const agenteVozId = await insertTestAgenteVoz(
+        client,
+        'Lívia Teste Selecao Lote',
+        'agent-selecao-lote-001'
+      );
 
       const transcricaoInconsistente = JSON.stringify({
         historico: [
@@ -274,12 +271,11 @@ test('atendimento com resposta 404 da ElevenLabs e persistido com reprocessament
     const client = await createConnectedClient();
 
     try {
-      const agenteResult = await client.query<{ id: string }>(`
-        insert into agentes_voz (nome, elevenlabs_agent_id)
-        values ('Lívia Teste 404', 'agent-404-001')
-        returning id
-      `);
-      const agenteVozId = agenteResult.rows[0]?.id;
+      const agenteVozId = await insertTestAgenteVoz(
+        client,
+        'Lívia Teste 404',
+        'agent-404-001'
+      );
 
       const transcricaoInconsistente = JSON.stringify({
         historico: [
@@ -363,12 +359,11 @@ test('falhas transitorias incrementam tentativas ate 3 e excluem do lote seguint
     const client = await createConnectedClient();
 
     try {
-      const agenteResult = await client.query<{ id: string }>(`
-        insert into agentes_voz (nome, elevenlabs_agent_id)
-        values ('Lívia Teste 5xx', 'agent-5xx-001')
-        returning id
-      `);
-      const agenteVozId = agenteResult.rows[0]?.id;
+      const agenteVozId = await insertTestAgenteVoz(
+        client,
+        'Lívia Teste 5xx',
+        'agent-5xx-001'
+      );
 
       const transcricaoInconsistente = JSON.stringify({
         historico: [
@@ -469,12 +464,11 @@ test('reprocessamento com sucesso atualiza transcricao, duracao, tme e reseta co
     const client = await createConnectedClient();
 
     try {
-      const agenteResult = await client.query<{ id: string }>(`
-        insert into agentes_voz (nome, elevenlabs_agent_id)
-        values ('Lívia Teste Sucesso', 'agent-sucesso-001')
-        returning id
-      `);
-      const agenteVozId = agenteResult.rows[0]?.id;
+      const agenteVozId = await insertTestAgenteVoz(
+        client,
+        'Lívia Teste Sucesso',
+        'agent-sucesso-001'
+      );
 
       // Atendimento que já teve falhas prévias (tentativas = 2, erro anterior gravado)
       const insertResult = await client.query<{ id: string }>(`

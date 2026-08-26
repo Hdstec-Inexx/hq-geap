@@ -5,6 +5,7 @@ import { buildApp } from '../../apps/api/src/app.js';
 import {
   createConnectedClient,
   insertSnapshotAvaliacaoIa,
+  insertTestAgenteVoz,
   withPreparedTestDatabase
 } from '../support/test-db.js';
 
@@ -39,13 +40,11 @@ test('ciclo completo de saneamento no boot da API: atualiza transcrições incon
 
     try {
       // 1. Cria agente de voz
-      const agenteResult = await client.query<{ id: string }>(`
-        insert into agentes_voz (nome, elevenlabs_agent_id)
-        values ('Lívia Saneamento Boot E2E', 'agent-saneamento-boot-e2e')
-        returning id
-      `);
-      const agenteVozId = agenteResult.rows[0]?.id;
-      assert.ok(agenteVozId);
+      const agenteVozId = await insertTestAgenteVoz(
+        client,
+        'Lívia Saneamento Boot E2E',
+        'agent-saneamento-boot-e2e'
+      );
 
       // 2. Cria 2 atendimentos com transcrições inconsistentes legadas
       const legacyInconsistent1 = JSON.stringify({
@@ -277,12 +276,11 @@ test('concorrência entre instâncias Fastify: advisory lock impede que segunda 
     const client = await createConnectedClient();
 
     try {
-      const agenteResult = await client.query<{ id: string }>(`
-        insert into agentes_voz (nome, elevenlabs_agent_id)
-        values ('Lívia Concorrência E2E', 'agent-concorrencia-e2e')
-        returning id
-      `);
-      const agenteVozId = agenteResult.rows[0]?.id;
+      const agenteVozId = await insertTestAgenteVoz(
+        client,
+        'Lívia Concorrência E2E',
+        'agent-concorrencia-e2e'
+      );
 
       await client.query(`
         insert into atendimentos (
@@ -375,12 +373,11 @@ test('critérios de elegibilidade e corte temporal: lote seleciona apenas atendi
     const client = await createConnectedClient();
 
     try {
-      const agenteResult = await client.query<{ id: string }>(`
-        insert into agentes_voz (nome, elevenlabs_agent_id)
-        values ('Lívia Elegibilidade E2E', 'agent-elegibilidade-e2e')
-        returning id
-      `);
-      const agenteVozId = agenteResult.rows[0]?.id;
+      const agenteVozId = await insertTestAgenteVoz(
+        client,
+        'Lívia Elegibilidade E2E',
+        'agent-elegibilidade-e2e'
+      );
 
       const inconsistentTranscript = JSON.stringify({
         historico: [
@@ -575,12 +572,11 @@ test('isolamento transacional e tolerância a falhas no lote: trata 200, 404 e 5
     const client = await createConnectedClient();
 
     try {
-      const agenteResult = await client.query<{ id: string }>(`
-        insert into agentes_voz (nome, elevenlabs_agent_id)
-        values ('Lívia Tolerância E2E', 'agent-tolerancia-e2e')
-        returning id
-      `);
-      const agenteVozId = agenteResult.rows[0]?.id;
+      const agenteVozId = await insertTestAgenteVoz(
+        client,
+        'Lívia Tolerância E2E',
+        'agent-tolerancia-e2e'
+      );
 
       const inconsistent = JSON.stringify([
         { role: 'agent', message: 'Olá', time_in_call_secs: 0 },
