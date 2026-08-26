@@ -45,7 +45,24 @@ const configSchema = z
         typeof value === 'string' && value.trim() === '' ? undefined : value,
       z.string().trim().min(1).optional()
     ),
-    ELEVENLABS_API_URL: z.url().default('https://api.elevenlabs.io')
+    ELEVENLABS_API_URL: z.url().default('https://api.elevenlabs.io'),
+    REPROCESSAMENTO_TRANSCRICAO_INTERVALO_MINUTOS: z.preprocess(
+      (value) =>
+        value === undefined || (typeof value === 'string' && value.trim() === '')
+          ? undefined
+          : value,
+      z.coerce.number().int().positive().default(10)
+    ),
+    AUTO_REPROCESS_TRANSCRICOES: z.preprocess((val) => {
+      if (val === undefined || (typeof val === 'string' && val.trim() === '')) {
+        return process.env.NODE_ENV !== 'test';
+      }
+      if (typeof val === 'string') {
+        const lower = val.trim().toLowerCase();
+        return lower !== 'false' && lower !== '0';
+      }
+      return Boolean(val);
+    }, z.boolean().default(true))
   })
   .superRefine((config, context) => {
     if (
