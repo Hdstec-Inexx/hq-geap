@@ -84,7 +84,8 @@ export async function executeReprocessamentoCycle(
       apiKey: options?.apiKey,
       fetchFn: options?.fetchFn,
       limit: options?.limit ?? REPROCESSAMENTO_LOTE_PADRAO,
-      dbClient: db
+      dbClient: db,
+      log: logger
     });
 
     await lockClient.query('commit');

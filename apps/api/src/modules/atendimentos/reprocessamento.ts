@@ -15,10 +15,17 @@ export interface DatabaseQueryable {
   ): Promise<{ rows: T[]; rowCount: number | null }>;
 }
 
+export interface ReprocessamentoLogger {
+  info?: (...args: unknown[]) => void;
+  warn?: (...args: unknown[]) => void;
+  error?: (...args: unknown[]) => void;
+}
+
 export interface ReprocessOptions {
   apiUrl?: string;
   apiKey?: string;
   fetchFn?: typeof fetch;
+  log?: ReprocessamentoLogger;
 }
 
 export interface RunPassOptions extends ReprocessOptions {
@@ -255,7 +262,7 @@ async function persistReprocessError(
   }
 }
 
-export async function reprocessConversation(
+export async function reprocessAtendimento(
   db: DatabaseQueryable | pg.Pool,
   conversationId: string,
   options?: ReprocessOptions
@@ -331,12 +338,13 @@ export async function reprocessConversation(
   });
 }
 
+export const reprocessConversation = reprocessAtendimento;
 export const fetchElevenLabsTranscript = fetchElevenLabsConversation;
-export const reprocessAtendimento = reprocessConversation;
 
 export async function runPass(
   options?: RunPassOptions
 ): Promise<{ processed: number; success: number; failed: number }> {
+  const logger = options?.log ?? console;
   let db: DatabaseQueryable | pg.Pool;
   let shouldCloseDb = false;
 
@@ -373,13 +381,13 @@ export async function runPass(
     }
 
     if (conversationIds.length === 0) {
-      console.log(
+      logger.info?.(
         `[${new Date().toISOString()}] Nenhuma transcrição inconsistente pendente de reprocessamento.`
       );
       return { processed: 0, success: 0, failed: 0 };
     }
 
-    console.log(
+    logger.info?.(
       `[${new Date().toISOString()}] Reprocessando transcrições de ${conversationIds.length} atendimento(s)...`
     );
 
@@ -388,31 +396,32 @@ export async function runPass(
 
     for (let i = 0; i < conversationIds.length; i++) {
       const conversationId = conversationIds[i]!;
-      const outcome = await reprocessConversation(db, conversationId, {
+      const outcome = await reprocessAtendimento(db, conversationId, {
         apiUrl: options?.apiUrl,
         apiKey: options?.apiKey,
-        fetchFn: options?.fetchFn
+        fetchFn: options?.fetchFn,
+        log: options?.log
       });
 
       if (outcome.success) {
         successCount++;
-        console.log(
+        logger.info?.(
           `  ✓ [${i + 1}/${conversationIds.length}] Transcrição atualizada: ${conversationId}`
         );
       } else if (outcome.ignored) {
         failedCount++;
-        console.warn(
+        logger.warn?.(
           `  ⚠ [${i + 1}/${conversationIds.length}] Atendimento descartado (404): ${conversationId}`
         );
       } else {
         failedCount++;
-        console.error(
+        logger.error?.(
           `  ✗ [${i + 1}/${conversationIds.length}] Erro em ${conversationId}: ${outcome.error}`
         );
       }
     }
 
-    console.log(
+    logger.info?.(
       `[${new Date().toISOString()}] Concluído: ${successCount}/${conversationIds.length} transcrições reprocessadas com sucesso (${failedCount} falhas).`
     );
 
@@ -422,8 +431,8 @@ export async function runPass(
       failed: failedCount
     };
   } finally {
-    if (shouldCloseDb && 'end' in db && typeof (db as any).end === 'function') {
-      await (db as any).end();
+    if (shouldCloseDb && 'end' in db && typeof (db as { end?: unknown }).end === 'function') {
+      await (db as { end: () => Promise<void> }).end();
     }
   }
 }
