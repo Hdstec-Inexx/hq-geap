@@ -77,9 +77,14 @@ test('buildInconsistentTranscriptionSqlPredicate gera predicado SQL compativel c
   assert.match(aliasedPredicate, /jsonb_typeof\(a\.transcricao->'historico'\) = 'array'/i);
 });
 
-test('findInconsistentConversationIdsQuery gera SQL que filtra atendimentos concluidos com transcricoes invalidas, nulas ou tempos zerados em multiplos turnos', () => {
+test('findInconsistentConversationIdsQuery gera SQL que filtra atendimentos concluidos com corte temporal, rastreamento de tentativas, exclusao de ignorados e ordenacao ASC', () => {
   const query = findInconsistentConversationIdsQuery();
   assert.match(query, /status = 'concluido'/i);
+  assert.match(query, /not reprocessamento_ignorado|reprocessamento_ignorado = false/i);
+  assert.match(query, /reprocessamento_tentativas < 3/i);
+  assert.match(query, /concluido_em < '2026-08-19'/i);
+  assert.match(query, /order by concluido_em asc/i);
+  assert.match(query, /limit \$1/i);
   assert.match(query, /transcricao is null/i);
   assert.match(query, /jsonb_typeof\(transcricao\) not in \('array', 'object'\)/i);
   assert.match(query, /jsonb_typeof\(transcricao\) = 'array'/i);
@@ -88,17 +93,23 @@ test('findInconsistentConversationIdsQuery gera SQL que filtra atendimentos conc
   assert.match(query, /time_in_call_secs/i);
   assert.match(query, /tempo_segundos/i);
   assert.match(query, /jsonb_array_length/i);
-  assert.match(query, /order by concluido_em desc nulls last/i);
-  assert.match(query, /limit \$1/i);
 
   const aliasedQuery = findInconsistentConversationIdsQuery({ tableAlias: 'a' });
   assert.match(aliasedQuery, /from atendimentos a/i);
   assert.match(aliasedQuery, /a\.elevenlabs_conversation_id/i);
   assert.match(aliasedQuery, /a\.status = 'concluido'/i);
+  assert.match(aliasedQuery, /not a\.reprocessamento_ignorado|a\.reprocessamento_ignorado = false/i);
+  assert.match(aliasedQuery, /a\.reprocessamento_tentativas < 3/i);
+  assert.match(aliasedQuery, /a\.concluido_em < '2026-08-19'/i);
+  assert.match(aliasedQuery, /order by a\.concluido_em asc/i);
   assert.match(aliasedQuery, /a\.transcricao is null/i);
 
   const forceQuery = findInconsistentConversationIdsQuery({ force: true });
   assert.match(forceQuery, /status = 'concluido'/i);
+  assert.match(forceQuery, /not reprocessamento_ignorado|reprocessamento_ignorado = false/i);
+  assert.match(forceQuery, /reprocessamento_tentativas < 3/i);
+  assert.match(forceQuery, /concluido_em < '2026-08-19'/i);
+  assert.match(forceQuery, /order by concluido_em asc/i);
   assert.doesNotMatch(forceQuery, /transcricao is null/i);
   assert.match(forceQuery, /limit \$1/i);
 
@@ -233,7 +244,7 @@ test('isTranscricaoInconsistente NAO seleciona atendimentos legitimos com apenas
   assert.equal(isTranscricaoInconsistente(transcriptBrutoValido), false);
 });
 
-test('reprocessConversation transforma transcript, recalcula duracao e tme e atualiza banco de forma transacional', async () => {
+test('reprocessConversation transforma transcript, recalcula duracao e tme e atualiza banco de forma transacional resetando contadores', async () => {
   const executedQueries: Array<{ text: string; values?: unknown[] }> = [];
 
   const mockDb = {
@@ -288,11 +299,14 @@ test('reprocessConversation transforma transcript, recalcula duracao e tme e atu
   assert.ok(executedQueries.some((q) => q.text === 'begin'));
   assert.ok(executedQueries.some((q) => q.text === 'commit'));
 
-  const updateQuery = executedQueries.find((q) => q.text.includes('update atendimentos'));
+  const updateQuery = executedQueries.find((q) => q.text.includes('update atendimentos') && q.text.includes('transcricao'));
   assert.ok(updateQuery);
   assert.match(updateQuery.text, /transcricao\s*=\s*\$1::jsonb/i);
   assert.match(updateQuery.text, /duracao_segundos\s*=\s*\$2/i);
   assert.match(updateQuery.text, /tme_segundos\s*=\s*\$3/i);
+  assert.match(updateQuery.text, /reprocessamento_tentativas\s*=\s*0/i);
+  assert.match(updateQuery.text, /reprocessamento_ignorado\s*=\s*false/i);
+  assert.match(updateQuery.text, /reprocessamento_ultimo_erro\s*=\s*null/i);
   assert.match(updateQuery.text, /atualizado_em\s*=\s*now\(\)/i);
   assert.match(updateQuery.text, /elevenlabs_conversation_id\s*=\s*\$4/i);
   assert.match(updateQuery.text, /status\s*=\s*'concluido'/i);
@@ -339,6 +353,116 @@ test('reprocessConversation transforma transcript, recalcula duracao e tme e atu
   });
 });
 
+test('reprocessConversation descarta imediatamente em caso de resposta HTTP 404 marcando reprocessamento_ignorado', async () => {
+  const executedQueries: Array<{ text: string; values?: unknown[] }> = [];
+
+  const mockDb = {
+    query: async (text: string, values?: unknown[]) => {
+      executedQueries.push({ text, values });
+      return { rowCount: 1, rows: [] };
+    }
+  };
+
+  const mockFetch: typeof fetch = async () => {
+    return new Response(JSON.stringify({ detail: 'Conversation not found' }), {
+      status: 404,
+      statusText: 'Not Found'
+    });
+  };
+
+  const outcome = await reprocessConversation(mockDb as any, 'conv-404-discard', {
+    apiUrl: 'https://api.elevenlabs.io',
+    apiKey: 'test-key',
+    fetchFn: mockFetch
+  });
+
+  assert.equal(outcome.success, false);
+  assert.equal(outcome.conversationId, 'conv-404-discard');
+  assert.equal(outcome.ignored, true);
+  assert.match(outcome.error ?? '', /404/i);
+
+  const updateQuery = executedQueries.find((q) => q.text.includes('update atendimentos'));
+  assert.ok(updateQuery, 'Deve executar update na tabela atendimentos para marcar descarte');
+  assert.match(updateQuery.text, /reprocessamento_ignorado\s*=\s*true/i);
+  assert.match(updateQuery.text, /reprocessamento_ultimo_erro\s*=\s*'404 Not Found'|\$1/i);
+  assert.match(updateQuery.text, /atualizado_em\s*=\s*now\(\)/i);
+  assert.match(updateQuery.text, /elevenlabs_conversation_id/i);
+  assert.match(updateQuery.text, /status\s*=\s*'concluido'/i);
+
+  // Garante que a tabela avaliacoes nunca é alterada
+  assert.equal(
+    executedQueries.some((q) => q.text.toLowerCase().includes('avaliacoes')),
+    false,
+    'Tabela avaliacoes nao pode ser alterada no descarte 404'
+  );
+});
+
+test('reprocessConversation incrementa tentativas e persiste erro em falhas transitorias (5xx e rede)', async () => {
+  const executedQueries: Array<{ text: string; values?: unknown[] }> = [];
+
+  const mockDb = {
+    query: async (text: string, values?: unknown[]) => {
+      executedQueries.push({ text, values });
+      return { rowCount: 1, rows: [] };
+    }
+  };
+
+  // 1. Falha HTTP 500
+  const mockFetch500: typeof fetch = async () => {
+    return new Response(JSON.stringify({ detail: 'Internal Server Error' }), {
+      status: 500,
+      statusText: 'Internal Server Error'
+    });
+  };
+
+  const outcome500 = await reprocessConversation(mockDb as any, 'conv-500-transient', {
+    apiUrl: 'https://api.elevenlabs.io',
+    apiKey: 'test-key',
+    fetchFn: mockFetch500
+  });
+
+  assert.equal(outcome500.success, false);
+  assert.equal(outcome500.conversationId, 'conv-500-transient');
+  assert.equal(outcome500.ignored ?? false, false);
+  assert.match(outcome500.error ?? '', /500/i);
+
+  const update500 = executedQueries.find(
+    (q) => q.text.includes('update atendimentos') && q.values?.includes('conv-500-transient')
+  );
+  assert.ok(update500, 'Deve executar update para registrar falha 500');
+  assert.match(update500.text, /reprocessamento_tentativas\s*=\s*reprocessamento_tentativas\s*\+\s*1/i);
+  assert.match(update500.text, /reprocessamento_ultimo_erro/i);
+  assert.match(update500.text, /elevenlabs_conversation_id/i);
+
+  // 2. Falha de rede / Timeout (exceção no fetch)
+  const mockFetchNetworkError: typeof fetch = async () => {
+    throw new Error('fetch failed: connection timeout');
+  };
+
+  const outcomeNetwork = await reprocessConversation(mockDb as any, 'conv-net-err', {
+    apiUrl: 'https://api.elevenlabs.io',
+    apiKey: 'test-key',
+    fetchFn: mockFetchNetworkError
+  });
+
+  assert.equal(outcomeNetwork.success, false);
+  assert.equal(outcomeNetwork.conversationId, 'conv-net-err');
+  assert.match(outcomeNetwork.error ?? '', /connection timeout|fetch failed/i);
+
+  const updateNetwork = executedQueries.find(
+    (q) => q.text.includes('update atendimentos') && q.values?.includes('conv-net-err')
+  );
+  assert.ok(updateNetwork, 'Deve executar update para registrar erro de rede');
+  assert.match(updateNetwork.text, /reprocessamento_tentativas\s*=\s*reprocessamento_tentativas\s*\+\s*1/i);
+
+  // Garante que a tabela avaliacoes nunca é alterada
+  assert.equal(
+    executedQueries.some((q) => q.text.toLowerCase().includes('avaliacoes')),
+    false,
+    'Tabela avaliacoes nao pode ser alterada em falhas transitorias'
+  );
+});
+
 test('runPass suporta lista pontual de conversation IDs e executa em lote com metricas claras', async () => {
   const executedUpdates: string[] = [];
 
@@ -346,7 +470,7 @@ test('runPass suporta lista pontual de conversation IDs e executa em lote com me
     connect: async () => {},
     end: async () => {},
     query: async (text: string, values?: unknown[]) => {
-      if (text.includes('update atendimentos')) {
+      if (text.includes('update atendimentos') && text.includes('transcricao')) {
         executedUpdates.push(values?.[3] as string);
       }
       return { rowCount: 1, rows: [] };
