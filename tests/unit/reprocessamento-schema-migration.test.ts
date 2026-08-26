@@ -125,10 +125,49 @@ test('tabela atendimentos aplica defaults retrocompativeis e restricoes de rastr
   }
 });
 
+test('indice parcial idx_atendimentos_reprocessamento_pendente e selecionado pelo query planner', async () => {
+  await prepareTestDatabase();
+
+  const connectionString =
+    process.env.TEST_DATABASE_URL ??
+    'postgres://hq_geap:hq_geap@127.0.0.1:5432/hq_geap_test';
+  const client = new Client({ connectionString });
+  await client.connect();
+
+  try {
+    // Força uso de index scan pelo planner durante o teste de plano
+    await client.query('set enable_seqscan = off');
+
+    const explainResult = await client.query<{ 'QUERY PLAN': string }>(`
+      explain
+      select id, elevenlabs_conversation_id
+      from atendimentos
+      where status = 'concluido'
+        and not reprocessamento_ignorado
+        and reprocessamento_tentativas < 3
+        and concluido_em < '2026-08-19'
+      order by concluido_em asc
+      limit 50
+    `);
+
+    const plan = explainResult.rows.map((r) => r['QUERY PLAN']).join('\n');
+    assert.match(
+      plan,
+      /idx_atendimentos_reprocessamento_pendente/i,
+      'Query planner deve usar o índice parcial idx_atendimentos_reprocessamento_pendente'
+    );
+  } finally {
+    await client.query('set enable_seqscan = on').catch(() => {});
+    await client.end();
+  }
+});
+
 test('preparacao e execucao de migrations eh idempotente com a migration 0016', async () => {
   // Executa novamente prepareTestDatabase para verificar idempotência
   await assert.doesNotReject(async () => {
     await prepareTestDatabase();
   });
 });
+
+
 
