@@ -205,6 +205,33 @@ export interface ReprocessOutcome {
   error?: string;
 }
 
+async function persistReprocessError(
+  db: DatabaseQueryable,
+  conversationId: string,
+  options: { is404: boolean; errorMessage: string }
+): Promise<void> {
+  const updateClause = options.is404
+    ? 'reprocessamento_ignorado = true'
+    : 'reprocessamento_tentativas = reprocessamento_tentativas + 1';
+
+  try {
+    await db.query(
+      `
+      update atendimentos
+      set ${updateClause},
+          reprocessamento_ultimo_erro = $1,
+          atualizado_em = now()
+      where elevenlabs_conversation_id = $2
+        and status = 'concluido'
+    `,
+      [options.errorMessage, conversationId]
+    );
+  } catch (dbError) {
+    const action = options.is404 ? 'marcar 404' : 'registrar erro transitório';
+    console.warn(`  [aviso] Falha ao ${action} no banco para ${conversationId}:`, dbError);
+  }
+}
+
 export async function reprocessConversation(
   db: DatabaseQueryable,
   conversationId: string,
@@ -213,52 +240,17 @@ export async function reprocessConversation(
   const fetchResult = await fetchElevenLabsConversationDetail(conversationId, options);
 
   if (!fetchResult.ok || !fetchResult.data) {
-    if (fetchResult.status === 404) {
-      const errorMsg = '404 Not Found';
-      try {
-        await db.query(
-          `
-          update atendimentos
-          set reprocessamento_ignorado = true,
-              reprocessamento_ultimo_erro = $1,
-              atualizado_em = now()
-          where elevenlabs_conversation_id = $2
-            and status = 'concluido'
-        `,
-          [errorMsg, conversationId]
-        );
-      } catch (dbError) {
-        console.warn(`  [aviso] Falha ao marcar 404 no banco para ${conversationId}:`, dbError);
-      }
+    const is404 = fetchResult.status === 404;
+    const errorMsg = is404
+      ? '404 Not Found'
+      : (fetchResult.error ?? 'Falha de comunicação com ElevenLabs');
 
-      return {
-        conversationId,
-        success: false,
-        ignored: true,
-        error: errorMsg
-      };
-    }
-
-    const errorMsg = fetchResult.error ?? 'Falha de comunicação com ElevenLabs';
-    try {
-      await db.query(
-        `
-        update atendimentos
-        set reprocessamento_tentativas = reprocessamento_tentativas + 1,
-            reprocessamento_ultimo_erro = $1,
-            atualizado_em = now()
-        where elevenlabs_conversation_id = $2
-          and status = 'concluido'
-      `,
-        [errorMsg, conversationId]
-      );
-    } catch (dbError) {
-      console.warn(`  [aviso] Falha ao registrar erro transitório no banco para ${conversationId}:`, dbError);
-    }
+    await persistReprocessError(db, conversationId, { is404, errorMessage: errorMsg });
 
     return {
       conversationId,
       success: false,
+      ...(is404 ? { ignored: true } : {}),
       error: errorMsg
     };
   }

@@ -270,6 +270,27 @@ test('selecao em lote respeita corte temporal (< 19/08), ordenacao asc, limite d
   }
 });
 
+async function insertSnapshotAvaliacaoIa(
+  client: pg.Client,
+  atendimentoId: string,
+  nota = 10.0,
+  resumo = 'Resumo da avaliação'
+): Promise<void> {
+  await client.query(`
+    insert into avaliacoes (
+      atendimento_id, autor, prompt_id, nota, nota_qualidade, resumo_atendimento,
+      saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
+      resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
+      encerramento_geap, uso_correto_ferramentas, atendimento_aprovado
+    )
+    select $1, 'ia', p.id, $2, $2, $3,
+      true, true, true, true, true, true, true, true, true
+    from prompts_ia_avaliadora p
+    where p.ativo
+    limit 1
+  `, [atendimentoId, nota, resumo]);
+}
+
 test('atendimento com resposta 404 da ElevenLabs e persistido com reprocessamento_ignorado e erro, sendo excluido do lote', async () => {
   await prepareTestDatabase();
   const client = await createConnectedClient();
@@ -303,19 +324,7 @@ test('atendimento com resposta 404 da ElevenLabs e persistido com reprocessament
     assert.ok(atendimentoId);
 
     // Cria uma avaliação existente para checar imutabilidade
-    await client.query(`
-      insert into avaliacoes (
-        atendimento_id, autor, prompt_id, nota, nota_qualidade, resumo_atendimento,
-        saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
-        resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
-        encerramento_geap, uso_correto_ferramentas, atendimento_aprovado
-      )
-      select $1, 'ia', p.id, 8.5, 8.5, 'Resumo original intacto',
-        true, true, true, true, true, true, true, true, true
-      from prompts_ia_avaliadora p
-      where p.ativo
-      limit 1
-    `, [atendimentoId]);
+    await insertSnapshotAvaliacaoIa(client, atendimentoId, 8.5, 'Resumo original intacto');
 
     // Mock do fetch retornando 404
     const mockFetch404: typeof fetch = async () => {
@@ -402,19 +411,7 @@ test('falhas transitorias incrementam tentativas ate 3 e excluem do lote seguint
     const atendimentoId = insertResult.rows[0]?.id;
 
     // Avaliação inicial
-    await client.query(`
-      insert into avaliacoes (
-        atendimento_id, autor, prompt_id, nota, nota_qualidade, resumo_atendimento,
-        saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
-        resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
-        encerramento_geap, uso_correto_ferramentas, atendimento_aprovado
-      )
-      select $1, 'ia', p.id, 9.0, 9.0, 'Avaliacao imutavel',
-        true, true, true, true, true, true, true, true, true
-      from prompts_ia_avaliadora p
-      where p.ativo
-      limit 1
-    `, [atendimentoId]);
+    await insertSnapshotAvaliacaoIa(client, atendimentoId, 9.0, 'Avaliacao imutavel');
 
     const mockFetch500: typeof fetch = async () => {
       return new Response(JSON.stringify({ detail: 'Internal Server Error' }), {
@@ -516,19 +513,7 @@ test('reprocessamento com sucesso atualiza transcricao, duracao, tme e reseta co
     const atendimentoId = insertResult.rows[0]?.id;
 
     // Snapshot de avaliação existente
-    await client.query(`
-      insert into avaliacoes (
-        atendimento_id, autor, prompt_id, nota, nota_qualidade, resumo_atendimento,
-        saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
-        resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
-        encerramento_geap, uso_correto_ferramentas, atendimento_aprovado
-      )
-      select $1, 'ia', p.id, 10.0, 10.0, 'Resumo perfeito',
-        true, true, true, true, true, true, true, true, true
-      from prompts_ia_avaliadora p
-      where p.ativo
-      limit 1
-    `, [atendimentoId]);
+    await insertSnapshotAvaliacaoIa(client, atendimentoId, 10.0, 'Resumo perfeito');
 
     // Resposta bem sucedida da ElevenLabs com timestamps reais
     const mockFetchSuccess: typeof fetch = async () => {
