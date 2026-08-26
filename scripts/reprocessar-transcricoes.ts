@@ -43,6 +43,10 @@ export interface RunPassOptions extends ReprocessOptions {
   limit?: number;
 }
 
+export const REPROCESSAMENTO_MAX_TENTATIVAS = 3;
+export const REPROCESSAMENTO_DATA_CORTE = '2026-08-19';
+export const REPROCESSAMENTO_LOTE_PADRAO = 50;
+
 function assertSafeSqlIdentifier(identifier: string): void {
   if (!/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(identifier)) {
     throw new Error(`Identificador SQL inválido: ${identifier}`);
@@ -90,12 +94,19 @@ export function findInconsistentConversationIdsQuery(options?: {
   const table = options?.tableAlias ? `atendimentos ${options.tableAlias}` : 'atendimentos';
   const prefix = options?.tableAlias ? `${options.tableAlias}.` : '';
 
+  const baseConditions = `
+    ${prefix}status = 'concluido'
+    and not ${prefix}reprocessamento_ignorado
+    and ${prefix}reprocessamento_tentativas < ${REPROCESSAMENTO_MAX_TENTATIVAS}
+    and ${prefix}concluido_em < '${REPROCESSAMENTO_DATA_CORTE}'
+  `.trim();
+
   if (options?.force) {
     return `
       select ${prefix}elevenlabs_conversation_id as "conversationId"
       from ${table}
-      where ${prefix}status = 'concluido'
-      order by ${prefix}concluido_em desc nulls last
+      where ${baseConditions}
+      order by ${prefix}concluido_em asc
       limit $1
     `.trim();
   }
@@ -105,17 +116,24 @@ export function findInconsistentConversationIdsQuery(options?: {
   return `
     select ${prefix}elevenlabs_conversation_id as "conversationId"
     from ${table}
-    where ${prefix}status = 'concluido'
+    where ${baseConditions}
       and ${predicate}
-    order by ${prefix}concluido_em desc nulls last
+    order by ${prefix}concluido_em asc
     limit $1
   `.trim();
 }
 
-export async function fetchElevenLabsConversation(
+export type ElevenLabsFetchOutcome = {
+  ok: boolean;
+  status: number;
+  data: Record<string, unknown> | null;
+  error?: string;
+};
+
+export async function fetchElevenLabsConversationDetail(
   conversationId: string,
   options?: ReprocessOptions
-): Promise<Record<string, unknown> | null> {
+): Promise<ElevenLabsFetchOutcome> {
   const baseUrl = (
     options?.apiUrl ??
     process.env.ELEVENLABS_API_URL ??
@@ -134,34 +152,118 @@ export async function fetchElevenLabsConversation(
 
   try {
     const response = await fetchFn(url, { headers });
+    if (response.status === 404) {
+      return {
+        ok: false,
+        status: 404,
+        data: null,
+        error: '404 Not Found'
+      };
+    }
     if (!response.ok) {
-      return null;
+      const errorMsg = `HTTP ${response.status}: ${response.statusText || 'Error'}`;
+      return {
+        ok: false,
+        status: response.status,
+        data: null,
+        error: errorMsg
+      };
     }
     const data = (await response.json()) as Record<string, unknown>;
-    return data;
+    return {
+      ok: true,
+      status: response.status,
+      data
+    };
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
     console.warn(
       `  [aviso] Falha na requisição ElevenLabs para ${conversationId}:`,
-      error instanceof Error ? error.message : error
+      errorMsg
     );
-    return null;
+    return {
+      ok: false,
+      status: 0,
+      data: null,
+      error: errorMsg || 'Network error'
+    };
   }
+}
+
+export async function fetchElevenLabsConversation(
+  conversationId: string,
+  options?: ReprocessOptions
+): Promise<Record<string, unknown> | null> {
+  const result = await fetchElevenLabsConversationDetail(conversationId, options);
+  return result.ok ? result.data : null;
+}
+
+export interface ReprocessOutcome {
+  conversationId: string;
+  success: boolean;
+  ignored?: boolean;
+  error?: string;
 }
 
 export async function reprocessConversation(
   db: DatabaseQueryable,
   conversationId: string,
   options?: ReprocessOptions
-): Promise<{ conversationId: string; success: boolean; error?: string }> {
-  const conversationData = await fetchElevenLabsConversation(conversationId, options);
-  if (!conversationData) {
+): Promise<ReprocessOutcome> {
+  const fetchResult = await fetchElevenLabsConversationDetail(conversationId, options);
+
+  if (!fetchResult.ok || !fetchResult.data) {
+    if (fetchResult.status === 404) {
+      const errorMsg = '404 Not Found';
+      try {
+        await db.query(
+          `
+          update atendimentos
+          set reprocessamento_ignorado = true,
+              reprocessamento_ultimo_erro = $1,
+              atualizado_em = now()
+          where elevenlabs_conversation_id = $2
+            and status = 'concluido'
+        `,
+          [errorMsg, conversationId]
+        );
+      } catch (dbError) {
+        console.warn(`  [aviso] Falha ao marcar 404 no banco para ${conversationId}:`, dbError);
+      }
+
+      return {
+        conversationId,
+        success: false,
+        ignored: true,
+        error: errorMsg
+      };
+    }
+
+    const errorMsg = fetchResult.error ?? 'Falha de comunicação com ElevenLabs';
+    try {
+      await db.query(
+        `
+        update atendimentos
+        set reprocessamento_tentativas = reprocessamento_tentativas + 1,
+            reprocessamento_ultimo_erro = $1,
+            atualizado_em = now()
+        where elevenlabs_conversation_id = $2
+          and status = 'concluido'
+      `,
+        [errorMsg, conversationId]
+      );
+    } catch (dbError) {
+      console.warn(`  [aviso] Falha ao registrar erro transitório no banco para ${conversationId}:`, dbError);
+    }
+
     return {
       conversationId,
       success: false,
-      error: 'Atendimento não encontrado ou falha de comunicação com ElevenLabs'
+      error: errorMsg
     };
   }
 
+  const conversationData = fetchResult.data;
   const historicoTranscricao = transformToHistoricoTranscricao(conversationData);
   const serialized = JSON.stringify(historicoTranscricao);
   const duracaoSegundos = extractCallDuration(conversationData);
@@ -175,6 +277,9 @@ export async function reprocessConversation(
       set transcricao = $1::jsonb,
           duracao_segundos = $2,
           tme_segundos = $3,
+          reprocessamento_tentativas = 0,
+          reprocessamento_ignorado = false,
+          reprocessamento_ultimo_erro = null,
           atualizado_em = now()
       where elevenlabs_conversation_id = $4
         and status = 'concluido'
@@ -226,7 +331,7 @@ export async function runPass(
     if (options?.specificIds && options.specificIds.length > 0) {
       conversationIds = options.specificIds;
     } else {
-      const effectiveLimit = Math.max(1, Math.trunc(Number(options?.limit) || 500));
+      const effectiveLimit = Math.max(1, Math.trunc(Number(options?.limit) || REPROCESSAMENTO_LOTE_PADRAO));
       const queryText = findInconsistentConversationIdsQuery({
         force: options?.force
       });
@@ -257,6 +362,9 @@ export async function runPass(
       if (outcome.success) {
         successCount++;
         console.log(`  ✓ [${i + 1}/${conversationIds.length}] Transcrição atualizada: ${conversationId}`);
+      } else if (outcome.ignored) {
+        failedCount++;
+        console.warn(`  ⚠ [${i + 1}/${conversationIds.length}] Atendimento descartado (404): ${conversationId}`);
       } else {
         failedCount++;
         console.error(`  ✗ [${i + 1}/${conversationIds.length}] Erro em ${conversationId}: ${outcome.error}`);
