@@ -1,5 +1,5 @@
 import type { EstadoCriterio } from '@hq-geap/contracts/avaliacoes';
-import type { AvaliacaoCurador } from '@hq-geap/contracts/curadoria';
+import type { AvaliacaoCurador, CuradoriaDetail } from '@hq-geap/contracts/curadoria';
 import { canWriteAsCurador, type UserRole } from '@hq-geap/contracts/auth';
 
 export interface ReviewFormInitialState {
@@ -21,12 +21,10 @@ export function shouldShowReadingCardFirst(
 }
 
 export function getInitialReviewFormState(
-  avaliacaoIa: {
-    nota: number;
-    checklist: Array<{ chave: string; estado: EstadoCriterio }>;
-    falhasIdentificadas: string[];
-    resumoAtendimento?: string | null;
-  },
+  avaliacaoIa: Pick<
+    CuradoriaDetail['avaliacaoIa'],
+    'nota' | 'checklist' | 'falhasIdentificadas' | 'resumoAtendimento'
+  >,
   avaliacaoMaisRecente?: AvaliacaoCurador | null
 ): ReviewFormInitialState {
   if (avaliacaoMaisRecente) {
