@@ -625,12 +625,20 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.getByRole('heading', { name: 'Fila de Curadoria' })).toBeVisible();
 
     await page.goto(`/curadoria/${atendimentoId}`);
-    await expect(page.getByText('Consultar revisões anteriores')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toBeVisible();
+    await expect(page.getByRole('tablist', { name: 'Histórico de revisões' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Revisão 2.*Vigente/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Revisão 1.*Histórico/ })).toBeVisible();
 
-    await page.getByText('Consultar revisões anteriores').click();
-    const anterior = page.locator('.curadorias-anteriores li').first();
-    await expect(anterior).toContainText('Informação de Protocolo');
-    await expect(anterior).toContainText('Não atendido');
+    // Na aba vigente (Revisão 2), protocolo foi marcado como atendido
+    const card = page.locator('.avaliacao-panel');
+    await expect(card.locator('.criterio-check').filter({ hasText: 'Informação de Protocolo' })).toContainText('Atendido');
+
+    // Ao alternar para a Revisão 1 (Histórico), todo o card atualiza para o snapshot anterior
+    await page.getByRole('tab', { name: /Revisão 1.*Histórico/ }).click();
+    await expect(card.locator('.criterio-check').filter({ hasText: 'Informação de Protocolo' })).toContainText('Não atendido');
+    await expect(card.getByText('Corrigir protocolo.')).toBeVisible();
+    await expect(card.getByText('Nota da Avaliação da IA: 3')).toBeVisible();
   });
 
   test('formulário de curadoria exibe tag crítico alinhada ao título e custom tooltip com descrição no hover/focus', async ({
@@ -1774,6 +1782,120 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     // 8. Redireciona com sucesso de volta para Minhas Curadorias (origem via ?from)
     await expect(page).toHaveURL('/minhas-curadorias');
     await expect(page.getByRole('heading', { name: 'Minhas Curadorias' })).toBeVisible();
+  });
+
+  test('Navegação por abas de histórico de revisões imutáveis em Curadorias Realizadas e Minhas Curadorias por Curador, Admin e Gestão', async ({
+    page,
+    request
+  }) => {
+    const convId = 'conv-historico-abas-e2e';
+    const atendimentoId = await createAtendimento(convId);
+    await persistirAvaliacaoIa(atendimentoId);
+
+    const curador = await login(request, 'curador');
+    const gestao = await login(request, 'gestao');
+    const admin = await login(request, 'admin');
+
+    const detalheRes = await request.get(`${apiUrl}/curadoria/${atendimentoId}`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    });
+    const detalheJson = await detalheRes.json();
+
+    // 1. Criar primeira revisão (snapshot inicial)
+    await request.post(`${apiUrl}/curadoria/${atendimentoId}/avaliacoes`, {
+      headers: { authorization: `Bearer ${curador.token}` },
+      data: {
+        checklist: detalheJson.avaliacaoIa.checklist.map((c: { chave: string; estado: string }) => ({
+          chave: c.chave,
+          estado: c.chave === 'informou_protocolo_email' ? 'nao_atendido' : 'atendido'
+        })),
+        notaAvaliacaoIa: 5.0,
+        falhasIdentificadas: ['Primeira falha'],
+        resumoAtendimento: 'Primeiro resumo histórico.',
+        comentario: 'Primeiro comentário de auditoria.'
+      }
+    });
+
+    // Curador acessa com apenas 1 revisão no histórico -> não renderiza barra de abas redundante
+    await loginUi(page, 'curador');
+    await page.goto(`/curadoria/${atendimentoId}?from=/minhas-curadorias`);
+    await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toBeVisible();
+    await expect(page.getByRole('tablist', { name: 'Histórico de revisões' })).toHaveCount(0);
+    await expect(page.getByText('Primeiro resumo histórico.')).toBeVisible();
+
+    // 2. Criar segunda revisão (snapshot mais recente / vigente)
+    await request.post(`${apiUrl}/curadoria/${atendimentoId}/avaliacoes`, {
+      headers: { authorization: `Bearer ${curador.token}` },
+      data: {
+        checklist: detalheJson.avaliacaoIa.checklist.map((c: { chave: string; estado: string }) => ({
+          chave: c.chave,
+          estado: 'atendido'
+        })),
+        notaAvaliacaoIa: 9.5,
+        falhasIdentificadas: ['Falha corrigida'],
+        resumoAtendimento: 'Segundo resumo vigente.',
+        comentario: 'Segundo comentário aprovado.'
+      }
+    });
+
+    // 3. Curador acessa a partir de Minhas Curadorias e navega entre abas
+    await page.goto(`/curadoria/${atendimentoId}?from=/minhas-curadorias`);
+    const tablist = page.getByRole('tablist', { name: 'Histórico de revisões' });
+    await expect(tablist).toBeVisible();
+
+    const tabVigente = page.getByRole('tab', { name: /Revisão 2.*Vigente/ });
+    const tabHistorico = page.getByRole('tab', { name: /Revisão 1.*Histórico/ });
+
+    await expect(tabVigente).toBeVisible();
+    await expect(tabHistorico).toBeVisible();
+    await expect(tabVigente).toHaveAttribute('aria-selected', 'true');
+    await expect(tabHistorico).toHaveAttribute('aria-selected', 'false');
+
+    const card = page.locator('.avaliacao-panel');
+
+    // Snapshot vigente ativo por padrão
+    await expect(card.getByText('Segundo resumo vigente.')).toBeVisible();
+    await expect(card.getByText('Segundo comentário aprovado.')).toBeVisible();
+    await expect(card.getByText('Nota da Avaliação da IA: 9,5')).toBeVisible();
+    await expect(card.locator('.criterio-check').filter({ hasText: 'Informação de Protocolo' })).toContainText('Atendido');
+
+    // Alterna para o snapshot histórico (Revisão 1)
+    await tabHistorico.click();
+    await expect(tabHistorico).toHaveAttribute('aria-selected', 'true');
+    await expect(tabVigente).toHaveAttribute('aria-selected', 'false');
+
+    await expect(card.getByText('Primeiro resumo histórico.')).toBeVisible();
+    await expect(card.getByText('Primeiro comentário de auditoria.')).toBeVisible();
+    await expect(card.getByText('Nota da Avaliação da IA: 5')).toBeVisible();
+    await expect(card.locator('.criterio-check').filter({ hasText: 'Informação de Protocolo' })).toContainText('Não atendido');
+
+    // Alterna de volta para Vigente (Revisão 2)
+    await tabVigente.click();
+    await expect(card.getByText('Segundo resumo vigente.')).toBeVisible();
+    await expect(card.locator('.criterio-check').filter({ hasText: 'Informação de Protocolo' })).toContainText('Atendido');
+
+    // 4. Gestão consulta em Curadorias Realizadas (100% leitura, sem botão de edição)
+    await page.evaluate(() => window.sessionStorage.clear());
+    await loginUi(page, 'gestao');
+    await page.goto(`/curadoria/${atendimentoId}?from=/curadorias-realizadas`);
+
+    await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fazer nova revisão' })).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: /Revisão 2.*Vigente/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Revisão 1.*Histórico/ })).toBeVisible();
+
+    // Gestão alterna para o snapshot histórico
+    await page.getByRole('tab', { name: /Revisão 1.*Histórico/ }).click();
+    await expect(page.locator('.avaliacao-panel').getByText('Primeiro resumo histórico.')).toBeVisible();
+
+    // 5. Admin consulta em Curadorias Realizadas (com acesso total)
+    await page.evaluate(() => window.sessionStorage.clear());
+    await loginUi(page, 'admin');
+    await page.goto(`/curadoria/${atendimentoId}?from=/curadorias-realizadas`);
+
+    await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Revisão 2.*Vigente/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Revisão 1.*Histórico/ })).toBeVisible();
   });
 });
 
