@@ -4,6 +4,7 @@ import type { EstadoCriterio } from '@hq-geap/contracts/avaliacoes';
 type ChecklistItem = {
   chave: string;
   nome: string;
+  descricao?: string | null;
   estado: EstadoCriterio;
   valor: string;
   critico: boolean;
@@ -54,11 +55,13 @@ async function findChecklist(
     select
       ac.criterio_chave as chave,
       ac.criterio_nome as nome,
+      c.descricao as descricao,
       ac.estado,
       ac.valor_criterio as valor,
       ac.criterio_critico as critico,
       ac.criterio_ordem as ordem
     from avaliacao_criterios ac
+    left join criterios c on c.id = ac.criterio_id
     where ac.avaliacao_id = $1
     order by ac.criterio_ordem
   `, [avaliacaoId]);
@@ -131,11 +134,13 @@ export function createAvaliacoesRepository(db: pg.Pool) {
         select
           ac.criterio_chave as chave,
           ac.criterio_nome as nome,
+          c.descricao as descricao,
           ac.estado,
           ac.valor_criterio as valor,
           ac.criterio_critico as critico,
           ac.criterio_ordem as ordem
         from avaliacao_curador_criterios ac
+        left join criterios c on c.id = ac.criterio_id
         where ac.avaliacao_curador_id = $1
         order by ac.criterio_ordem
       `, [row.id]);
