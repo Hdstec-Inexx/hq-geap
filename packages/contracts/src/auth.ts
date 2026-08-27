@@ -36,3 +36,8 @@ export function canDownloadAudio(role: UserRole | null | undefined): boolean {
   return role === 'admin' || role === 'gestao';
 }
 
+/** Admin and Curador may mutate curadoria/comentários; Gestão is read-only. */
+export function canWriteAsCurador(role: UserRole | null | undefined): boolean {
+  return role === 'admin' || role === 'curador';
+}
+
