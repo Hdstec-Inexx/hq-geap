@@ -493,8 +493,7 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     expect(headingIndex('Avaliação original')).toBeLessThan(headingIndex('Transcrição'));
     expect(headingIndex('Transcrição')).toBeLessThan(headingIndex('Ouça antes de decidir'));
     expect(headingIndex('Ouça antes de decidir')).toBeLessThan(headingIndex('Conferência humana'));
-    expect(headingIndex('Conferência humana')).toBeLessThan(headingIndex('Revisão mais recente'));
-    expect(headingIndex('Revisão mais recente')).toBeLessThan(headingIndex('Comentários'));
+    expect(headingIndex('Conferência humana')).toBeLessThan(headingIndex('Comentários'));
     await expect(page.getByText('Tempo de Espera', { exact: true })).toHaveCount(0);
     await expect(page.getByText('TME', { exact: true })).toHaveCount(0);
   }
@@ -513,9 +512,53 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await page.goto(`/curadoria/${atendimentoId}`);
 
     await expect(page.getByRole('heading', { name: 'Revisar Atendimento' })).toBeVisible();
-    await expect(page.getByText('Consulta somente leitura')).toBeVisible();
+    await expect(page.getByText('Ainda não há conferência do Curador para este Atendimento.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Salvar conferência' })).toHaveCount(0);
-    await expectSecoesDaRevisaoNaOrdem(page);
+  });
+
+  test('Gestao visualiza o card padronizado de Avaliação do Curador em atendimento ja revisado', async ({
+    page,
+    request
+  }) => {
+    const atendimentoId = await createAtendimento('conv-curadoria-gestao-concluida');
+    await persistirAvaliacaoIa(atendimentoId);
+
+    const curador = await login(request, 'curador');
+    const detalheRes = await request.get(`${apiUrl}/curadoria/${atendimentoId}`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    });
+    const detalheJson = await detalheRes.json();
+    const postRes = await request.post(`${apiUrl}/curadoria/${atendimentoId}/avaliacoes`, {
+      headers: { authorization: `Bearer ${curador.token}` },
+      data: {
+        checklist: detalheJson.avaliacaoIa.checklist.map((c: { chave: string; estado: string }) => ({
+          chave: c.chave,
+          estado: c.estado
+        })),
+        notaAvaliacaoIa: 8.5,
+        falhasIdentificadas: ['Falha no protocolo'],
+        resumoAtendimento: 'Atendimento revisado pelo curador.',
+        comentario: 'Curadoria completa para auditoria.'
+      }
+    });
+    expect(postRes.status()).toBe(201);
+
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('gestao@hq.test');
+    await page.getByLabel('Senha').fill('senha-gestao');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto(`/curadoria/${atendimentoId}`);
+
+    await expect(page.getByRole('heading', { name: 'Revisar Atendimento' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toBeVisible();
+    await expect(page.getByText('Caio Curador')).toBeVisible();
+    await expect(page.getByText('Nota da Avaliação da IA: 8,5')).toBeVisible();
+    await expect(page.getByText('Atendimento revisado pelo curador.')).toBeVisible();
+    await expect(page.getByText('Falha no protocolo')).toBeVisible();
+    await expect(page.getByText('Curadoria completa para auditoria.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Salvar conferência' })).toHaveCount(0);
+    await expect(page.locator('.review-history')).toHaveCount(0);
   });
 
   test('Curador confere o checklist da IA pela interface e consulta o historico', async ({
@@ -564,18 +607,12 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.getByRole('link', { name: /conv-curadoria-interface/ })).toHaveCount(0);
 
     await page.goto(`/curadoria/${atendimentoId}`);
-    await expect(page.getByRole('heading', { name: 'Revisão mais recente' })).toBeVisible();
-    await expect(page.getByRole('main').getByText('Caio Curador')).toBeVisible();
-    await expect(page.getByText('1 revisão')).toBeVisible();
-    const revisaoRecente = page
-      .locator('.review-history article')
-      .filter({ hasText: 'Caio Curador' });
-    await expect(revisaoRecente.getByText('Nota da Avaliação da IA:')).toBeVisible();
-    await expect(revisaoRecente.getByText('3', { exact: true })).toBeVisible();
-    await expect(revisaoRecente.getByText('Corrigir protocolo.')).toBeVisible();
-    await expect(revisaoRecente.getByText('Não atendido').first()).toBeVisible();
-
+    await expect(page.getByRole('heading', { name: 'Conferência humana' })).toBeVisible();
+    await expect(page.getByLabel('Nota da Avaliação da IA')).toHaveValue('3');
+    await expect(page.getByLabel('Comentário da revisão (opcional)')).toHaveValue('Corrigir protocolo.');
     const protocoloSalvo = page.getByRole('group', { name: /Informação de Protocolo/ });
+    await expect(protocoloSalvo.getByLabel('Não atendido')).toBeChecked();
+
     await protocoloSalvo.getByLabel('Atendido', { exact: true }).check();
     await page.getByLabel('Nota da Avaliação da IA').fill('8');
     await page.getByLabel('Comentário da revisão (opcional)').fill('');
@@ -583,10 +620,10 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.getByRole('heading', { name: 'Fila de Curadoria' })).toBeVisible();
 
     await page.goto(`/curadoria/${atendimentoId}`);
-    await expect(page.getByText('2 revisões')).toBeVisible();
+    await expect(page.getByText('Consultar revisões anteriores')).toBeVisible();
 
     await page.getByText('Consultar revisões anteriores').click();
-    const anterior = page.locator('.review-history details li').first();
+    const anterior = page.locator('.curadorias-anteriores li').first();
     await expect(anterior).toContainText('Informação de Protocolo');
     await expect(anterior).toContainText('Não atendido');
   });

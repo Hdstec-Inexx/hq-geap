@@ -11,7 +11,8 @@ import type { AvaliacaoCuradorResumoRow, AvaliacaoIaRow } from './repository.js'
 function checklistValues(checklist: AvaliacaoIaRow['checklist']) {
   return checklist.map((criterio) => ({
     ...criterio,
-    valor: Number(criterio.valor)
+    valor: Number(criterio.valor),
+    descricao: criterio.descricao ?? null
   }));
 }
 

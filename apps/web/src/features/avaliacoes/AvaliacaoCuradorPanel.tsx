@@ -1,46 +1,41 @@
 import {
   avaliacaoCuradorResponseSchema,
-  type AvaliacaoCuradorResumo
+  type AvaliacaoCuradorResumo,
+  type EstadoCriterio
 } from '@hq-geap/contracts/avaliacoes';
+import type { AvaliacaoCurador } from '@hq-geap/contracts/curadoria';
 import { useAuthenticatedResource } from '../atendimentos/api';
+import { CriterionTooltip } from './CriterionTooltip';
 
-const estadoLabels: Record<
-  AvaliacaoCuradorResumo['checklist'][number]['estado'],
-  string
-> = {
+export const estadoLabels: Record<EstadoCriterio, string> = {
   atendido: 'Atendido',
   nao_atendido: 'Não atendido',
   nao_se_aplica: 'Não se aplica'
 };
 
-export function AvaliacaoCuradorPanel({
-  atendimentoId
+export const dateTime = new Intl.DateTimeFormat('pt-BR', {
+  dateStyle: 'short',
+  timeStyle: 'short'
+});
+
+export type AvaliacaoCuradorPanelProps = {
+  atendimentoId?: string;
+  avaliacao?: AvaliacaoCuradorResumo | AvaliacaoCurador | null;
+  emptyMessage?: string;
+};
+
+export function AvaliacaoCuradorCard({
+  avaliacao
 }: {
-  atendimentoId: string;
+  avaliacao: AvaliacaoCuradorResumo | AvaliacaoCurador;
 }) {
-  const state = useAuthenticatedResource(
-    `/atendimentos/${atendimentoId}/avaliacao-curador`,
-    avaliacaoCuradorResponseSchema
-  );
-
-  if (state.status === 'error') {
-    return (
-      <section className="avaliacao-panel avaliacao-state">
-        Não foi possível carregar a Avaliação do Curador.
-      </section>
-    );
-  }
-
-  if (state.status !== 'ready' || state.data === null) {
-    return null;
-  }
-
-  const avaliacao = state.data;
   return (
     <section className="avaliacao-panel" aria-labelledby="avaliacao-curador-heading">
       <header className="avaliacao-heading">
         <div>
-          <p className="panel-label">{avaliacao.autor.nome}</p>
+          <p className="panel-label">
+            {avaliacao.autor.nome} · {dateTime.format(new Date(avaliacao.criadoEm))}
+          </p>
           <h2 id="avaliacao-curador-heading">Avaliação do Curador</h2>
         </div>
         <div className={`avaliacao-score ${avaliacao.aprovacao}`}>
@@ -55,6 +50,7 @@ export function AvaliacaoCuradorPanel({
         Nota da Avaliação da IA:{' '}
         {avaliacao.notaAvaliacaoIa.toLocaleString('pt-BR')}
       </p>
+
       {avaliacao.resumoAtendimento || avaliacao.falhasIdentificadas.length > 0 ? (
         <div className="avaliacao-curador-top-scroll">
           {avaliacao.resumoAtendimento ? <p>{avaliacao.resumoAtendimento}</p> : null}
@@ -75,7 +71,13 @@ export function AvaliacaoCuradorPanel({
             key={criterio.chave}
           >
             <div>
-              <h3>{criterio.nome}</h3>
+              <h3>
+                <CriterionTooltip
+                  chave={criterio.chave}
+                  nome={criterio.nome}
+                  descricao={criterio.descricao}
+                />
+              </h3>
               {criterio.critico ? (
                 <span className="critical-label">Crítico</span>
               ) : null}
@@ -95,5 +97,70 @@ export function AvaliacaoCuradorPanel({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function AvaliacaoCuradorPanelFetcher({
+  atendimentoId,
+  emptyMessage
+}: {
+  atendimentoId: string;
+  emptyMessage?: string;
+}) {
+  const state = useAuthenticatedResource(
+    `/atendimentos/${atendimentoId}/avaliacao-curador`,
+    avaliacaoCuradorResponseSchema
+  );
+
+  if (state.status === 'error') {
+    return (
+      <section className="avaliacao-panel avaliacao-state">
+        Não foi possível carregar a Avaliação do Curador.
+      </section>
+    );
+  }
+
+  if (state.status !== 'ready' || state.data === null) {
+    if (state.status === 'ready' && state.data === null && emptyMessage) {
+      return (
+        <section className="avaliacao-panel avaliacao-state">
+          {emptyMessage}
+        </section>
+      );
+    }
+    return null;
+  }
+
+  return <AvaliacaoCuradorCard avaliacao={state.data} />;
+}
+
+export function AvaliacaoCuradorPanel({
+  atendimentoId,
+  avaliacao,
+  emptyMessage
+}: AvaliacaoCuradorPanelProps) {
+  if (avaliacao !== undefined) {
+    if (!avaliacao) {
+      if (emptyMessage) {
+        return (
+          <section className="avaliacao-panel avaliacao-state">
+            {emptyMessage}
+          </section>
+        );
+      }
+      return null;
+    }
+    return <AvaliacaoCuradorCard avaliacao={avaliacao} />;
+  }
+
+  if (!atendimentoId) {
+    return null;
+  }
+
+  return (
+    <AvaliacaoCuradorPanelFetcher
+      atendimentoId={atendimentoId}
+      emptyMessage={emptyMessage}
+    />
   );
 }

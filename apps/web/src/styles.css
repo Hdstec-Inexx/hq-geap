@@ -2429,8 +2429,7 @@ h1 {
 }
 
 .curadoria-empty,
-.ia-review-context,
-.review-history {
+.ia-review-context {
   padding: 30px;
   background: rgb(255 255 255 / 72%);
   border-top: 3px solid #16816f;
@@ -2438,8 +2437,7 @@ h1 {
 
 .curadoria-empty h2,
 .ia-review-context h2,
-.review-form h2,
-.review-history h2 {
+.review-form h2 {
   margin: 8px 0 12px;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 2rem;
@@ -2780,65 +2778,52 @@ h1 {
   font-weight: 700;
 }
 
-.review-history {
-  display: grid;
-  grid-template-columns: minmax(220px, 0.7fr) minmax(300px, 1.3fr);
-  gap: 28px;
+.curadorias-anteriores {
   margin-top: 24px;
+  padding: 24px;
+  background: rgb(255 255 255 / 72%);
+  border-top: 2px solid #9db5ae;
 }
 
-.review-history article {
-  display: grid;
-  align-content: center;
-  gap: 6px;
-  padding: 20px;
-  color: #eff9f5;
-  background: #123b4a;
-}
-
-.review-history article span {
-  color: #b9d9cf;
-}
-
-.review-history details {
-  grid-column: 1 / -1;
-}
-
-.review-history details > summary {
+.curadorias-anteriores > summary {
   cursor: pointer;
   font-weight: 800;
+  color: #123b4a;
 }
 
-.review-history details ol {
+.curadorias-anteriores ol {
   display: grid;
   gap: 18px;
-  padding-left: 24px;
+  margin-top: 18px;
+  padding-left: 20px;
 }
 
-.review-history details li {
+.curadorias-anteriores li {
   padding: 18px;
   background: #fff;
+  border-left: 4px solid #16816f;
 }
 
-.review-history details li > p {
+.curadorias-anteriores li > p {
   margin-top: 0;
   font-weight: 800;
+  color: #123b4a;
 }
 
-.review-history details dl {
+.curadorias-anteriores dl {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
-  margin: 0;
+  margin: 12px 0 0;
 }
 
-.review-history details dt {
+.curadorias-anteriores dt {
   color: #52717a;
   font-size: 0.75rem;
   font-weight: 800;
 }
 
-.review-history details dd {
+.curadorias-anteriores dd {
   margin: 4px 0 0;
 }
 
@@ -3033,7 +3018,6 @@ h1 {
   .avaliacao-checklist,
   .avaliacao-notes,
   .curadoria-row,
-  .review-history,
   .review-checklist fieldset {
     grid-template-columns: 1fr;
   }
