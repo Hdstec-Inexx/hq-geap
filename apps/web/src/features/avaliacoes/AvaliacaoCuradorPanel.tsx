@@ -45,29 +45,49 @@ export function AvaliacaoCuradorCard({
         : [];
 
   const [activeSnapshotIndex, setActiveSnapshotIndex] = useState(0);
+  const activeIndex = activeSnapshotIndex < revisoes.length ? activeSnapshotIndex : 0;
 
   if (revisoes.length === 0) {
     return null;
   }
 
-  const avaliacao = revisoes[activeSnapshotIndex] ?? revisoes[0];
+  const avaliacao = revisoes[activeIndex] ?? revisoes[0];
+
+  const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      const nextIndex = (index + 1) % revisoes.length;
+      setActiveSnapshotIndex(nextIndex);
+      const nextTab = document.getElementById(`review-tab-${nextIndex}`);
+      nextTab?.focus();
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const prevIndex = (index - 1 + revisoes.length) % revisoes.length;
+      setActiveSnapshotIndex(prevIndex);
+      const prevTab = document.getElementById(`review-tab-${prevIndex}`);
+      prevTab?.focus();
+    }
+  };
 
   return (
-    <section className="avaliacao-panel" aria-labelledby="avaliacao-curador-heading">
+    <section className="avaliacao-panel" aria-labelledby="avaliacao-curador-heading" id="avaliacao-curador-panel">
       {revisoes.length > 1 ? (
         <div className="review-tabs" role="tablist" aria-label="Histórico de revisões">
           {revisoes.map((item, index) => {
             const isVigente = index === 0;
             const revisionNumber = revisoes.length - index;
-            const isActive = index === activeSnapshotIndex;
+            const isActive = index === activeIndex;
             return (
               <button
                 key={item.id}
+                id={`review-tab-${index}`}
                 type="button"
                 role="tab"
                 aria-selected={isActive}
+                aria-controls="avaliacao-curador-panel"
                 className={`review-tab-item ${isActive ? 'active' : ''}`}
                 onClick={() => setActiveSnapshotIndex(index)}
+                onKeyDown={(e) => handleKeyDown(e, index)}
               >
                 <span>
                   Revisão {revisionNumber} · {dateTime.format(new Date(item.criadoEm))}

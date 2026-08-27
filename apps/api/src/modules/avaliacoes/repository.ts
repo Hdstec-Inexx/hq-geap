@@ -49,7 +49,9 @@ export type AvaliacaoCuradorResumoRow = {
 
 async function findChecklist(
   db: pg.Pool,
-  avaliacaoId: string
+  table: 'avaliacao_criterios' | 'avaliacao_curador_criterios',
+  fkColumn: 'avaliacao_id' | 'avaliacao_curador_id',
+  id: string
 ): Promise<ChecklistItem[]> {
   const checklist = await db.query<ChecklistItem>(`
     select
@@ -60,11 +62,11 @@ async function findChecklist(
       ac.valor_criterio as valor,
       ac.criterio_critico as critico,
       ac.criterio_ordem as ordem
-    from avaliacao_criterios ac
+    from ${table} ac
     left join criterios c on c.id = ac.criterio_id
-    where ac.avaliacao_id = $1
+    where ac.${fkColumn} = $1
     order by ac.criterio_ordem
-  `, [avaliacaoId]);
+  `, [id]);
   return checklist.rows;
 }
 
@@ -101,7 +103,10 @@ export function createAvaliacoesRepository(db: pg.Pool) {
         return null;
       }
 
-      return { ...row, checklist: await findChecklist(db, row.id) };
+      return {
+        ...row,
+        checklist: await findChecklist(db, 'avaliacao_criterios', 'avaliacao_id', row.id)
+      };
     },
 
     async findLatestCuradorByAtendimentoId(
@@ -130,27 +135,19 @@ export function createAvaliacoesRepository(db: pg.Pool) {
         return null;
       }
 
-      const checklist = await db.query<ChecklistItem>(`
-        select
-          ac.criterio_chave as chave,
-          ac.criterio_nome as nome,
-          c.descricao as descricao,
-          ac.estado,
-          ac.valor_criterio as valor,
-          ac.criterio_critico as critico,
-          ac.criterio_ordem as ordem
-        from avaliacao_curador_criterios ac
-        left join criterios c on c.id = ac.criterio_id
-        where ac.avaliacao_curador_id = $1
-        order by ac.criterio_ordem
-      `, [row.id]);
+      const checklist = await findChecklist(
+        db,
+        'avaliacao_curador_criterios',
+        'avaliacao_curador_id',
+        row.id
+      );
 
       return {
         ...row,
         falhasIdentificadas: Array.isArray(row.falhasIdentificadas)
           ? row.falhasIdentificadas
           : [],
-        checklist: checklist.rows
+        checklist
       };
     }
   };
