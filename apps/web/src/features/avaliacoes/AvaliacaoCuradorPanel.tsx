@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import {
   avaliacaoCuradorResponseSchema,
   type AvaliacaoCuradorResumo,
@@ -22,19 +23,66 @@ export const dateTime = new Intl.DateTimeFormat('pt-BR', {
 export type AvaliacaoCuradorPanelProps = {
   atendimentoId?: string;
   avaliacao?: AvaliacaoCuradorResumo | AvaliacaoCurador | null;
+  historico?: Array<AvaliacaoCuradorResumo | AvaliacaoCurador> | null;
   emptyMessage?: string;
   action?: ReactNode;
 };
 
 export function AvaliacaoCuradorCard({
-  avaliacao,
+  avaliacao: avaliacaoProp,
+  historico,
   action
 }: {
-  avaliacao: AvaliacaoCuradorResumo | AvaliacaoCurador;
+  avaliacao?: AvaliacaoCuradorResumo | AvaliacaoCurador | null;
+  historico?: Array<AvaliacaoCuradorResumo | AvaliacaoCurador> | null;
   action?: ReactNode;
 }) {
+  const revisoes =
+    historico && historico.length > 0
+      ? historico
+      : avaliacaoProp
+        ? [avaliacaoProp]
+        : [];
+
+  const [activeSnapshotIndex, setActiveSnapshotIndex] = useState(0);
+
+  if (revisoes.length === 0) {
+    return null;
+  }
+
+  const avaliacao = revisoes[activeSnapshotIndex] ?? revisoes[0];
+
   return (
     <section className="avaliacao-panel" aria-labelledby="avaliacao-curador-heading">
+      {revisoes.length > 1 ? (
+        <div className="review-tabs" role="tablist" aria-label="Histórico de revisões">
+          {revisoes.map((item, index) => {
+            const isVigente = index === 0;
+            const revisionNumber = revisoes.length - index;
+            const isActive = index === activeSnapshotIndex;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                className={`review-tab-item ${isActive ? 'active' : ''}`}
+                onClick={() => setActiveSnapshotIndex(index)}
+              >
+                <span>
+                  Revisão {revisionNumber} · {dateTime.format(new Date(item.criadoEm))}
+                </span>
+                <span
+                  className={`review-tab-badge ${isVigente ? 'vigente' : 'historico'}`}
+                >
+                  {isVigente ? 'Vigente' : 'Histórico'}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
       <header className="avaliacao-heading">
         <div>
           <p className="panel-label">
@@ -149,11 +197,15 @@ function AvaliacaoCuradorPanelFetcher({
 export function AvaliacaoCuradorPanel({
   atendimentoId,
   avaliacao,
+  historico,
   emptyMessage,
   action
 }: AvaliacaoCuradorPanelProps) {
-  if (avaliacao !== undefined) {
-    if (!avaliacao) {
+  if (historico !== undefined || avaliacao !== undefined) {
+    const hasItems =
+      (historico && historico.length > 0) ||
+      (avaliacao !== null && avaliacao !== undefined);
+    if (!hasItems) {
       if (emptyMessage) {
         return (
           <section className="avaliacao-panel avaliacao-state">
@@ -163,7 +215,13 @@ export function AvaliacaoCuradorPanel({
       }
       return null;
     }
-    return <AvaliacaoCuradorCard action={action} avaliacao={avaliacao} />;
+    return (
+      <AvaliacaoCuradorCard
+        action={action}
+        avaliacao={avaliacao}
+        historico={historico}
+      />
+    );
   }
 
   if (!atendimentoId) {

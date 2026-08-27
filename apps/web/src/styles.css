@@ -2804,53 +2804,67 @@ h1 {
   font-weight: 700;
 }
 
-.curadorias-anteriores {
-  margin-top: 24px;
-  padding: 24px;
-  background: rgb(255 255 255 / 72%);
-  border-top: 2px solid #9db5ae;
+.review-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgb(18 59 74 / 12%);
 }
 
-.curadorias-anteriores > summary {
+.review-tab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  color: #45636d;
+  background: rgb(18 59 74 / 6%);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
-  font-weight: 800;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.review-tab-item:hover {
   color: #123b4a;
+  background: rgb(18 59 74 / 10%);
 }
 
-.curadorias-anteriores ol {
-  display: grid;
-  gap: 18px;
-  margin-top: 18px;
-  padding-left: 20px;
-}
-
-.curadorias-anteriores li {
-  padding: 18px;
-  background: #fff;
-  border-left: 4px solid #16816f;
-}
-
-.curadorias-anteriores li > p {
-  margin-top: 0;
-  font-weight: 800;
+.review-tab-item.active {
   color: #123b4a;
+  background: #ffffff;
+  border-color: #16816f;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
 }
 
-.curadorias-anteriores dl {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  margin: 12px 0 0;
+.review-tab-item:focus-visible {
+  outline: 3px solid #e5b85c;
+  outline-offset: 2px;
 }
 
-.curadorias-anteriores dt {
-  color: #52717a;
-  font-size: 0.75rem;
-  font-weight: 800;
+.review-tab-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.curadorias-anteriores dd {
-  margin: 4px 0 0;
+.review-tab-badge.vigente {
+  color: #ffffff;
+  background: #16816f;
+}
+
+.review-tab-badge.historico {
+  color: #ffffff;
+  background: #607d8b;
 }
 
 @keyframes curadoria-loading {
@@ -2872,7 +2886,6 @@ h1 {
   .app-shell-auth,
   .app-shell-auth-collapsed {
     grid-template-columns: minmax(0, 1fr);
-    transition: grid-template-rows 250ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .app-shell-auth-collapsed {

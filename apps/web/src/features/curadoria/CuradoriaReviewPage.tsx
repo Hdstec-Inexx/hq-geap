@@ -382,36 +382,10 @@ function ReviewContent({
             ) : undefined
           }
           avaliacao={detail.avaliacaoMaisRecente}
+          historico={detail.historico}
           emptyMessage="Ainda não há conferência do Curador para este Atendimento."
         />
       )}
-
-      {detail.historico.length > 1 ? (
-        <details className="curadorias-anteriores">
-          <summary>Consultar revisões anteriores</summary>
-          <ol>
-            {detail.historico.slice(1).map((avaliacao) => (
-              <li key={avaliacao.id}>
-                <p>
-                  {dateTime.format(new Date(avaliacao.criadoEm))} ·{' '}
-                  {avaliacao.autor.nome} · Nota{' '}
-                  {avaliacao.nota.toLocaleString('pt-BR')} · Nota da Avaliação da IA{' '}
-                  {avaliacao.notaAvaliacaoIa.toLocaleString('pt-BR')}
-                </p>
-                {avaliacao.comentario ? <p>{avaliacao.comentario}</p> : null}
-                <dl>
-                  {avaliacao.checklist.map((criterio) => (
-                    <div key={criterio.chave}>
-                      <dt>{criterio.nome}</dt>
-                      <dd>{estadoLabels[criterio.estado]}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </li>
-            ))}
-          </ol>
-        </details>
-      ) : null}
 
       <ComentariosPanel atendimentoId={atendimento.id} />
     </main>

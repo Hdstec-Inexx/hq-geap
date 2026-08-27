@@ -410,8 +410,7 @@ test.describe('casca autenticada', () => {
     await expect(abrirFaixa(page)).toHaveAttribute('aria-expanded', 'false');
     await expect(abrirFaixa(page)).toBeInViewport();
     await expect(abrirFaixa(page)).toBeFocused();
-    const trilhoBox = await visibleBox(cascaChrome(page));
-    expect(trilhoBox.width).toBeLessThan(trilhoRecolhidoMaxWidthPx);
+    await expect.poll(async () => (await visibleBox(cascaChrome(page))).width).toBeLessThan(trilhoRecolhidoMaxWidthPx);
     await expect(cascaNav(page)).toHaveCount(0);
     await expect(cascaChrome(page)).toBeVisible();
     await expect(page.getByRole('link', { name: 'GEAP, início' })).toHaveCount(0);
@@ -547,20 +546,18 @@ test.describe('casca autenticada', () => {
 
     await fecharFaixa(page).click();
     await expect(abrirFaixa(page)).toBeVisible();
-    const leftClosed = (await visibleBox(heading)).x;
-    expect(leftClosed).toBeLessThan(conteudoSemFaixaMaxLeftPx);
+    await expect.poll(async () => (await visibleBox(heading)).x).toBeLessThan(conteudoSemFaixaMaxLeftPx);
 
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(abrirFaixa(page)).toBeInViewport();
     const topClosed = (await visibleBox(heading)).y;
     await abrirFaixa(page).click();
     await expect(cascaChrome(page)).toBeVisible();
+    await expect.poll(async () => (await visibleBox(heading)).y).toBeGreaterThan(topClosed + faixaEstreitaMinShiftPx);
     const topOpen = (await visibleBox(heading)).y;
-    expect(topOpen).toBeGreaterThan(topClosed + faixaEstreitaMinShiftPx);
 
     await fecharFaixa(page).click();
     await expect(abrirFaixa(page)).toBeInViewport();
-    const topClosedAgain = (await visibleBox(heading)).y;
-    expect(topClosedAgain).toBeLessThan(topOpen - faixaEstreitaMinShiftPx);
+    await expect.poll(async () => (await visibleBox(heading)).y).toBeLessThan(topOpen - faixaEstreitaMinShiftPx);
   });
 });
