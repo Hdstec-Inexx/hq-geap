@@ -7,13 +7,13 @@ import type { AvaliacaoCurador } from '@hq-geap/contracts/curadoria';
 import { useAuthenticatedResource } from '../atendimentos/api';
 import { CriterionTooltip } from './CriterionTooltip';
 
-const estadoLabels: Record<EstadoCriterio, string> = {
+export const estadoLabels: Record<EstadoCriterio, string> = {
   atendido: 'Atendido',
   nao_atendido: 'Não atendido',
   nao_se_aplica: 'Não se aplica'
 };
 
-const dateTime = new Intl.DateTimeFormat('pt-BR', {
+export const dateTime = new Intl.DateTimeFormat('pt-BR', {
   dateStyle: 'short',
   timeStyle: 'short'
 });

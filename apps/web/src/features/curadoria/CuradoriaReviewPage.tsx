@@ -13,7 +13,11 @@ import { canWriteAsCurador, usePerfil } from '../auth/perfil-context';
 import { formatAtendimentoDate, formatDuration } from '../atendimentos/atendimento-facts-logic';
 import { useAuthenticatedResource } from '../atendimentos/api';
 import { formatMotivoContato } from '../atendimentos/motivo-combobox-logic';
-import { AvaliacaoCuradorPanel } from '../avaliacoes/AvaliacaoCuradorPanel';
+import {
+  AvaliacaoCuradorPanel,
+  dateTime,
+  estadoLabels
+} from '../avaliacoes/AvaliacaoCuradorPanel';
 import { CriterionTooltip } from '../avaliacoes/CriterionTooltip';
 import { ComentariosPanel } from '../comentarios/ComentariosPanel';
 import {
@@ -23,17 +27,6 @@ import {
   TranscriptPanel,
   useAudioPlayer
 } from '../player';
-
-const estadoLabels: Record<EstadoCriterio, string> = {
-  atendido: 'Atendido',
-  nao_atendido: 'Não atendido',
-  nao_se_aplica: 'Não se aplica'
-};
-
-const dateTime = new Intl.DateTimeFormat('pt-BR', {
-  dateStyle: 'short',
-  timeStyle: 'short'
-});
 
 function CuradoriaMedia({ detail }: { detail: CuradoriaDetail }) {
   const mainPlayerRef = useRef<HTMLElement | null>(null);
