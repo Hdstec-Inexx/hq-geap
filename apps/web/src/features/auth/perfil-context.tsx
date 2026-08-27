@@ -1,12 +1,13 @@
 import {
   canDownloadAudio,
+  canWriteAsCurador,
   type Perfil,
   type UserRole
 } from '@hq-geap/contracts/auth';
 import { createContext, useContext, type ReactNode } from 'react';
 import { getPerfil } from './session';
 
-export { canDownloadAudio };
+export { canDownloadAudio, canWriteAsCurador };
 
 const PerfilContext = createContext<Perfil | null | undefined>(undefined);
 
@@ -29,11 +30,6 @@ export function usePerfil(): Perfil | null {
     return fromContext;
   }
   return getPerfil();
-}
-
-/** Admin and Curador may mutate curadoria/comentários; Gestão is read-only. */
-export function canWriteAsCurador(role: UserRole | null | undefined): boolean {
-  return role === 'admin' || role === 'curador';
 }
 
 export function samePerfil(a: Perfil | null, b: Perfil | null): boolean {

@@ -864,6 +864,24 @@ h1 {
   cursor: pointer;
 }
 
+.secondary-action {
+  min-height: 50px;
+  padding: 0 24px;
+  color: #123b4a;
+  background: transparent;
+  border: 1px solid rgb(18 59 74 / 28%);
+  border-radius: 3px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.secondary-action:hover {
+  background: rgb(18 59 74 / 8%);
+  border-color: #123b4a;
+}
+
 .users-table-wrap {
   overflow-x: auto;
   background: rgb(255 255 255 / 70%);
@@ -1410,6 +1428,14 @@ h1 {
 .avaliacao-curador-comentario p:not(.panel-label) {
   margin: 8px 0 0;
   line-height: 1.6;
+}
+
+.avaliacao-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 24px;
 }
 
 .avaliacao-resumo-scroll,
@@ -2429,8 +2455,7 @@ h1 {
 }
 
 .curadoria-empty,
-.ia-review-context,
-.review-history {
+.ia-review-context {
   padding: 30px;
   background: rgb(255 255 255 / 72%);
   border-top: 3px solid #16816f;
@@ -2438,8 +2463,7 @@ h1 {
 
 .curadoria-empty h2,
 .ia-review-context h2,
-.review-form h2,
-.review-history h2 {
+.review-form h2 {
   margin: 8px 0 12px;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 2rem;
@@ -2780,66 +2804,67 @@ h1 {
   font-weight: 700;
 }
 
-.review-history {
-  display: grid;
-  grid-template-columns: minmax(220px, 0.7fr) minmax(300px, 1.3fr);
-  gap: 28px;
-  margin-top: 24px;
+.review-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgb(18 59 74 / 12%);
 }
 
-.review-history article {
-  display: grid;
-  align-content: center;
-  gap: 6px;
-  padding: 20px;
-  color: #eff9f5;
-  background: #123b4a;
-}
-
-.review-history article span {
-  color: #b9d9cf;
-}
-
-.review-history details {
-  grid-column: 1 / -1;
-}
-
-.review-history details > summary {
+.review-tab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  color: #45636d;
+  background: rgb(18 59 74 / 6%);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
-  font-weight: 800;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
-.review-history details ol {
-  display: grid;
-  gap: 18px;
-  padding-left: 24px;
+.review-tab-item:hover {
+  color: #123b4a;
+  background: rgb(18 59 74 / 10%);
 }
 
-.review-history details li {
-  padding: 18px;
-  background: #fff;
+.review-tab-item.active {
+  color: #123b4a;
+  background: #ffffff;
+  border-color: #16816f;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
 }
 
-.review-history details li > p {
-  margin-top: 0;
-  font-weight: 800;
+.review-tab-item:focus-visible {
+  outline: 3px solid #e5b85c;
+  outline-offset: 2px;
 }
 
-.review-history details dl {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  margin: 0;
+.review-tab-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.review-history details dt {
-  color: #52717a;
-  font-size: 0.75rem;
-  font-weight: 800;
+.review-tab-badge.vigente {
+  color: #ffffff;
+  background: #16816f;
 }
 
-.review-history details dd {
-  margin: 4px 0 0;
+.review-tab-badge.historico {
+  color: #ffffff;
+  background: #607d8b;
 }
 
 @keyframes curadoria-loading {
@@ -2861,7 +2886,6 @@ h1 {
   .app-shell-auth,
   .app-shell-auth-collapsed {
     grid-template-columns: minmax(0, 1fr);
-    transition: grid-template-rows 250ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .app-shell-auth-collapsed {
@@ -3033,7 +3057,6 @@ h1 {
   .avaliacao-checklist,
   .avaliacao-notes,
   .curadoria-row,
-  .review-history,
   .review-checklist fieldset {
     grid-template-columns: 1fr;
   }
@@ -3054,6 +3077,7 @@ h1 {
 
   .review-form-heading,
   .review-actions,
+  .avaliacao-actions,
   .criterion-options {
     align-items: stretch;
     flex-direction: column;

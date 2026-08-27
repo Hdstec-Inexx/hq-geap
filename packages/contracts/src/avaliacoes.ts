@@ -20,6 +20,7 @@ export const checklistIaBooleanoSchema = z.object({
 export const criterioIaSnapshotSchema = z.object({
   chave: z.string(),
   nome: z.string(),
+  descricao: z.string().nullable().default(null).optional(),
   atendido: z.boolean(),
   valor: z.number().nonnegative(),
   critico: z.boolean(),
@@ -59,6 +60,7 @@ export const avaliacaoCuradorResumoSchema = z.object({
     z.object({
       chave: z.string(),
       nome: z.string(),
+      descricao: z.string().nullable().default(null).optional(),
       estado: estadoCriterioSchema,
       valor: z.number().nonnegative(),
       critico: z.boolean(),

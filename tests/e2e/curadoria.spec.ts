@@ -493,8 +493,7 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     expect(headingIndex('Avaliação original')).toBeLessThan(headingIndex('Transcrição'));
     expect(headingIndex('Transcrição')).toBeLessThan(headingIndex('Ouça antes de decidir'));
     expect(headingIndex('Ouça antes de decidir')).toBeLessThan(headingIndex('Conferência humana'));
-    expect(headingIndex('Conferência humana')).toBeLessThan(headingIndex('Revisão mais recente'));
-    expect(headingIndex('Revisão mais recente')).toBeLessThan(headingIndex('Comentários'));
+    expect(headingIndex('Conferência humana')).toBeLessThan(headingIndex('Comentários'));
     await expect(page.getByText('Tempo de Espera', { exact: true })).toHaveCount(0);
     await expect(page.getByText('TME', { exact: true })).toHaveCount(0);
   }
@@ -513,9 +512,53 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await page.goto(`/curadoria/${atendimentoId}`);
 
     await expect(page.getByRole('heading', { name: 'Revisar Atendimento' })).toBeVisible();
-    await expect(page.getByText('Consulta somente leitura')).toBeVisible();
+    await expect(page.getByText('Ainda não há conferência do Curador para este Atendimento.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Salvar conferência' })).toHaveCount(0);
-    await expectSecoesDaRevisaoNaOrdem(page);
+  });
+
+  test('Gestao visualiza o card padronizado de Avaliação do Curador em atendimento ja revisado', async ({
+    page,
+    request
+  }) => {
+    const atendimentoId = await createAtendimento('conv-curadoria-gestao-concluida');
+    await persistirAvaliacaoIa(atendimentoId);
+
+    const curador = await login(request, 'curador');
+    const detalheRes = await request.get(`${apiUrl}/curadoria/${atendimentoId}`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    });
+    const detalheJson = await detalheRes.json();
+    const postRes = await request.post(`${apiUrl}/curadoria/${atendimentoId}/avaliacoes`, {
+      headers: { authorization: `Bearer ${curador.token}` },
+      data: {
+        checklist: detalheJson.avaliacaoIa.checklist.map((c: { chave: string; estado: string }) => ({
+          chave: c.chave,
+          estado: c.estado
+        })),
+        notaAvaliacaoIa: 8.5,
+        falhasIdentificadas: ['Falha no protocolo'],
+        resumoAtendimento: 'Atendimento revisado pelo curador.',
+        comentario: 'Curadoria completa para auditoria.'
+      }
+    });
+    expect(postRes.status()).toBe(201);
+
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('gestao@hq.test');
+    await page.getByLabel('Senha').fill('senha-gestao');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto(`/curadoria/${atendimentoId}`);
+
+    await expect(page.getByRole('heading', { name: 'Revisar Atendimento' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toBeVisible();
+    await expect(page.getByText('Caio Curador')).toBeVisible();
+    await expect(page.getByText('Nota da Avaliação da IA: 8,5')).toBeVisible();
+    await expect(page.getByText('Atendimento revisado pelo curador.')).toBeVisible();
+    await expect(page.getByText('Falha no protocolo')).toBeVisible();
+    await expect(page.getByText('Curadoria completa para auditoria.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Salvar conferência' })).toHaveCount(0);
+    await expect(page.locator('.review-history')).toHaveCount(0);
   });
 
   test('Curador confere o checklist da IA pela interface e consulta o historico', async ({
@@ -564,18 +607,17 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.getByRole('link', { name: /conv-curadoria-interface/ })).toHaveCount(0);
 
     await page.goto(`/curadoria/${atendimentoId}`);
-    await expect(page.getByRole('heading', { name: 'Revisão mais recente' })).toBeVisible();
-    await expect(page.getByRole('main').getByText('Caio Curador')).toBeVisible();
-    await expect(page.getByText('1 revisão')).toBeVisible();
-    const revisaoRecente = page
-      .locator('.review-history article')
-      .filter({ hasText: 'Caio Curador' });
-    await expect(revisaoRecente.getByText('Nota da Avaliação da IA:')).toBeVisible();
-    await expect(revisaoRecente.getByText('3', { exact: true })).toBeVisible();
-    await expect(revisaoRecente.getByText('Corrigir protocolo.')).toBeVisible();
-    await expect(revisaoRecente.getByText('Não atendido').first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fazer nova revisão' })).toBeVisible();
+    await page.getByRole('button', { name: 'Fazer nova revisão' }).click();
 
+    await expect(page.getByRole('heading', { name: 'Conferência humana' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Cancelar reavaliação' })).toBeVisible();
+    await expect(page.getByLabel('Nota da Avaliação da IA')).toHaveValue('3');
+    await expect(page.getByLabel('Comentário da revisão (opcional)')).toHaveValue('Corrigir protocolo.');
     const protocoloSalvo = page.getByRole('group', { name: /Informação de Protocolo/ });
+    await expect(protocoloSalvo.getByLabel('Não atendido')).toBeChecked();
+
     await protocoloSalvo.getByLabel('Atendido', { exact: true }).check();
     await page.getByLabel('Nota da Avaliação da IA').fill('8');
     await page.getByLabel('Comentário da revisão (opcional)').fill('');
@@ -583,12 +625,20 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.getByRole('heading', { name: 'Fila de Curadoria' })).toBeVisible();
 
     await page.goto(`/curadoria/${atendimentoId}`);
-    await expect(page.getByText('2 revisões')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toBeVisible();
+    await expect(page.getByRole('tablist', { name: 'Histórico de revisões' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Revisão 2.*Vigente/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Revisão 1.*Histórico/ })).toBeVisible();
 
-    await page.getByText('Consultar revisões anteriores').click();
-    const anterior = page.locator('.review-history details li').first();
-    await expect(anterior).toContainText('Informação de Protocolo');
-    await expect(anterior).toContainText('Não atendido');
+    // Na aba vigente (Revisão 2), protocolo foi marcado como atendido
+    const card = page.locator('.avaliacao-panel');
+    await expect(card.locator('.criterio-check').filter({ hasText: 'Informação de Protocolo' })).toContainText('Atendido');
+
+    // Ao alternar para a Revisão 1 (Histórico), todo o card atualiza para o snapshot anterior
+    await page.getByRole('tab', { name: /Revisão 1.*Histórico/ }).click();
+    await expect(card.locator('.criterio-check').filter({ hasText: 'Informação de Protocolo' })).toContainText('Não atendido');
+    await expect(card.getByText('Corrigir protocolo.')).toBeVisible();
+    await expect(card.getByText('Nota da Avaliação da IA: 3')).toBeVisible();
   });
 
   test('formulário de curadoria exibe tag crítico alinhada ao título e custom tooltip com descrição no hover/focus', async ({
@@ -1647,6 +1697,205 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await page.getByRole('button', { name: 'Limpar filtros' }).click();
     await expect(page).toHaveURL('/curadorias-realizadas');
     await expect(realInput).toHaveValue('');
+  });
+
+  test('Curador alterna entre card de leitura e formulario de reavaliacao com pre-preenchimento e cancelamento', async ({
+    page,
+    request
+  }) => {
+    const atendimentoId = await createAtendimento('conv-curadoria-alternancia-fluxo');
+    await persistirAvaliacaoIa(atendimentoId);
+
+    const curador = await login(request, 'curador');
+    const detalheRes = await request.get(`${apiUrl}/curadoria/${atendimentoId}`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    });
+    const detalheJson = await detalheRes.json();
+
+    // Primeira revisão realizada via API
+    await request.post(`${apiUrl}/curadoria/${atendimentoId}/avaliacoes`, {
+      headers: { authorization: `Bearer ${curador.token}` },
+      data: {
+        checklist: detalheJson.avaliacaoIa.checklist.map((c: { chave: string; estado: string }) => ({
+          chave: c.chave,
+          estado: c.chave === 'informou_protocolo_email' ? 'nao_atendido' : 'atendido'
+        })),
+        notaAvaliacaoIa: 6.5,
+        falhasIdentificadas: ['Faltou protocolo no e-mail'],
+        resumoAtendimento: 'Primeira conferência realizada pelo curador.',
+        comentario: 'Avaliador errou o protocolo.'
+      }
+    });
+
+    // 1. Curador acessa atendimento já conferido a partir de Minhas Curadorias
+    await loginUi(page, 'curador');
+    await page.goto(`/curadoria/${atendimentoId}?from=/minhas-curadorias`);
+
+    // 2. Renderiza inicialmente o card padronizado de leitura com o botão "Fazer nova revisão"
+    await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toBeVisible();
+    await expect(page.getByText('Primeira conferência realizada pelo curador.')).toBeVisible();
+    await expect(page.getByText('Faltou protocolo no e-mail')).toBeVisible();
+    await expect(page.getByText('Avaliador errou o protocolo.')).toBeVisible();
+    const btnNovaRevisao = page.getByRole('button', { name: 'Fazer nova revisão' });
+    await expect(btnNovaRevisao).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Salvar conferência' })).toHaveCount(0);
+
+    // 3. Ao clicar em "Fazer nova revisão", alterna para o ReviewForm pré-preenchido
+    await btnNovaRevisao.click();
+    await expect(page.getByRole('heading', { name: 'Conferência humana' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fazer nova revisão' })).toHaveCount(0);
+
+    // Valida pré-preenchimento com os dados da revisão mais recente
+    await expect(page.getByLabel('Nota da Avaliação da IA')).toHaveValue('6.5');
+    await expect(page.getByLabel('Falhas identificadas')).toHaveValue('Faltou protocolo no e-mail');
+    await expect(page.getByLabel('Resumo do atendimento')).toHaveValue('Primeira conferência realizada pelo curador.');
+    await expect(page.getByLabel('Comentário da revisão (opcional)')).toHaveValue('Avaliador errou o protocolo.');
+    const protocoloGroup = page.getByRole('group', { name: /Informação de Protocolo/ });
+    await expect(protocoloGroup.getByLabel('Não atendido')).toBeChecked();
+
+    // 4. Altera valores em rascunho e clica em "Cancelar reavaliação"
+    await page.getByLabel('Nota da Avaliação da IA').fill('2.0');
+    await page.getByLabel('Comentário da revisão (opcional)').fill('Rascunho descartado.');
+    await protocoloGroup.getByLabel('Atendido', { exact: true }).check();
+
+    const btnCancelar = page.getByRole('button', { name: 'Cancelar reavaliação' });
+    await expect(btnCancelar).toBeVisible();
+    await btnCancelar.click();
+
+    // 5. Retorna com segurança para o card de leitura com os dados preservados intactos
+    await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fazer nova revisão' })).toBeVisible();
+    await expect(page.getByText('Avaliador errou o protocolo.')).toBeVisible();
+    await expect(page.getByText('Rascunho descartado.')).toHaveCount(0);
+
+    // 6. Clica em "Fazer nova revisão" novamente e confirma que os valores anteriores foram preservados
+    await page.getByRole('button', { name: 'Fazer nova revisão' }).click();
+    await expect(page.getByLabel('Nota da Avaliação da IA')).toHaveValue('6.5');
+    await expect(page.getByLabel('Comentário da revisão (opcional)')).toHaveValue('Avaliador errou o protocolo.');
+
+    // 7. Faz alterações definitivas e salva a nova conferência
+    await protocoloGroup.getByLabel('Atendido', { exact: true }).check();
+    await page.getByLabel('Nota da Avaliação da IA').fill('9.0');
+    await page.getByLabel('Comentário da revisão (opcional)').fill('Reavaliação concluída com sucesso.');
+    await page.getByRole('button', { name: 'Salvar conferência' }).click();
+
+    // 8. Redireciona com sucesso de volta para Minhas Curadorias (origem via ?from)
+    await expect(page).toHaveURL('/minhas-curadorias');
+    await expect(page.getByRole('heading', { name: 'Minhas Curadorias' })).toBeVisible();
+  });
+
+  test('Navegação por abas de histórico de revisões imutáveis em Curadorias Realizadas e Minhas Curadorias por Curador, Admin e Gestão', async ({
+    page,
+    request
+  }) => {
+    const convId = 'conv-historico-abas-e2e';
+    const atendimentoId = await createAtendimento(convId);
+    await persistirAvaliacaoIa(atendimentoId);
+
+    const curador = await login(request, 'curador');
+    const gestao = await login(request, 'gestao');
+    const admin = await login(request, 'admin');
+
+    const detalheRes = await request.get(`${apiUrl}/curadoria/${atendimentoId}`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    });
+    const detalheJson = await detalheRes.json();
+
+    // 1. Criar primeira revisão (snapshot inicial)
+    await request.post(`${apiUrl}/curadoria/${atendimentoId}/avaliacoes`, {
+      headers: { authorization: `Bearer ${curador.token}` },
+      data: {
+        checklist: detalheJson.avaliacaoIa.checklist.map((c: { chave: string; estado: string }) => ({
+          chave: c.chave,
+          estado: c.chave === 'informou_protocolo_email' ? 'nao_atendido' : 'atendido'
+        })),
+        notaAvaliacaoIa: 5.0,
+        falhasIdentificadas: ['Primeira falha'],
+        resumoAtendimento: 'Primeiro resumo histórico.',
+        comentario: 'Primeiro comentário de auditoria.'
+      }
+    });
+
+    // Curador acessa com apenas 1 revisão no histórico -> não renderiza barra de abas redundante
+    await loginUi(page, 'curador');
+    await page.goto(`/curadoria/${atendimentoId}?from=/minhas-curadorias`);
+    await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toBeVisible();
+    await expect(page.getByRole('tablist', { name: 'Histórico de revisões' })).toHaveCount(0);
+    await expect(page.getByText('Primeiro resumo histórico.')).toBeVisible();
+
+    // 2. Criar segunda revisão (snapshot mais recente / vigente)
+    await request.post(`${apiUrl}/curadoria/${atendimentoId}/avaliacoes`, {
+      headers: { authorization: `Bearer ${curador.token}` },
+      data: {
+        checklist: detalheJson.avaliacaoIa.checklist.map((c: { chave: string; estado: string }) => ({
+          chave: c.chave,
+          estado: 'atendido'
+        })),
+        notaAvaliacaoIa: 9.5,
+        falhasIdentificadas: ['Falha corrigida'],
+        resumoAtendimento: 'Segundo resumo vigente.',
+        comentario: 'Segundo comentário aprovado.'
+      }
+    });
+
+    // 3. Curador acessa a partir de Minhas Curadorias e navega entre abas
+    await page.goto(`/curadoria/${atendimentoId}?from=/minhas-curadorias`);
+    const tablist = page.getByRole('tablist', { name: 'Histórico de revisões' });
+    await expect(tablist).toBeVisible();
+
+    const tabVigente = page.getByRole('tab', { name: /Revisão 2.*Vigente/ });
+    const tabHistorico = page.getByRole('tab', { name: /Revisão 1.*Histórico/ });
+
+    await expect(tabVigente).toBeVisible();
+    await expect(tabHistorico).toBeVisible();
+    await expect(tabVigente).toHaveAttribute('aria-selected', 'true');
+    await expect(tabHistorico).toHaveAttribute('aria-selected', 'false');
+
+    const card = page.locator('.avaliacao-panel');
+
+    // Snapshot vigente ativo por padrão
+    await expect(card.getByText('Segundo resumo vigente.')).toBeVisible();
+    await expect(card.getByText('Segundo comentário aprovado.')).toBeVisible();
+    await expect(card.getByText('Nota da Avaliação da IA: 9,5')).toBeVisible();
+    await expect(card.locator('.criterio-check').filter({ hasText: 'Informação de Protocolo' })).toContainText('Atendido');
+
+    // Alterna para o snapshot histórico (Revisão 1)
+    await tabHistorico.click();
+    await expect(tabHistorico).toHaveAttribute('aria-selected', 'true');
+    await expect(tabVigente).toHaveAttribute('aria-selected', 'false');
+
+    await expect(card.getByText('Primeiro resumo histórico.')).toBeVisible();
+    await expect(card.getByText('Primeiro comentário de auditoria.')).toBeVisible();
+    await expect(card.getByText('Nota da Avaliação da IA: 5')).toBeVisible();
+    await expect(card.locator('.criterio-check').filter({ hasText: 'Informação de Protocolo' })).toContainText('Não atendido');
+
+    // Alterna de volta para Vigente (Revisão 2)
+    await tabVigente.click();
+    await expect(card.getByText('Segundo resumo vigente.')).toBeVisible();
+    await expect(card.locator('.criterio-check').filter({ hasText: 'Informação de Protocolo' })).toContainText('Atendido');
+
+    // 4. Gestão consulta em Curadorias Realizadas (100% leitura, sem botão de edição)
+    await page.evaluate(() => window.sessionStorage.clear());
+    await loginUi(page, 'gestao');
+    await page.goto(`/curadoria/${atendimentoId}?from=/curadorias-realizadas`);
+
+    await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fazer nova revisão' })).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: /Revisão 2.*Vigente/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Revisão 1.*Histórico/ })).toBeVisible();
+
+    // Gestão alterna para o snapshot histórico
+    await page.getByRole('tab', { name: /Revisão 1.*Histórico/ }).click();
+    await expect(page.locator('.avaliacao-panel').getByText('Primeiro resumo histórico.')).toBeVisible();
+
+    // 5. Admin consulta em Curadorias Realizadas (com acesso total)
+    await page.evaluate(() => window.sessionStorage.clear());
+    await loginUi(page, 'admin');
+    await page.goto(`/curadoria/${atendimentoId}?from=/curadorias-realizadas`);
+
+    await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Revisão 2.*Vigente/ })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Revisão 1.*Histórico/ })).toBeVisible();
   });
 });
 

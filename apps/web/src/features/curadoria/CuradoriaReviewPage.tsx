@@ -1,18 +1,29 @@
 import {
   avaliacaoCuradorSchema,
   curadoriaDetailSchema,
+  type AvaliacaoCurador,
   type CuradoriaDetail
 } from '@hq-geap/contracts/curadoria';
 import type { EstadoCriterio } from '@hq-geap/contracts/avaliacoes';
 import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { curadoriasRealizadasHref, filaHref, pageFromSearch } from './pagination';
+import { curadoriasRealizadasHref, filaHref } from './pagination';
+import {
+  getInitialReviewFormState,
+  shouldShowReadingCardFirst
+} from './curadoria-review-logic';
 import { apiUrl, getSession } from '../auth/session';
 
 import { canWriteAsCurador, usePerfil } from '../auth/perfil-context';
 import { formatAtendimentoDate, formatDuration } from '../atendimentos/atendimento-facts-logic';
 import { useAuthenticatedResource } from '../atendimentos/api';
 import { formatMotivoContato } from '../atendimentos/motivo-combobox-logic';
+import {
+  AvaliacaoCuradorPanel,
+  dateTime,
+  estadoLabels
+} from '../avaliacoes/AvaliacaoCuradorPanel';
+import { CriterionTooltip } from '../avaliacoes/CriterionTooltip';
 import { ComentariosPanel } from '../comentarios/ComentariosPanel';
 import {
   AudioDownloadButton,
@@ -21,65 +32,6 @@ import {
   TranscriptPanel,
   useAudioPlayer
 } from '../player';
-
-const stateLabels: Record<EstadoCriterio, string> = {
-  atendido: 'Atendido',
-  nao_atendido: 'Não atendido',
-  nao_se_aplica: 'Não se aplica'
-};
-
-const dateTime = new Intl.DateTimeFormat('pt-BR', {
-  dateStyle: 'short',
-  timeStyle: 'short'
-});
-
-function CriterionTooltip({
-  chave,
-  nome,
-  descricao
-}: {
-  chave: string;
-  nome: string;
-  descricao?: string | null;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const tooltipId = `tooltip-${chave}`;
-
-  if (!descricao) {
-    return <span className="criterion-title-text">{nome}</span>;
-  }
-
-  return (
-    <span
-      className="criterion-tooltip-wrapper"
-      onMouseEnter={() => setIsOpen(true)}
-      onMouseLeave={() => setIsOpen(false)}
-    >
-      <span
-        className="criterion-tooltip-trigger"
-        tabIndex={0}
-        aria-describedby={isOpen ? tooltipId : undefined}
-        onFocus={() => setIsOpen(true)}
-        onBlur={() => setIsOpen(false)}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') setIsOpen(false);
-        }}
-      >
-        {nome}
-      </span>
-      {isOpen ? (
-        <span
-          id={tooltipId}
-          role="tooltip"
-          className="criterion-tooltip"
-        >
-          <span className="criterion-tooltip-arrow" aria-hidden="true" />
-          {descricao}
-        </span>
-      ) : null}
-    </span>
-  );
-}
 
 function CuradoriaMedia({ detail }: { detail: CuradoriaDetail }) {
   const mainPlayerRef = useRef<HTMLElement | null>(null);
@@ -123,26 +75,33 @@ function CuradoriaMedia({ detail }: { detail: CuradoriaDetail }) {
 
 function ReviewForm({
   detail,
+  initialData,
+  onCancel,
   onSaved
 }: {
   detail: CuradoriaDetail;
+  initialData?: AvaliacaoCurador | null;
+  onCancel?: () => void;
   onSaved: () => void;
 }) {
-  const [estados, setEstados] = useState<Record<string, EstadoCriterio>>(() =>
-    Object.fromEntries(
-      detail.avaliacaoIa.checklist.map(({ chave, estado }) => [chave, estado])
-    )
+  const [initialState] = useState(() =>
+    getInitialReviewFormState(detail.avaliacaoIa, initialData)
   );
-  const [notaAvaliacaoIa, setNotaAvaliacaoIa] = useState(() =>
-    String(detail.avaliacaoIa.nota)
+  const [estados, setEstados] = useState<Record<string, EstadoCriterio>>(
+    () => initialState.estados
+  );
+  const [notaAvaliacaoIa, setNotaAvaliacaoIa] = useState(
+    () => initialState.notaAvaliacaoIa
   );
   const [falhasIdentificadas, setFalhasIdentificadas] = useState(
-    detail.avaliacaoIa.falhasIdentificadas.join('\n')
+    () => initialState.falhasIdentificadas
   );
   const [resumoAtendimento, setResumoAtendimento] = useState(
-    detail.avaliacaoIa.resumoAtendimento ?? ''
+    () => initialState.resumoAtendimento
   );
-  const [comentario, setComentario] = useState('');
+  const [comentario, setComentario] = useState(
+    () => initialState.comentario
+  );
   const [submitState, setSubmitState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const ferramentasNaoAtendidas = estados.uso_correto_ferramentas === 'nao_atendido';
   const checklist = detail.avaliacaoIa.checklist.map((criterio) => {
@@ -261,7 +220,7 @@ function ReviewForm({
                       type="radio"
                       value={estado}
                     />
-                    <span>{stateLabels[estado]}</span>
+                    <span>{estadoLabels[estado]}</span>
                   </label>
                 )
               )}
@@ -315,6 +274,15 @@ function ReviewForm({
           {submitState === 'saved' ? 'Conferência salva' : null}
           {submitState === 'error' ? 'Não foi possível salvar a conferência.' : null}
         </p>
+        {onCancel ? (
+          <button
+            className="secondary-action"
+            onClick={onCancel}
+            type="button"
+          >
+            Cancelar reavaliação
+          </button>
+        ) : null}
         <button
           className="primary-action"
           disabled={submitState === 'saving' || !notaAvaliacaoIaValida}
@@ -360,7 +328,11 @@ function ReviewContent({
   onSaved: () => void;
 }) {
   const atendimento = detail.atendimento;
-  const canWrite = canWriteAsCurador(usePerfil()?.role);
+  const role = usePerfil()?.role;
+  const canWrite = canWriteAsCurador(role);
+  const hasPreviousReview = detail.avaliacaoMaisRecente !== null;
+  const showReadingFirst = shouldShowReadingCardFirst(role, detail.avaliacaoMaisRecente);
+  const [isRevising, setIsRevising] = useState(() => !showReadingFirst);
   const backLink = getBackLinkInfo(searchParams);
   return (
     <main className="atendimentos-page curadoria-review-page">
@@ -372,7 +344,6 @@ function ReviewContent({
         </div>
         <Link className="back-link" to={backLink.to}>{backLink.label}</Link>
       </header>
-
 
       <section className="atendimento-facts" aria-label="Dados do Atendimento">
         <div><span>Motivo de Contato</span><strong>{formatMotivoContato(atendimento.motivoContato)}</strong></div>
@@ -390,104 +361,32 @@ function ReviewContent({
 
       <CuradoriaMedia detail={detail} />
 
-      {canWrite ? (
-        <ReviewForm detail={detail} onSaved={onSaved} />
+      {canWrite && (!hasPreviousReview || isRevising) ? (
+        <ReviewForm
+          detail={detail}
+          initialData={detail.avaliacaoMaisRecente}
+          onCancel={hasPreviousReview ? () => setIsRevising(false) : undefined}
+          onSaved={onSaved}
+        />
       ) : (
-        <section className="ia-review-context">
-          <p className="panel-label">Consulta somente leitura</p>
-          <h2>Conferência humana</h2>
-          {detail.avaliacaoMaisRecente ? (
-            <>
-              <p>
-                Nota da Avaliação da IA:{' '}
-                {detail.avaliacaoMaisRecente.notaAvaliacaoIa.toLocaleString('pt-BR')}
-              </p>
-              {detail.avaliacaoMaisRecente.comentario ? (
-                <p>{detail.avaliacaoMaisRecente.comentario}</p>
-              ) : null}
-              <dl className="readonly-checklist">
-                {detail.avaliacaoMaisRecente.checklist.map((criterio) => (
-                  <div key={criterio.chave}>
-                    <dt>
-                      {criterio.nome}
-                      {criterio.critico ? ' (crítico)' : ''}
-                    </dt>
-                    <dd>{stateLabels[criterio.estado]}</dd>
-                  </div>
-                ))}
-              </dl>
-            </>
-          ) : (
-            <p>Ainda não há conferência do Curador para este Atendimento.</p>
-          )}
-        </section>
+        <AvaliacaoCuradorPanel
+          action={
+            canWrite && hasPreviousReview ? (
+              <button
+                className="primary-action"
+                onClick={() => setIsRevising(true)}
+                type="button"
+              >
+                Fazer nova revisão
+              </button>
+            ) : undefined
+          }
+          avaliacao={detail.avaliacaoMaisRecente}
+          historico={detail.historico}
+          emptyMessage="Ainda não há conferência do Curador para este Atendimento."
+        />
       )}
 
-      <section className="review-history">
-        <div>
-          <p className="panel-label">Histórico imutável</p>
-          <h2>Revisão mais recente</h2>
-          <p>{detail.historico.length} {detail.historico.length === 1 ? 'revisão' : 'revisões'}</p>
-        </div>
-        {detail.avaliacaoMaisRecente ? (
-          <article>
-            <strong>{detail.avaliacaoMaisRecente.autor.nome}</strong>
-            <span>{dateTime.format(new Date(detail.avaliacaoMaisRecente.criadoEm))}</span>
-            <b>{detail.avaliacaoMaisRecente.nota.toLocaleString('pt-BR')} / {detail.avaliacaoMaisRecente.aprovacao === 'aprovado' ? 'Aprovado' : 'Reprovado'}</b>
-            <p>
-              Nota da Avaliação da IA:{' '}
-              <span>{detail.avaliacaoMaisRecente.notaAvaliacaoIa.toLocaleString('pt-BR')}</span>
-            </p>
-            {detail.avaliacaoMaisRecente.resumoAtendimento ? (
-              <p>{detail.avaliacaoMaisRecente.resumoAtendimento}</p>
-            ) : null}
-            {detail.avaliacaoMaisRecente.falhasIdentificadas.length > 0 ? (
-              <ul>
-                {detail.avaliacaoMaisRecente.falhasIdentificadas.map((falha) => (
-                  <li key={falha}>{falha}</li>
-                ))}
-              </ul>
-            ) : null}
-            {detail.avaliacaoMaisRecente.comentario ? (
-              <p>{detail.avaliacaoMaisRecente.comentario}</p>
-            ) : null}
-            <dl>
-              {detail.avaliacaoMaisRecente.checklist.map((criterio) => (
-                <div key={criterio.chave}>
-                  <dt>{criterio.nome}</dt>
-                  <dd>{stateLabels[criterio.estado]}</dd>
-                </div>
-              ))}
-            </dl>
-          </article>
-        ) : <p>A primeira conferência ainda não foi salva.</p>}
-        {detail.historico.length > 1 ? (
-          <details>
-            <summary>Consultar revisões anteriores</summary>
-            <ol>
-              {detail.historico.slice(1).map((avaliacao) => (
-                <li key={avaliacao.id}>
-                  <p>
-                    {dateTime.format(new Date(avaliacao.criadoEm))} ·{' '}
-                    {avaliacao.autor.nome} · Nota{' '}
-                    {avaliacao.nota.toLocaleString('pt-BR')} · Nota da Avaliação da IA{' '}
-                    {avaliacao.notaAvaliacaoIa.toLocaleString('pt-BR')}
-                  </p>
-                  {avaliacao.comentario ? <p>{avaliacao.comentario}</p> : null}
-                  <dl>
-                    {avaliacao.checklist.map((criterio) => (
-                      <div key={criterio.chave}>
-                        <dt>{criterio.nome}</dt>
-                        <dd>{stateLabels[criterio.estado]}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </li>
-              ))}
-            </ol>
-          </details>
-        ) : null}
-      </section>
       <ComentariosPanel atendimentoId={atendimento.id} />
     </main>
   );
@@ -516,6 +415,5 @@ export function CuradoriaReviewPage() {
       searchParams={searchParams}
       onSaved={() => navigate(getBackLinkInfo(searchParams).to)}
     />
-
   );
 }
