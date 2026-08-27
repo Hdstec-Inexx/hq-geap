@@ -864,6 +864,24 @@ h1 {
   cursor: pointer;
 }
 
+.secondary-action {
+  min-height: 50px;
+  padding: 0 24px;
+  color: #123b4a;
+  background: transparent;
+  border: 1px solid rgb(18 59 74 / 28%);
+  border-radius: 3px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.secondary-action:hover {
+  background: rgb(18 59 74 / 8%);
+  border-color: #123b4a;
+}
+
 .users-table-wrap {
   overflow-x: auto;
   background: rgb(255 255 255 / 70%);
@@ -1410,6 +1428,14 @@ h1 {
 .avaliacao-curador-comentario p:not(.panel-label) {
   margin: 8px 0 0;
   line-height: 1.6;
+}
+
+.avaliacao-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 24px;
 }
 
 .avaliacao-resumo-scroll,
@@ -3038,6 +3064,7 @@ h1 {
 
   .review-form-heading,
   .review-actions,
+  .avaliacao-actions,
   .criterion-options {
     align-items: stretch;
     flex-direction: column;

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import {
   avaliacaoCuradorResponseSchema,
   type AvaliacaoCuradorResumo,
@@ -22,12 +23,15 @@ export type AvaliacaoCuradorPanelProps = {
   atendimentoId?: string;
   avaliacao?: AvaliacaoCuradorResumo | AvaliacaoCurador | null;
   emptyMessage?: string;
+  action?: ReactNode;
 };
 
 export function AvaliacaoCuradorCard({
-  avaliacao
+  avaliacao,
+  action
 }: {
   avaliacao: AvaliacaoCuradorResumo | AvaliacaoCurador;
+  action?: ReactNode;
 }) {
   return (
     <section className="avaliacao-panel" aria-labelledby="avaliacao-curador-heading">
@@ -96,16 +100,24 @@ export function AvaliacaoCuradorCard({
           <p className="avaliacao-comentario-scroll">{avaliacao.comentario}</p>
         </div>
       ) : null}
+
+      {action ? (
+        <div className="avaliacao-actions">
+          {action}
+        </div>
+      ) : null}
     </section>
   );
 }
 
 function AvaliacaoCuradorPanelFetcher({
   atendimentoId,
-  emptyMessage
+  emptyMessage,
+  action
 }: {
   atendimentoId: string;
   emptyMessage?: string;
+  action?: ReactNode;
 }) {
   const state = useAuthenticatedResource(
     `/atendimentos/${atendimentoId}/avaliacao-curador`,
@@ -131,13 +143,14 @@ function AvaliacaoCuradorPanelFetcher({
     return null;
   }
 
-  return <AvaliacaoCuradorCard avaliacao={state.data} />;
+  return <AvaliacaoCuradorCard action={action} avaliacao={state.data} />;
 }
 
 export function AvaliacaoCuradorPanel({
   atendimentoId,
   avaliacao,
-  emptyMessage
+  emptyMessage,
+  action
 }: AvaliacaoCuradorPanelProps) {
   if (avaliacao !== undefined) {
     if (!avaliacao) {
@@ -150,7 +163,7 @@ export function AvaliacaoCuradorPanel({
       }
       return null;
     }
-    return <AvaliacaoCuradorCard avaliacao={avaliacao} />;
+    return <AvaliacaoCuradorCard action={action} avaliacao={avaliacao} />;
   }
 
   if (!atendimentoId) {
@@ -159,6 +172,7 @@ export function AvaliacaoCuradorPanel({
 
   return (
     <AvaliacaoCuradorPanelFetcher
+      action={action}
       atendimentoId={atendimentoId}
       emptyMessage={emptyMessage}
     />

@@ -607,7 +607,12 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.getByRole('link', { name: /conv-curadoria-interface/ })).toHaveCount(0);
 
     await page.goto(`/curadoria/${atendimentoId}`);
+    await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fazer nova revisão' })).toBeVisible();
+    await page.getByRole('button', { name: 'Fazer nova revisão' }).click();
+
     await expect(page.getByRole('heading', { name: 'Conferência humana' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Cancelar reavaliação' })).toBeVisible();
     await expect(page.getByLabel('Nota da Avaliação da IA')).toHaveValue('3');
     await expect(page.getByLabel('Comentário da revisão (opcional)')).toHaveValue('Corrigir protocolo.');
     const protocoloSalvo = page.getByRole('group', { name: /Informação de Protocolo/ });
@@ -1684,6 +1689,91 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await page.getByRole('button', { name: 'Limpar filtros' }).click();
     await expect(page).toHaveURL('/curadorias-realizadas');
     await expect(realInput).toHaveValue('');
+  });
+
+  test('Curador alterna entre card de leitura e formulario de reavaliacao com pre-preenchimento e cancelamento', async ({
+    page,
+    request
+  }) => {
+    const atendimentoId = await createAtendimento('conv-curadoria-alternancia-fluxo');
+    await persistirAvaliacaoIa(atendimentoId);
+
+    const curador = await login(request, 'curador');
+    const detalheRes = await request.get(`${apiUrl}/curadoria/${atendimentoId}`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    });
+    const detalheJson = await detalheRes.json();
+
+    // Primeira revisão realizada via API
+    await request.post(`${apiUrl}/curadoria/${atendimentoId}/avaliacoes`, {
+      headers: { authorization: `Bearer ${curador.token}` },
+      data: {
+        checklist: detalheJson.avaliacaoIa.checklist.map((c: { chave: string; estado: string }) => ({
+          chave: c.chave,
+          estado: c.chave === 'informou_protocolo_email' ? 'nao_atendido' : 'atendido'
+        })),
+        notaAvaliacaoIa: 6.5,
+        falhasIdentificadas: ['Faltou protocolo no e-mail'],
+        resumoAtendimento: 'Primeira conferência realizada pelo curador.',
+        comentario: 'Avaliador errou o protocolo.'
+      }
+    });
+
+    // 1. Curador acessa atendimento já conferido a partir de Minhas Curadorias
+    await loginUi(page, 'curador');
+    await page.goto(`/curadoria/${atendimentoId}?from=/minhas-curadorias`);
+
+    // 2. Renderiza inicialmente o card padronizado de leitura com o botão "Fazer nova revisão"
+    await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toBeVisible();
+    await expect(page.getByText('Primeira conferência realizada pelo curador.')).toBeVisible();
+    await expect(page.getByText('Faltou protocolo no e-mail')).toBeVisible();
+    await expect(page.getByText('Avaliador errou o protocolo.')).toBeVisible();
+    const btnNovaRevisao = page.getByRole('button', { name: 'Fazer nova revisão' });
+    await expect(btnNovaRevisao).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Salvar conferência' })).toHaveCount(0);
+
+    // 3. Ao clicar em "Fazer nova revisão", alterna para o ReviewForm pré-preenchido
+    await btnNovaRevisao.click();
+    await expect(page.getByRole('heading', { name: 'Conferência humana' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fazer nova revisão' })).toHaveCount(0);
+
+    // Valida pré-preenchimento com os dados da revisão mais recente
+    await expect(page.getByLabel('Nota da Avaliação da IA')).toHaveValue('6.5');
+    await expect(page.getByLabel('Falhas identificadas')).toHaveValue('Faltou protocolo no e-mail');
+    await expect(page.getByLabel('Resumo do atendimento')).toHaveValue('Primeira conferência realizada pelo curador.');
+    await expect(page.getByLabel('Comentário da revisão (opcional)')).toHaveValue('Avaliador errou o protocolo.');
+    const protocoloGroup = page.getByRole('group', { name: /Informação de Protocolo/ });
+    await expect(protocoloGroup.getByLabel('Não atendido')).toBeChecked();
+
+    // 4. Altera valores em rascunho e clica em "Cancelar reavaliação"
+    await page.getByLabel('Nota da Avaliação da IA').fill('2.0');
+    await page.getByLabel('Comentário da revisão (opcional)').fill('Rascunho descartado.');
+    await protocoloGroup.getByLabel('Atendido', { exact: true }).check();
+
+    const btnCancelar = page.getByRole('button', { name: 'Cancelar reavaliação' });
+    await expect(btnCancelar).toBeVisible();
+    await btnCancelar.click();
+
+    // 5. Retorna com segurança para o card de leitura com os dados preservados intactos
+    await expect(page.getByRole('heading', { name: 'Avaliação do Curador' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fazer nova revisão' })).toBeVisible();
+    await expect(page.getByText('Avaliador errou o protocolo.')).toBeVisible();
+    await expect(page.getByText('Rascunho descartado.')).toHaveCount(0);
+
+    // 6. Clica em "Fazer nova revisão" novamente e confirma que os valores anteriores foram preservados
+    await page.getByRole('button', { name: 'Fazer nova revisão' }).click();
+    await expect(page.getByLabel('Nota da Avaliação da IA')).toHaveValue('6.5');
+    await expect(page.getByLabel('Comentário da revisão (opcional)')).toHaveValue('Avaliador errou o protocolo.');
+
+    // 7. Faz alterações definitivas e salva a nova conferência
+    await protocoloGroup.getByLabel('Atendido', { exact: true }).check();
+    await page.getByLabel('Nota da Avaliação da IA').fill('9.0');
+    await page.getByLabel('Comentário da revisão (opcional)').fill('Reavaliação concluída com sucesso.');
+    await page.getByRole('button', { name: 'Salvar conferência' }).click();
+
+    // 8. Redireciona com sucesso de volta para Minhas Curadorias (origem via ?from)
+    await expect(page).toHaveURL('/minhas-curadorias');
+    await expect(page.getByRole('heading', { name: 'Minhas Curadorias' })).toBeVisible();
   });
 });
 

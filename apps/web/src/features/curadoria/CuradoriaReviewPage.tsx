@@ -1,12 +1,17 @@
 import {
   avaliacaoCuradorSchema,
   curadoriaDetailSchema,
+  type AvaliacaoCurador,
   type CuradoriaDetail
 } from '@hq-geap/contracts/curadoria';
 import type { EstadoCriterio } from '@hq-geap/contracts/avaliacoes';
 import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { curadoriasRealizadasHref, filaHref } from './pagination';
+import {
+  getInitialReviewFormState,
+  shouldShowReadingCardFirst
+} from './curadoria-review-logic';
 import { apiUrl, getSession } from '../auth/session';
 
 import { canWriteAsCurador, usePerfil } from '../auth/perfil-context';
@@ -70,26 +75,33 @@ function CuradoriaMedia({ detail }: { detail: CuradoriaDetail }) {
 
 function ReviewForm({
   detail,
+  initialData,
+  onCancel,
   onSaved
 }: {
   detail: CuradoriaDetail;
+  initialData?: AvaliacaoCurador | null;
+  onCancel?: () => void;
   onSaved: () => void;
 }) {
-  const [estados, setEstados] = useState<Record<string, EstadoCriterio>>(() =>
-    Object.fromEntries(
-      detail.avaliacaoIa.checklist.map(({ chave, estado }) => [chave, estado])
-    )
+  const [initialState] = useState(() =>
+    getInitialReviewFormState(detail.avaliacaoIa, initialData)
   );
-  const [notaAvaliacaoIa, setNotaAvaliacaoIa] = useState(() =>
-    String(detail.avaliacaoIa.nota)
+  const [estados, setEstados] = useState<Record<string, EstadoCriterio>>(
+    () => initialState.estados
+  );
+  const [notaAvaliacaoIa, setNotaAvaliacaoIa] = useState(
+    () => initialState.notaAvaliacaoIa
   );
   const [falhasIdentificadas, setFalhasIdentificadas] = useState(
-    detail.avaliacaoIa.falhasIdentificadas.join('\n')
+    () => initialState.falhasIdentificadas
   );
   const [resumoAtendimento, setResumoAtendimento] = useState(
-    detail.avaliacaoIa.resumoAtendimento ?? ''
+    () => initialState.resumoAtendimento
   );
-  const [comentario, setComentario] = useState('');
+  const [comentario, setComentario] = useState(
+    () => initialState.comentario
+  );
   const [submitState, setSubmitState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const ferramentasNaoAtendidas = estados.uso_correto_ferramentas === 'nao_atendido';
   const checklist = detail.avaliacaoIa.checklist.map((criterio) => {
@@ -262,6 +274,15 @@ function ReviewForm({
           {submitState === 'saved' ? 'Conferência salva' : null}
           {submitState === 'error' ? 'Não foi possível salvar a conferência.' : null}
         </p>
+        {onCancel ? (
+          <button
+            className="secondary-action"
+            onClick={onCancel}
+            type="button"
+          >
+            Cancelar reavaliação
+          </button>
+        ) : null}
         <button
           className="primary-action"
           disabled={submitState === 'saving' || !notaAvaliacaoIaValida}
@@ -307,7 +328,11 @@ function ReviewContent({
   onSaved: () => void;
 }) {
   const atendimento = detail.atendimento;
-  const canWrite = canWriteAsCurador(usePerfil()?.role);
+  const role = usePerfil()?.role;
+  const canWrite = canWriteAsCurador(role);
+  const hasPreviousReview = detail.avaliacaoMaisRecente !== null;
+  const showReadingFirst = shouldShowReadingCardFirst(role, detail.avaliacaoMaisRecente);
+  const [isRevising, setIsRevising] = useState(() => !showReadingFirst);
   const backLink = getBackLinkInfo(searchParams);
   return (
     <main className="atendimentos-page curadoria-review-page">
@@ -336,10 +361,26 @@ function ReviewContent({
 
       <CuradoriaMedia detail={detail} />
 
-      {canWrite ? (
-        <ReviewForm detail={detail} onSaved={onSaved} />
+      {canWrite && (!hasPreviousReview || isRevising) ? (
+        <ReviewForm
+          detail={detail}
+          initialData={detail.avaliacaoMaisRecente}
+          onCancel={hasPreviousReview ? () => setIsRevising(false) : undefined}
+          onSaved={onSaved}
+        />
       ) : (
         <AvaliacaoCuradorPanel
+          action={
+            canWrite && hasPreviousReview ? (
+              <button
+                className="primary-action"
+                onClick={() => setIsRevising(true)}
+                type="button"
+              >
+                Fazer nova revisão
+              </button>
+            ) : undefined
+          }
           avaliacao={detail.avaliacaoMaisRecente}
           emptyMessage="Ainda não há conferência do Curador para este Atendimento."
         />
