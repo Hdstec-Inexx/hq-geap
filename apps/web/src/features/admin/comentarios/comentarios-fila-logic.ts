@@ -18,11 +18,23 @@ export function formatComentarioAtendimentoHeader(
   return `${agenteNome} · ${dateTime.format(new Date(rawDate))}`;
 }
 
+function getPathname(url: string): string {
+  return url.split('?')[0].split('#')[0];
+}
+
 export function isMaintenanceQueueOrigin(from: string | null | undefined): boolean {
-  if (!from) return false;
+  if (!from || !from.startsWith('/') || from.startsWith('//')) return false;
+  return getPathname(from) === '/admin/comentarios';
+}
+
+export function isDashboardOrigin(from: string | null | undefined): boolean {
+  if (!from || !from.startsWith('/') || from.startsWith('//')) return false;
+  const path = getPathname(from);
   return (
-    from === '/admin/comentarios' ||
-    from.startsWith('/admin/comentarios?')
+    path === '/' ||
+    path === '/dashboard' ||
+    path === '/gestao' ||
+    path === '/gestao/dashboard'
   );
 }
 
@@ -40,10 +52,39 @@ export function getAtendimentoBackLink(
   searchParams: URLSearchParams
 ): { to: string; label: string } {
   const from = searchParams.get('from');
-  if (isMaintenanceQueueOrigin(from)) {
+  if (from && from.startsWith('/') && !from.startsWith('//')) {
+    if (isMaintenanceQueueOrigin(from)) {
+      return {
+        to: from,
+        label: 'Voltar à Fila de Manutenção'
+      };
+    }
+
+    if (isDashboardOrigin(from)) {
+      return {
+        to: from,
+        label: 'Voltar ao Dashboard'
+      };
+    }
+
+    const path = getPathname(from);
+    if (path === '/curadoria') {
+      return {
+        to: from,
+        label: 'Voltar à Fila de Curadoria'
+      };
+    }
+
+    if (path === '/atendimentos') {
+      return {
+        to: from,
+        label: 'Voltar à lista'
+      };
+    }
+
     return {
-      to: from!,
-      label: 'Voltar à Fila de Manutenção'
+      to: from,
+      label: 'Voltar'
     };
   }
 

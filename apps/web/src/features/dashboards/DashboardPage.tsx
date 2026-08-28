@@ -1,6 +1,6 @@
 import { dashboardSchema } from '@hq-geap/contracts/dashboards';
 import { useEffect, useState } from 'react';
-import { Form, Link, useSearchParams } from 'react-router-dom';
+import { Form, Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuthenticatedResource } from '../atendimentos/api';
 import { formatMotivoContato } from '../atendimentos/motivo-combobox-logic';
 import { ConcordanciaChart } from './components/ConcordanciaChart';
@@ -30,6 +30,7 @@ const dateTime = new Intl.DateTimeFormat('pt-BR', {
 });
 
 export function DashboardPage() {
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const fallback = defaultPeriod();
   const inicioParam = searchParams.get('inicio');
@@ -159,26 +160,31 @@ export function DashboardPage() {
                 </p>
               ) : (
                 <ol>
-                  {state.data.pioresAtendimentos.map((atendimento) => (
-                    <li key={atendimento.id}>
-                      <strong
-                        aria-label={`Nota IA ${atendimento.notaIa.toLocaleString('pt-BR')}`}
-                      >
-                        {atendimento.notaIa.toLocaleString('pt-BR')}
-                      </strong>
-                      <div>
-                        <Link to={`/atendimentos/${atendimento.id}`}>
-                          {formatMotivoContato(atendimento.motivoContato)}
-                        </Link>
-                        <span>
-                          {dateTime.format(new Date(atendimento.concluidoEm))}
-                          {' · '}
-                          Curador{' '}
-                          {atendimento.notaCurador?.toLocaleString('pt-BR') ?? '—'}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
+                  {state.data.pioresAtendimentos.map((atendimento) => {
+                    const fromUrl = `${location.pathname}${location.search}`;
+                    return (
+                      <li key={atendimento.id}>
+                        <strong
+                          aria-label={`Nota IA ${atendimento.notaIa.toLocaleString('pt-BR')}`}
+                        >
+                          {atendimento.notaIa.toLocaleString('pt-BR')}
+                        </strong>
+                        <div>
+                          <Link
+                            to={`/atendimentos/${atendimento.id}?from=${encodeURIComponent(fromUrl)}`}
+                          >
+                            {formatMotivoContato(atendimento.motivoContato)}
+                          </Link>
+                          <span>
+                            {dateTime.format(new Date(atendimento.concluidoEm))}
+                            {' · '}
+                            Curador{' '}
+                            {atendimento.notaCurador?.toLocaleString('pt-BR') ?? '—'}
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ol>
               )}
             </section>

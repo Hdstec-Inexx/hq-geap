@@ -7,6 +7,7 @@ import {
   determineQueueAdvanceTarget,
   extractQueueFiltersFromFromParam,
   getAtendimentoBackLink,
+  isDashboardOrigin,
   isMaintenanceQueueOrigin
 } from '../../apps/web/src/features/admin/comentarios/comentarios-fila-logic.js';
 import type { ComentarioFila } from '../../packages/contracts/src/comentarios.js';
@@ -36,7 +37,7 @@ test('buildFilaAtendimentoHref propaga contexto da Fila de Manutencao via URL', 
   );
 });
 
-test('isMaintenanceQueueOrigin identifica origem da Fila de Manutencao', () => {
+test('isMaintenanceQueueOrigin e isDashboardOrigin identificam origens contextuais', () => {
   assert.equal(isMaintenanceQueueOrigin('/admin/comentarios'), true);
   assert.equal(
     isMaintenanceQueueOrigin('/admin/comentarios?status=pendente'),
@@ -50,9 +51,34 @@ test('isMaintenanceQueueOrigin identifica origem da Fila de Manutencao', () => {
   assert.equal(isMaintenanceQueueOrigin('/curadoria'), false);
   assert.equal(isMaintenanceQueueOrigin(null), false);
   assert.equal(isMaintenanceQueueOrigin(undefined), false);
+  assert.equal(isMaintenanceQueueOrigin('//evil.com/admin/comentarios'), false);
+
+  assert.equal(isDashboardOrigin('/'), true);
+  assert.equal(isDashboardOrigin('/?inicio=2026-08-01&fim=2026-08-20'), true);
+  assert.equal(isDashboardOrigin('/dashboard'), true);
+  assert.equal(isDashboardOrigin('/gestao/dashboard?inicio=2026-08-01'), true);
+  assert.equal(isDashboardOrigin('/atendimentos'), false);
+  assert.equal(isDashboardOrigin(null), false);
+  assert.equal(isDashboardOrigin('//evil.com'), false);
 });
 
 test('getAtendimentoBackLink define rota e texto conforme origem contextual', () => {
+  // Acessado a partir do Dashboard com filtros de período
+  const searchFromDashboard = new URLSearchParams({
+    from: '/?inicio=2026-08-01&fim=2026-08-20'
+  });
+  const backDashboard = getAtendimentoBackLink(searchFromDashboard);
+  assert.equal(backDashboard.label, 'Voltar ao Dashboard');
+  assert.equal(backDashboard.to, '/?inicio=2026-08-01&fim=2026-08-20');
+
+  // Acessado a partir do Dashboard da gestão sem querystring
+  const searchFromGestaoDashboard = new URLSearchParams({
+    from: '/gestao/dashboard'
+  });
+  const backGestaoDashboard = getAtendimentoBackLink(searchFromGestaoDashboard);
+  assert.equal(backGestaoDashboard.label, 'Voltar ao Dashboard');
+  assert.equal(backGestaoDashboard.to, '/gestao/dashboard');
+
   // Acessado a partir da Fila de Manutenção com filtros
   const searchFromFila = new URLSearchParams({
     from: '/admin/comentarios?status=pendente&inicio=2026-08-10&fim=2026-08-15'
@@ -84,6 +110,14 @@ test('getAtendimentoBackLink define rota e texto conforme origem contextual', ()
     backAtendimentos.to,
     '/atendimentos?page=2&inicio=2026-08-01&motivo=D%C3%BAvidas'
   );
+
+  // Rejeita tentativas de open redirect com //
+  const searchOpenRedirect = new URLSearchParams({
+    from: '//external-site.com/phishing'
+  });
+  const backOpenRedirect = getAtendimentoBackLink(searchOpenRedirect);
+  assert.equal(backOpenRedirect.label, 'Voltar à lista');
+  assert.equal(backOpenRedirect.to, '/atendimentos');
 
   // Acesso direto sem query string
   const emptySearch = new URLSearchParams();
@@ -187,6 +221,18 @@ test('countPendingComentarios contabiliza comentarios com status pendente', () =
     0
   );
   assert.equal(countPendingComentarios([]), 0);
+});
+
+test('DashboardPage propaga da rota atual a querystring de origem no link para Atendimento', async () => {
+  const dashboardContent = await readFile(
+    new URL(
+      '../../apps/web/src/features/dashboards/DashboardPage.tsx',
+      import.meta.url
+    ),
+    'utf8'
+  );
+
+  assert.match(dashboardContent, /from=\$\{encodeURIComponent\(fromUrl\)\}/);
 });
 
 test('ComentariosPendentesPage propaga from com contexto nos links para Atendimento', async () => {
