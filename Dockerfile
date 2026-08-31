@@ -25,7 +25,7 @@ RUN pnpm --filter @hq-geap/contracts build \
     --moduleResolution NodeNext \
     --target ES2022 \
     --outDir scripts-dist \
-    --rootDir scripts \
+    --rootDir . \
     --esModuleInterop \
     --skipLibCheck \
     scripts/database.ts \
@@ -45,7 +45,8 @@ RUN pnpm install --frozen-lockfile --prod --filter @hq-geap/api... \
   && addgroup -S hq && adduser -S -G hq hq
 COPY --from=build /app/packages/contracts/dist packages/contracts/dist
 COPY --from=build /app/apps/api/dist apps/api/dist
-COPY --from=build /app/scripts-dist scripts
+COPY --from=build /app/scripts-dist/scripts scripts
+COPY --from=build /app/scripts-dist/apps/api/src/modules/atendimentos /app/apps/api/src/modules/atendimentos
 COPY --from=build /app/db db
 COPY docker/api-entrypoint.sh /app/docker/api-entrypoint.sh
 RUN chmod +x /app/docker/api-entrypoint.sh \
