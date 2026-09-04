@@ -32,6 +32,7 @@ function detailRow(
     motivoContato: 'Financeiro/Boletos',
     houveTransferencia: true,
     custo: '0.1842',
+    notaIa: null,
     eventTimestamp: '1785330252',
     audioReference: 'atendimentos/conv-tool-null-message.mp3',
     curadorId: null,
@@ -65,6 +66,42 @@ test('lista de Atendimentos usa envelope paginado com items e total', () => {
     items: [],
     total: 0
   });
+});
+
+const atendimentoSummaryBase = {
+  id: '21f908bd-3728-4bfd-8035-3abd750b74d7',
+  conversationId: 'conv-1',
+  agenteVoz: {
+    id: '11111111-1111-4111-8111-111111111111',
+    nome: 'Lívia',
+    agentId: 'agent-livia-test'
+  },
+  status: 'concluido' as const,
+  iniciadoEm: '2026-08-03T10:00:00.000Z',
+  concluidoEm: '2026-08-03T10:05:00.000Z',
+  duracaoSegundos: 300,
+  motivoContato: 'Financeiro/Boletos',
+  houveTransferencia: false,
+  custo: 0.15,
+  curadoria: {
+    realizada: false,
+    curadorId: null,
+    curadorNome: null,
+    nota: null,
+    realizadaEm: null
+  }
+};
+
+test('resumo de Atendimento inclui nota da IA Avaliadora ou nulo', () => {
+  assert.equal(
+    atendimentoSummarySchema.parse({ ...atendimentoSummaryBase, notaIa: 9.5 }).notaIa,
+    9.5
+  );
+  assert.equal(
+    atendimentoSummarySchema.parse({ ...atendimentoSummaryBase, notaIa: null }).notaIa,
+    null
+  );
+  assert.equal(atendimentoSummarySchema.safeParse(atendimentoSummaryBase).success, false);
 });
 
 const fixturePath = new URL(
@@ -1245,6 +1282,7 @@ test('toAtendimentoSummary mapeia curadoria realizada e pendente corretamente', 
     motivoContato: 'Financeiro/Boletos',
     houveTransferencia: false,
     custo: '0.15',
+    notaIa: null,
     eventTimestamp: '1785330252',
     curadorId: null,
     curadorNome: null,
@@ -1277,6 +1315,38 @@ test('toAtendimentoSummary mapeia curadoria realizada e pendente corretamente', 
     nota: 8.5,
     realizadaEm: '2026-08-03T11:00:00.000Z'
   });
+});
+
+test('toAtendimentoSummary mapeia nota da IA Avaliadora e nulo quando ausente', () => {
+  const row: AtendimentoSummaryRow = {
+    id: '21f908bd-3728-4bfd-8035-3abd750b74d7',
+    conversationId: 'conv-1',
+    agenteVozId: '11111111-1111-4111-8111-111111111111',
+    agenteVozNome: 'Lívia',
+    agentId: 'agent-livia-test',
+    status: 'concluido',
+    iniciadoEm: new Date('2026-08-03T10:00:00.000Z'),
+    concluidoEm: new Date('2026-08-03T10:05:00.000Z'),
+    duracaoSegundos: 300,
+    motivoContato: 'Financeiro/Boletos',
+    houveTransferencia: false,
+    custo: '0.15',
+    notaIa: null,
+    eventTimestamp: '1785330252',
+    curadorId: null,
+    curadorNome: null,
+    curadoriaNota: null,
+    curadoriaRealizadaEm: null
+  };
+
+  const semNota = toAtendimentoSummary(row);
+  assert.equal(semNota.notaIa, null);
+
+  const comNota = toAtendimentoSummary({
+    ...row,
+    notaIa: '9.50'
+  });
+  assert.equal(comNota.notaIa, 9.5);
 });
 
 test('filtros SQL suportam curadoriaStatus e curadorId', async () => {
@@ -1361,6 +1431,24 @@ test('filtros SQL suportam conversationId com ILIKE', async () => {
     /a\.elevenlabs_conversation_id ilike '%' \|\| \$1 \|\| '%'/
   );
   assert.deepEqual(filtro.values, ['conv-abc-123']);
+});
+
+test('lista de Atendimentos exibe Nota IA formatada no card', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const page = await readFile(
+    new URL('../../apps/web/src/features/atendimentos/AtendimentosPage.tsx', import.meta.url),
+    'utf8'
+  );
+  assert.match(page, /<dt>Nota IA<\/dt>/);
+  assert.match(page, /formatNotaIa\(atendimento\.notaIa\)/);
+});
+
+test('formatNotaIa formata nota da IA Avaliadora e em dash quando ausente', async () => {
+  const { formatNotaIa } = await import(
+    '../../apps/web/src/features/atendimentos/atendimento-facts-logic.js'
+  );
+  assert.equal(formatNotaIa(null), '—');
+  assert.equal(formatNotaIa(9.5), '9,5');
 });
 
 test('formatDate formata datas ISO no fuso oficial e trata nulos e invalidos', async () => {

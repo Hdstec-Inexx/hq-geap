@@ -481,6 +481,7 @@ export const atendimentoSummarySchema = z.object({
   motivoContato: z.string().nullable(),
   houveTransferencia: z.boolean(),
   custo: z.number().nonnegative().nullable().optional(),
+  notaIa: z.number().min(0).max(10).nullable(),
   curadoria: curadoriaAtendimentoSummarySchema
 });
 

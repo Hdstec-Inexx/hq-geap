@@ -511,6 +511,7 @@ test('toCuradoriaDetail preserva descricao da Regua no checklist da IA e do Cura
       motivoContato: 'Cancelamento',
       houveTransferencia: false,
       custo: null,
+      notaIa: null,
       eventTimestamp: null,
       curadorId: null,
       curadorNome: null,

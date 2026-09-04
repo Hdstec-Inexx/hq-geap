@@ -788,6 +788,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       items: Array<{
         id: string;
         conversationId: string;
+        notaIa: number | null;
         curadoria: {
           realizada: boolean;
           curadorId: string | null;
@@ -802,6 +803,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       (item) => item.conversationId === convRealizada
     );
     expect(itemRealizada).toBeDefined();
+    expect(itemRealizada?.notaIa).toEqual(expect.any(Number));
     expect(itemRealizada?.curadoria).toMatchObject({
       realizada: true,
       curadorId: curador?.id,
@@ -814,6 +816,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       (item) => item.conversationId === convPendente
     );
     expect(itemPendente).toBeDefined();
+    expect(itemPendente?.notaIa).toEqual(expect.any(Number));
     expect(itemPendente?.curadoria).toEqual({
       realizada: false,
       curadorId: null,
@@ -880,6 +883,15 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       page.getByText(`Curadoria: ${curadorUser.name}`).first()
     ).toBeVisible();
     await expect(page.getByText('Curadoria pendente').first()).toBeVisible();
+    const cardRealizada = page.locator('article.atendimento-row', {
+      hasText: 'Curadoria Realizada Motivo'
+    });
+    await expect(cardRealizada.locator('dt', { hasText: 'Nota IA' })).toBeVisible();
+    await expect(
+      cardRealizada.locator('dd', {
+        hasText: itemRealizada!.notaIa!.toLocaleString('pt-BR')
+      })
+    ).toBeVisible();
 
     // Filtrar por Status da Curadoria = Realizada
     await page
