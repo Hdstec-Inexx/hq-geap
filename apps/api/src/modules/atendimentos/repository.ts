@@ -19,6 +19,7 @@ export type AtendimentoSummaryRow = {
   motivoContato: string | null;
   houveTransferencia: boolean;
   custo: string | null;
+  notaIa: string | null;
   eventTimestamp: string | null;
   curadorId: string | null;
   curadorNome: string | null;
@@ -49,6 +50,12 @@ const selectAtendimentoSummary = `
     a.motivo_contato as "motivoContato",
     a.houve_transferencia as "houveTransferencia",
     a.custo,
+    (
+      select avaliacao_ia.nota
+      from avaliacoes avaliacao_ia
+      where avaliacao_ia.atendimento_id = a.id
+        and avaliacao_ia.autor = 'ia'
+    ) as "notaIa",
     a.elevenlabs_event_timestamp as "eventTimestamp",
     cur.autor_usuario_id as "curadorId",
     cur.autor_usuario_nome as "curadorNome",

@@ -344,7 +344,7 @@ export function createCuradoriaRepository(db: pg.Pool) {
 
 
     async findDetail(atendimentoId: string): Promise<CuradoriaAtendimentoRow | null> {
-      const atendimento = await db.query<Omit<AtendimentoRow, 'transcricao' | 'audioReference'> & {
+      const atendimento = await db.query<Omit<AtendimentoRow, 'transcricao' | 'audioReference' | 'notaIa'> & {
         transcricao: unknown;
         audioReference: string | null;
       }>(`
@@ -423,6 +423,7 @@ export function createCuradoriaRepository(db: pg.Pool) {
 
       return {
         ...atendimentoRow,
+        notaIa: ia.nota,
         avaliacaoIa: { ...ia, checklist: iaChecklists.get(ia.id) ?? [] },
         historico: avaliacoes.rows.map((avaliacao) => ({
           ...avaliacao,

@@ -31,6 +31,8 @@ function safeAudioUrl(audioUrl: string | null): string | null {
 function summaryValues(row: AtendimentoSummaryRow) {
   const custo =
     row.custo === null || row.custo === undefined ? null : Number(row.custo);
+  const notaIa =
+    row.notaIa === null || row.notaIa === undefined ? null : Number(row.notaIa);
   const curadoriaNota =
     row.curadoriaNota === null || row.curadoriaNota === undefined
       ? null
@@ -57,6 +59,10 @@ function summaryValues(row: AtendimentoSummaryRow) {
     motivoContato: row.motivoContato,
     houveTransferencia: Boolean(row.houveTransferencia),
     custo: custo !== null && Number.isFinite(custo) && custo >= 0 ? custo : null,
+    notaIa:
+      notaIa !== null && Number.isFinite(notaIa) && notaIa >= 0 && notaIa <= 10
+        ? notaIa
+        : null,
     curadoria: {
       realizada: curadoriaRealizada,
       curadorId: curadoriaRealizada ? row.curadorId : null,

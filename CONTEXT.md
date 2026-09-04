@@ -59,10 +59,15 @@ A exportação do arquivo de áudio (`.mp3`) do Atendimento. Acesso restrito aos
 ### Avaliação
 
 **Avaliação**:
-O veredito sobre um Atendimento, produzido pela IA Avaliadora ou pelo Curador — as duas coexistem lado a lado quando ambas existem, sem hierarquia, e são snapshots imutáveis. A da IA é gerada para todo Atendimento concluído e carrega: checklist de critérios, nota de 0–10 (soma dos atendidos), falhas identificadas e resumo do atendimento. A do Curador é a **conferência da avaliação da IA** em registro separado: ele confirma ou corrige o shape espelho (checklist, falhas e resumo), sua nota deriva da mesma soma da Régua, registra a **Nota da Avaliação da IA** (0–10, qualidade da própria IA Avaliadora) e pode adicionar um comentário opcional na revisão. Enquanto a conferência humana não for realizada, o painel do Curador não é exibido (sem renderizar card vazio nem mensagem de placeholder) e o painel da Avaliação da IA se expande para ocupar a largura total do container. Quando a avaliação do Curador existir, ambos os painéis coexistem lado a lado. Concordância não é flag gravada — deriva da comparação dos dois snapshots.
+O veredito sobre um Atendimento, produzido pela IA Avaliadora ou pelo Curador — as duas coexistem lado a lado quando ambas existem, sem hierarquia, e são snapshots imutáveis. A da IA é gerada para todo Atendimento concluído e carrega: checklist de critérios, **Nota da IA Avaliadora**, falhas identificadas e resumo do atendimento. A do Curador é a **conferência da avaliação da IA** em registro separado: ele confirma ou corrige o shape espelho (checklist, falhas e resumo), sua nota deriva da mesma soma da Régua, registra a **Nota da Avaliação da IA** (0–10, qualidade da própria IA Avaliadora) e pode adicionar um comentário opcional na revisão. Enquanto a conferência humana não for realizada, o painel do Curador não é exibido (sem renderizar card vazio nem mensagem de placeholder) e o painel da Avaliação da IA se expande para ocupar a largura total do container. Quando a avaliação do Curador existir, ambos os painéis coexistem lado a lado. Concordância não é flag gravada — deriva da comparação dos dois snapshots.
+
+**Nota da IA Avaliadora**:
+Nota de 0–10 do Atendimento na Régua, produzida pela Avaliação da IA (soma dos critérios atendidos). Distinta da **Nota da Avaliação da IA**.
+_Avoid_: Nota IA (ambíguo com Nota da Avaliação da IA)
 
 **Nota da Avaliação da IA**:
-Nota de 0–10 que o Curador atribui à qualidade da Avaliação da IA num Atendimento (calibração do avaliador), distinta da nota do Atendimento na Régua.
+Nota de 0–10 que o Curador atribui à qualidade da Avaliação da IA num Atendimento (calibração do avaliador), distinta da **Nota da IA Avaliadora**.
+_Avoid_: Nota IA
 
 **Aprovação**:
 O veredito final derivado de uma Avaliação: `Aprovado` quando a nota é ≥ 7.0 **e** não houve Falha Crítica; caso contrário, `Reprovado`. Não é dado gravado — é regra de leitura sobre o snapshot.

@@ -165,7 +165,7 @@ export function DashboardPage() {
                     return (
                       <li key={atendimento.id}>
                         <strong
-                          aria-label={`Nota IA ${atendimento.notaIa.toLocaleString('pt-BR')}`}
+                          aria-label={`Nota da IA Avaliadora ${atendimento.notaIa.toLocaleString('pt-BR')}`}
                         >
                           {atendimento.notaIa.toLocaleString('pt-BR')}
                         </strong>

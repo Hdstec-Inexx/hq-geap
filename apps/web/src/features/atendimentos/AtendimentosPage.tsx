@@ -4,7 +4,7 @@ import {
 import { curadoresListSchema } from '@hq-geap/contracts/curadoria';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { formatDuration } from './atendimento-facts-logic';
+import { formatDuration, formatNotaIa } from './atendimento-facts-logic';
 import { useAuthenticatedResource } from './api';
 import { formatMotivoContato } from './motivo-combobox-logic';
 import { MotivoCombobox } from './MotivoCombobox';
@@ -405,6 +405,7 @@ export function AtendimentosPage() {
                   <div><dt>Conclusão</dt><dd>{formatDate(atendimento.concluidoEm)}</dd></div>
                   <div><dt>Duração</dt><dd>{formatDuration(atendimento.duracaoSegundos)}</dd></div>
                   <div><dt>Transferência</dt><dd>{atendimento.houveTransferencia ? 'Sim' : 'Não'}</dd></div>
+                  <div><dt>Nota da IA Avaliadora</dt><dd>{formatNotaIa(atendimento.notaIa)}</dd></div>
                   {cost ? <div><dt>Custo</dt><dd>{cost}</dd></div> : null}
                 </dl>
               </article>

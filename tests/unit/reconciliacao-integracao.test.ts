@@ -193,6 +193,7 @@ function createMockDatabase() {
               motivoContato: row.motivo_contato,
               houveTransferencia: row.houve_transferencia,
               custo: row.custo,
+              notaIa: null,
               eventTimestamp: row.elevenlabs_event_timestamp,
               curadorId: null,
               curadorNome: null,

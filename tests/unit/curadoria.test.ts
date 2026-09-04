@@ -511,6 +511,7 @@ test('toCuradoriaDetail preserva descricao da Regua no checklist da IA e do Cura
       motivoContato: 'Cancelamento',
       houveTransferencia: false,
       custo: null,
+      notaIa: null,
       eventTimestamp: null,
       curadorId: null,
       curadorNome: null,
@@ -614,6 +615,20 @@ test('styles.css corrige layout de review-checklist legend e define tooltip flut
   // Deve ter estilos para o custom tooltip e seu indicador de seta
   assert.match(css, /\.criterion-tooltip\b/);
   assert.match(css, /\.criterion-tooltip-arrow\b/);
+});
+
+test('findDetail reusa a nota da Avaliacao da IA ja carregada sem join extra', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const repository = await readFile(
+    new URL('../../apps/api/src/modules/curadoria/repository.ts', import.meta.url),
+    'utf8'
+  );
+  const findDetail = repository.slice(
+    repository.indexOf('async findDetail'),
+    repository.indexOf('async createEvaluation')
+  );
+  assert.doesNotMatch(findDetail, /left join avaliacoes avaliacao_ia/);
+  assert.match(findDetail, /notaIa:\s*ia\.nota/);
 });
 
 

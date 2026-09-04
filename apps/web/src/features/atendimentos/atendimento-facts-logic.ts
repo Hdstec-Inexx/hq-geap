@@ -33,3 +33,7 @@ export function formatDuration(seconds: number | null): string {
   }
   return `${Math.floor(seconds / 60)}min ${seconds % 60}s`;
 }
+
+export function formatNotaIa(nota: number | null): string {
+  return nota === null ? '—' : nota.toLocaleString('pt-BR');
+}
