@@ -344,7 +344,7 @@ export function createCuradoriaRepository(db: pg.Pool) {
 
 
     async findDetail(atendimentoId: string): Promise<CuradoriaAtendimentoRow | null> {
-      const atendimento = await db.query<Omit<AtendimentoRow, 'transcricao' | 'audioReference'> & {
+      const atendimento = await db.query<Omit<AtendimentoRow, 'transcricao' | 'audioReference' | 'notaIa'> & {
         transcricao: unknown;
         audioReference: string | null;
       }>(`
@@ -361,14 +361,11 @@ export function createCuradoriaRepository(db: pg.Pool) {
           a.motivo_contato as "motivoContato",
           a.houve_transferencia as "houveTransferencia",
           a.custo,
-          avaliacao_ia.nota as "notaIa",
           a.elevenlabs_event_timestamp as "eventTimestamp",
           a.transcricao,
           a.audio_url as "audioReference"
         from atendimentos a
         join agentes_voz agente on agente.id = a.agente_voz_id
-        left join avaliacoes avaliacao_ia
-          on avaliacao_ia.atendimento_id = a.id and avaliacao_ia.autor = 'ia'
         where a.id = $1
       `, [atendimentoId]);
       const atendimentoRow = atendimento.rows[0];
@@ -426,6 +423,7 @@ export function createCuradoriaRepository(db: pg.Pool) {
 
       return {
         ...atendimentoRow,
+        notaIa: ia.nota,
         avaliacaoIa: { ...ia, checklist: iaChecklists.get(ia.id) ?? [] },
         historico: avaliacoes.rows.map((avaliacao) => ({
           ...avaliacao,

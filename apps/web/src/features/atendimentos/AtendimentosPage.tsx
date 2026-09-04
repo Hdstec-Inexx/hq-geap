@@ -405,7 +405,7 @@ export function AtendimentosPage() {
                   <div><dt>Conclusão</dt><dd>{formatDate(atendimento.concluidoEm)}</dd></div>
                   <div><dt>Duração</dt><dd>{formatDuration(atendimento.duracaoSegundos)}</dd></div>
                   <div><dt>Transferência</dt><dd>{atendimento.houveTransferencia ? 'Sim' : 'Não'}</dd></div>
-                  <div><dt>Nota IA</dt><dd>{formatNotaIa(atendimento.notaIa)}</dd></div>
+                  <div><dt>Nota da IA Avaliadora</dt><dd>{formatNotaIa(atendimento.notaIa)}</dd></div>
                   {cost ? <div><dt>Custo</dt><dd>{cost}</dd></div> : null}
                 </dl>
               </article>

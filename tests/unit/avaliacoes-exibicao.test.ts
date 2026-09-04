@@ -49,6 +49,26 @@ test('CONTEXT.md define semantica da exibicao da avaliacao do curador e expansao
   );
 });
 
+test('CONTEXT.md distingue Nota da IA Avaliadora da Nota da Avaliacao da IA', async () => {
+  const context = await readFile(contextPath, 'utf8');
+
+  assert.match(
+    context,
+    /\*\*Nota da IA Avaliadora\*\*:/,
+    'CONTEXT.md deve definir Nota da IA Avaliadora como termo da nota do Atendimento na Régua'
+  );
+  assert.match(
+    context,
+    /\*\*Nota da Avaliação da IA\*\*:/,
+    'CONTEXT.md deve manter Nota da Avaliação da IA como calibração do Curador'
+  );
+  assert.match(
+    context,
+    /_Avoid_:\s*Nota IA/,
+    'CONTEXT.md deve evitar a abreviação Nota IA por colidir os dois conceitos'
+  );
+});
+
 test('AvaliacaoCuradorPanel nao renderiza mensagem de placeholder nem cards vazios quando avaliacao for nula ou pendente', async () => {
   const code = await readFile(curadorPanelPath, 'utf8');
 

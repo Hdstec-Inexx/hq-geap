@@ -1433,13 +1433,33 @@ test('filtros SQL suportam conversationId com ILIKE', async () => {
   assert.deepEqual(filtro.values, ['conv-abc-123']);
 });
 
-test('lista de Atendimentos exibe Nota IA formatada no card', async () => {
+test('lista de Atendimentos busca nota da IA por subquery para nao duplicar linhas', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const repository = await readFile(
+    new URL(
+      '../../apps/api/src/modules/atendimentos/repository.ts',
+      import.meta.url
+    ),
+    'utf8'
+  );
+  assert.match(
+    repository,
+    /select avaliacao_ia\.nota[\s\S]*from avaliacoes avaliacao_ia[\s\S]*where avaliacao_ia\.atendimento_id = a\.id[\s\S]*and avaliacao_ia\.autor = 'ia'/
+  );
+  assert.doesNotMatch(
+    repository,
+    /left join avaliacoes avaliacao_ia/
+  );
+});
+
+test('lista de Atendimentos exibe Nota da IA Avaliadora formatada no card', async () => {
   const { readFile } = await import('node:fs/promises');
   const page = await readFile(
     new URL('../../apps/web/src/features/atendimentos/AtendimentosPage.tsx', import.meta.url),
     'utf8'
   );
-  assert.match(page, /<dt>Nota IA<\/dt>/);
+  assert.match(page, /<dt>Nota da IA Avaliadora<\/dt>/);
+  assert.doesNotMatch(page, /<dt>Nota IA<\/dt>/);
   assert.match(page, /formatNotaIa\(atendimento\.notaIa\)/);
 });
 

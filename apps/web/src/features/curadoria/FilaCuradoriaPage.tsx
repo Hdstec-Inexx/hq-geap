@@ -227,7 +227,7 @@ export function FilaCuradoriaPage() {
               <dl>
                 <div><dt>Motivo</dt><dd>{formatMotivoContato(item.motivoContato)}</dd></div>
                 <div><dt>Duração</dt><dd>{formatDuration(item.duracaoSegundos)}</dd></div>
-                <div><dt>Nota IA</dt><dd>{item.notaIa.toLocaleString('pt-BR')}</dd></div>
+                <div><dt>Nota da IA Avaliadora</dt><dd>{item.notaIa.toLocaleString('pt-BR')}</dd></div>
               </dl>
               <Link className="review-link" to={reviewHref(item.id, searchParams)}>
                 {canWrite ? 'Conferir' : 'Consultar'}

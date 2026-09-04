@@ -886,7 +886,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     const cardRealizada = page.locator('article.atendimento-row', {
       hasText: 'Curadoria Realizada Motivo'
     });
-    await expect(cardRealizada.locator('dt', { hasText: 'Nota IA' })).toBeVisible();
+    await expect(cardRealizada.locator('dt', { hasText: 'Nota da IA Avaliadora' })).toBeVisible();
     await expect(
       cardRealizada.locator('dd', {
         hasText: itemRealizada!.notaIa!.toLocaleString('pt-BR')

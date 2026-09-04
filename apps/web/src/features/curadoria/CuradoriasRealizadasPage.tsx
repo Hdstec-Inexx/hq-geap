@@ -335,7 +335,7 @@ export function CuradoriasRealizadasPage() {
               <dl>
                 <div><dt>Motivo</dt><dd>{formatMotivoContato(item.motivoContato)}</dd></div>
                 <div><dt>Duração</dt><dd>{formatDuration(item.duracaoSegundos)}</dd></div>
-                <div><dt>Nota IA</dt><dd>{item.notaIa.toLocaleString('pt-BR')}</dd></div>
+                <div><dt>Nota da IA Avaliadora</dt><dd>{item.notaIa.toLocaleString('pt-BR')}</dd></div>
                 <div><dt>Nota Curador</dt><dd>{item.notaCurador.toLocaleString('pt-BR')}</dd></div>
                 {!isMinhas && item.curadorNome ? (
                   <div><dt>Curador</dt><dd>{item.curadorNome}</dd></div>
