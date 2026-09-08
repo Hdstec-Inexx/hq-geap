@@ -1,0 +1,112 @@
+# Roda no GitHub Actions. Não acessa a VPS nem o EasyPanel.
+# Não dispara em push/PR: a dev pode ter pedaços incompletos.
+# Só roda quando alguém aciona em Actions → Conferir → Run workflow,
+# ou pede para o agente/gh: `gh workflow run Conferir --ref <branch>`
+
+name: Conferir
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: conferir-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '24'
+
+jobs:
+  qualidade:
+    name: Typecheck, build e testes unitários
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DATABASE_URL: postgres://hq_geap:hq_geap@127.0.0.1:5432/hq_geap
+      TEST_DATABASE_URL: postgres://hq_geap:hq_geap@127.0.0.1:5432/hq_geap_test
+      STORAGE_PROVIDER: minio
+      STORAGE_BUCKET: hq-geap
+      STORAGE_ENDPOINT: http://127.0.0.1:9000
+      STORAGE_ACCESS_KEY: minioadmin
+      STORAGE_SECRET_KEY: minioadmin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.18.0
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Postgres e MinIO (Compose local, não a VPS)
+        run: docker compose up -d --wait db minio minio-init
+
+      - name: Testes unitários
+        run: pnpm test:unit
+
+      - name: Resumo
+        if: always()
+        run: |
+          {
+            echo '## Qualidade'
+            echo '- Typecheck, build e testes unitários neste job.'
+            echo '- Sem SSH, webhook ou EasyPanel.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  imagens:
+    name: Build das imagens Docker (espelho EasyPanel)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validar compose.easypanel.yaml
+        env:
+          DATABASE_URL: postgres://ci:ci@db:5432/hq_geap
+          CORS_ORIGIN: https://ci.example.invalid
+          JWT_SECRET: ci-secret-with-at-least-32-characters
+          INGESTION_API_KEY: ci-ingestion-key-with-at-least-32-ch
+          ELEVENLABS_API_KEY: sk_ci_placeholder
+          STORAGE_PROVIDER: minio
+          STORAGE_PUBLIC_URL: https://ci.example.invalid/hq-geap
+          VITE_API_URL: https://ci.example.invalid
+        run: docker compose -f compose.easypanel.yaml config >/dev/null
+
+      - name: Build imagem da API
+        run: docker build --progress=plain -f Dockerfile -t hq-geap-api:ci .
+
+      - name: Build imagem da Web
+        run: >
+          docker build --progress=plain
+          -f Dockerfile.web
+          --build-arg VITE_API_URL=https://ci.example.invalid
+          -t hq-geap-web:ci
+          .
+
+      - name: Resumo
+        if: always()
+        run: |
+          {
+            echo '## Imagens'
+            echo '- `Dockerfile` (API) e `Dockerfile.web` (UI), o mesmo par do EasyPanel.'
+            echo '- Falha aqui costuma ser o mesmo erro de build do Compose na VPS.'
+            echo '- Este job não publica imagem nem conecta na VPS.'
+          } >> "$GITHUB_STEP_SUMMARY"
