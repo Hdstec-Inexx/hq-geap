@@ -2,6 +2,7 @@ import { expect, test, type APIRequestContext, type Page } from '@playwright/tes
 import pg from 'pg';
 import aprovada from '../fixtures/avaliacoes/avaliacao-aprovada.json' with { type: 'json' };
 import { authUsers } from '../support/auth-fixtures.js';
+import { expectFactValuesAligned } from '../support/fact-value-align.js';
 import {
   firstTurnFitsWithoutEmptyBox,
   longTranscript,
@@ -576,6 +577,10 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await page.goto('/curadoria');
 
     await expect(page.getByRole('heading', { name: 'Fila de Curadoria' })).toBeVisible();
+    const filaCard = page.locator('article.curadoria-row').filter({
+      hasText: 'conv-curadoria-interface'
+    });
+    await expectFactValuesAligned(filaCard, 'Nota da IA Avaliadora', 'Duração');
     await page.getByRole('link', { name: /conv-curadoria-interface/ }).click();
     await expect(page.getByRole('heading', { name: 'Conferência humana' })).toBeVisible();
     await expectSecoesDaRevisaoNaOrdem(page);
@@ -1493,6 +1498,7 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     const card = page.locator('article.curadoria-row').filter({ hasText: 'conv-curadorias-realizadas-gestao' });
     await expect(card).toBeVisible();
     await expect(card.getByText('Caio Curador')).toBeVisible();
+    await expectFactValuesAligned(card, 'Nota da IA Avaliadora', 'Duração');
 
     await card.getByRole('link', { name: 'Consultar' }).click();
     await expect(page.getByRole('heading', { name: 'Revisar Atendimento' })).toBeVisible();

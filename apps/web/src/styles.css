@@ -1215,6 +1215,12 @@ h1 {
   text-transform: uppercase;
 }
 
+.atendimento-row-data dt,
+.curadoria-row dt {
+  min-height: 2.4em;
+  line-height: 1.2;
+}
+
 .atendimento-row-data dd {
   margin: 0;
   font-weight: 700;
@@ -2510,7 +2516,7 @@ h1 {
 
 .curadoria-row dl {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
   gap: 18px;
   margin: 0;
 }
