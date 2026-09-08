@@ -4,6 +4,7 @@ import aprovada from '../fixtures/avaliacoes/avaliacao-aprovada.json' with { typ
 import fixture from '../fixtures/elevenlabs/atendimento-concluido.json' with { type: 'json' };
 import { authUsers } from '../support/auth-fixtures.js';
 import { ensureMinioTestAudio } from '../support/audio-fixture.js';
+import { expectFactValuesAligned } from '../support/fact-value-align.js';
 import {
   firstTurnFitsWithoutEmptyBox,
   longTranscript,
@@ -892,6 +893,11 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
         hasText: itemRealizada!.notaIa!.toLocaleString('pt-BR')
       })
     ).toBeVisible();
+    await expectFactValuesAligned(
+      cardRealizada,
+      'Nota da IA Avaliadora',
+      'Transferência'
+    );
 
     // Filtrar por Status da Curadoria = Realizada
     await page

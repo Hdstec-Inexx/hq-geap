@@ -164,6 +164,21 @@ test('styles.css define limites de altura e barras de rolagem para bloco superio
   );
 });
 
+test('styles.css alinha os fatos do card de Atendimento na mesma linha de valor', async () => {
+  const css = await readFile(stylesPath, 'utf8');
+
+  assert.match(
+    css,
+    /\.atendimento-row-data dt,\s*\.curadoria-row dt\s*\{[^}]*min-height:\s*2\.4em/s,
+    'rótulos de Atendimentos e da Fila/Curadorias Realizadas devem reservar duas linhas para a Nota da IA Avaliadora'
+  );
+  assert.match(
+    css,
+    /\.curadoria-row dl\s*\{[^}]*minmax\(88px,\s*1fr\)/s,
+    'fatos da Fila e Curadorias Realizadas não devem ficar presos em três colunas iguais'
+  );
+});
+
 test('styles.css expande a Avaliacao da IA para 100% da largura quando for o unico painel no container', async () => {
   const css = await readFile(stylesPath, 'utf8');
 
