@@ -56,7 +56,9 @@ jobs:
         run: pnpm build
 
       - name: Postgres e MinIO (Compose local, não a VPS)
-        run: docker compose up -d --wait db minio minio-init
+        run: |
+          docker compose up -d --wait db minio
+          docker compose up --abort-on-container-exit minio-init
 
       - name: Testes unitários
         run: pnpm test:unit
