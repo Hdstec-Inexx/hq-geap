@@ -93,7 +93,7 @@ export function buildDetalhamentoFilters(
       from avaliacoes ia
       where ia.atendimento_id = a.id
         and ia.autor = 'ia'
-        and ia.nota >= ${notaMin}
+        and ia.nota = ${notaMin}
     )`);
   }
 

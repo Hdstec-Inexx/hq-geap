@@ -1433,6 +1433,19 @@ test('filtros SQL suportam conversationId com ILIKE', async () => {
   assert.deepEqual(filtro.values, ['conv-abc-123']);
 });
 
+test('lista de Atendimentos ordena do mais antigo ao mais novo', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const repository = await readFile(
+    new URL('../../apps/api/src/modules/atendimentos/repository.ts', import.meta.url),
+    'utf8'
+  );
+  assert.match(
+    repository,
+    /order by coalesce\(a\.concluido_em, a\.iniciado_em, a\.criado_em\) asc, a\.id asc/
+  );
+  assert.doesNotMatch(repository, /order by a\.criado_em desc, a\.id desc/);
+});
+
 test('lista de Atendimentos busca nota da IA por subquery para nao duplicar linhas', async () => {
   const { readFile } = await import('node:fs/promises');
   const repository = await readFile(

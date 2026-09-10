@@ -542,7 +542,7 @@ function isHalfPointScore(value: number): boolean {
   return Number.isFinite(value) && Math.abs(value * 2 - Math.round(value * 2)) < 1e-8;
 }
 
-/** Piso inclusivo da Nota da IA Avaliadora (0–10, passo 0,5). Ausente ou 0 = sem filtro. */
+/** Nota da IA Avaliadora exata (0–10, passo 0,5). Ausente ou 0 = sem filtro. */
 export const notaMinQueryFilterSchema = z.preprocess((val) => {
   if (val === undefined || val === null || val === '') return undefined;
   return val;

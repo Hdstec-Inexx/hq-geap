@@ -1275,7 +1275,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await expect(idInput).toHaveValue('');
   });
 
-  test('filtra Atendimentos pelo piso da Nota da IA Avaliadora via API e slider', async ({
+  test('filtra Atendimentos pela Nota da IA Avaliadora exata via API e slider', async ({
     request,
     page
   }) => {
@@ -1284,10 +1284,12 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     const stamp = Date.now();
     const convSete = `conv-nota-min-7-${stamp}`;
     const convSeis = `conv-nota-min-65-${stamp}`;
+    const convOito = `conv-nota-min-8-${stamp}`;
     const convSem = `conv-nota-min-sem-${stamp}`;
-    const motivoSete = `Piso nota 7 ${stamp}`;
-    const motivoSeis = `Piso nota 6,5 ${stamp}`;
-    const motivoSem = `Piso sem nota ${stamp}`;
+    const motivoSete = `Nota exata 7 ${stamp}`;
+    const motivoSeis = `Nota exata 6,5 ${stamp}`;
+    const motivoOito = `Nota exata 8 ${stamp}`;
+    const motivoSem = `Sem nota ${stamp}`;
 
     const createdSete = await request.post(`${apiUrl}/atendimentos/ingestao`, {
       data: {
@@ -1312,6 +1314,18 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     });
     expect(createdSeis.status()).toBe(201);
     const seis = (await createdSeis.json()) as { id: string };
+
+    const createdOito = await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: {
+        ...atendimento,
+        conversation_id: convOito,
+        contact_reason: motivoOito,
+        completed_at: '2026-08-20T12:10:00.000Z'
+      },
+      headers: ingestionHeaders
+    });
+    expect(createdOito.status()).toBe(201);
+    const oito = (await createdOito.json()) as { id: string };
 
     const createdSem = await request.post(`${apiUrl}/atendimentos/ingestao`, {
       data: {
@@ -1350,6 +1364,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
 
     await persistirNotaIa(sete.id, 7);
     await persistirNotaIa(seis.id, 6.5);
+    await persistirNotaIa(oito.id, 8);
 
     const invalidHalf = await request.get(`${apiUrl}/atendimentos?notaMin=7.3`, {
       headers
@@ -1371,16 +1386,21 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       return body.items.map((item) => item.conversationId);
     }
 
-    const pisoSete = await listedIds(`conversationId=nota-min-&notaMin=7`);
-    expect(pisoSete).toContain(convSete);
-    expect(pisoSete).not.toContain(convSeis);
-    expect(pisoSete).not.toContain(convSem);
+    const notaSete = await listedIds(`conversationId=nota-min-&notaMin=7`);
+    expect(notaSete).toContain(convSete);
+    expect(notaSete).not.toContain(convSeis);
+    expect(notaSete).not.toContain(convOito);
+    expect(notaSete).not.toContain(convSem);
 
-    const semPiso = await listedIds(`conversationId=nota-min-`);
-    expect(semPiso).toEqual(expect.arrayContaining([convSete, convSeis, convSem]));
+    const semFiltro = await listedIds(`conversationId=nota-min-`);
+    expect(semFiltro).toEqual(
+      expect.arrayContaining([convSete, convSeis, convOito, convSem])
+    );
 
-    const pisoZero = await listedIds(`conversationId=nota-min-&notaMin=0`);
-    expect(pisoZero).toEqual(expect.arrayContaining([convSete, convSeis, convSem]));
+    const notaZero = await listedIds(`conversationId=nota-min-&notaMin=0`);
+    expect(notaZero).toEqual(
+      expect.arrayContaining([convSete, convSeis, convOito, convSem])
+    );
 
     const andMotivo = await listedIds(
       `notaMin=7&motivo=${encodeURIComponent(motivoSete)}`
@@ -1411,6 +1431,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await expect(page).toHaveURL(/notaMin=7/);
     await expect(page.getByText(motivoSete)).toBeVisible();
     await expect(page.getByText(motivoSeis)).toHaveCount(0);
+    await expect(page.getByText(motivoOito)).toHaveCount(0);
     await expect(page.getByText(motivoSem)).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Limpar filtros' }).click();

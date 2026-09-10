@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { atendimentosQuerySchema } from '../../packages/contracts/src/atendimentos.js';
 import { curadoriasRealizadasQuerySchema } from '../../packages/contracts/src/curadoria.js';
 
-test('atendimentosQuerySchema aceita notaMin opcional em multiplos de 0,5 e trata ausente como sem piso', () => {
+test('atendimentosQuerySchema aceita notaMin opcional em multiplos de 0,5 e trata ausente como sem filtro', () => {
   const omitted = atendimentosQuerySchema.safeParse({});
   assert.equal(omitted.success, true);
   if (omitted.success) {
@@ -59,7 +59,7 @@ test('buildDetalhamentoFilters nao restringe por nota quando notaMin e 0 ou omit
   assert.equal(zero.clauses.length, 0);
 });
 
-test('buildDetalhamentoFilters aplica piso inclusivo da Nota da IA Avaliadora', async () => {
+test('buildDetalhamentoFilters aplica igualdade da Nota da IA Avaliadora', async () => {
   const { buildDetalhamentoFilters } = await import(
     '../../apps/api/src/modules/atendimentos/detalhamentoFilters.js'
   );
@@ -71,7 +71,8 @@ test('buildDetalhamentoFilters aplica piso inclusivo da Nota da IA Avaliadora', 
 
   assert.equal(filtro.clauses.length, 1);
   assert.match(filtro.clauses[0]!, /ia\.autor = 'ia'/);
-  assert.match(filtro.clauses[0]!, /ia\.nota >= \$1/);
+  assert.match(filtro.clauses[0]!, /ia\.nota = \$1/);
+  assert.doesNotMatch(filtro.clauses[0]!, /ia\.nota >=/);
   assert.doesNotMatch(filtro.clauses[0]!, /avaliacoes_curador/);
   assert.deepEqual(filtro.values, [7]);
 });
@@ -91,7 +92,7 @@ test('buildDetalhamentoFilters combina notaMin com conversationId em AND', async
 
   assert.equal(filtro.clauses.length, 2);
   assert.match(filtro.clauses[0]!, /elevenlabs_conversation_id/);
-  assert.match(filtro.clauses[1]!, /ia\.nota >= \$2/);
+  assert.match(filtro.clauses[1]!, /ia\.nota = \$2/);
   assert.deepEqual(filtro.values, ['conv-123', 6.5]);
 });
 

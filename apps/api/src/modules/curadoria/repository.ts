@@ -225,7 +225,7 @@ export function buildFilaCuradoriaFilters(
 
   if (filters.notaMin && filters.notaMin > 0) {
     const notaMin = param(filters.notaMin);
-    clauses.push(`ia.nota >= ${notaMin}`);
+    clauses.push(`ia.nota = ${notaMin}`);
   }
 
   return { clauses, values };
@@ -318,7 +318,7 @@ export function createCuradoriaRepository(db: pg.Pool) {
           join agentes_voz agente on agente.id = a.agente_voz_id
           join avaliacoes ia on ia.atendimento_id = a.id and ia.autor = 'ia'
           ${whereClauseSelect}
-          order by a.concluido_em, a.id
+          order by a.concluido_em asc nulls last, a.id asc
           limit $1 offset $2
         `, [query.limit, query.offset, ...selectFilters.values])
       ]);
