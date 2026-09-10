@@ -1750,11 +1750,16 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await page.goto('/curadorias-realizadas');
     const sliderRealizadas = page.locator('#curadorias-realizadas-nota-ia-filtro');
     await expect(sliderRealizadas).toBeVisible();
+    await page.locator('#curadorias-realizadas-conversation-id-filtro').fill(
+      'conv-real-nota-min-'
+    );
     await sliderRealizadas.fill('7');
     await page.getByRole('button', { name: 'Filtrar' }).click();
     await expect(page).toHaveURL(/\/curadorias-realizadas/);
     await expect(page).toHaveURL(/notaMin=7/);
+    await expect(page).toHaveURL(/conversationId=conv-real-nota-min-/);
     await expect(page.getByRole('link', { name: convSete })).toBeVisible();
+    await expect(page.getByRole('link', { name: convAntiga })).toBeVisible();
     await expect(page.getByRole('link', { name: convSeis })).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Limpar filtros' }).click();
