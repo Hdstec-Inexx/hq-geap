@@ -235,6 +235,23 @@ test('filtros da Fila aplicam piso inclusivo de notaMin na Nota da IA Avaliadora
   assert.deepEqual(comPiso.values, ['2025-01-01', '2025-01-31', 7]);
 });
 
+test('buildCuradoriasRealizadasFilters aplica piso inclusivo na Nota da IA Avaliadora, nao na nota do Curador', async () => {
+  const { buildCuradoriasRealizadasFilters } = await import(
+    '../../apps/api/src/modules/curadoria/repository.js'
+  );
+
+  const semPiso = buildCuradoriasRealizadasFilters({ notaMin: 0 }, 1);
+  assert.doesNotMatch(semPiso.clauses.join(' and '), /ia\.nota/);
+  assert.doesNotMatch(semPiso.clauses.join(' and '), /concluido_em/);
+  assert.deepEqual(semPiso.values, []);
+
+  const comPiso = buildCuradoriasRealizadasFilters({ notaMin: 7 }, 1);
+  assert.match(comPiso.clauses.join(' and '), /ia\.nota >= \$1/);
+  assert.doesNotMatch(comPiso.clauses.join(' and '), /cur\.nota/);
+  assert.doesNotMatch(comPiso.clauses.join(' and '), /concluido_em/);
+  assert.deepEqual(comPiso.values, [7]);
+});
+
 test('buildCuradoriasRealizadasFilters sem datas nao aplica mes corrente implicito', async () => {
   const { buildCuradoriasRealizadasFilters } = await import(
     '../../apps/api/src/modules/curadoria/repository.js'

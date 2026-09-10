@@ -1621,6 +1621,150 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page).toHaveURL('/minhas-curadorias');
   });
 
+  test('Curadorias Realizadas e Minhas Curadorias filtram pelo piso da Nota da IA Avaliadora', async ({
+    page,
+    request
+  }) => {
+    test.setTimeout(60_000);
+    const convSete = 'conv-real-nota-min-7';
+    const convSeis = 'conv-real-nota-min-65';
+    const convAntiga = 'conv-real-nota-min-antiga';
+    const atSete = await createAtendimento(convSete);
+    const atSeis = await createAtendimento(convSeis);
+    const atAntiga = await createAtendimento(convAntiga);
+    const curadorUser = await queryDatabase<{ id: string; nome: string }>(
+      "select id, nome from usuarios where email = 'curador@hq.test'"
+    );
+    const curadorId = curadorUser.rows[0]!.id;
+    const curadorNome = curadorUser.rows[0]!.nome;
+
+    async function seedConferencia(atendimentoId: string, notaIa: number, notaCurador: number) {
+      const ia = await queryDatabase<{ id: string }>(
+        `
+        insert into avaliacoes (
+          atendimento_id, autor, prompt_id, nota, nota_qualidade, resumo_atendimento,
+          saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
+          resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
+          encerramento_geap, uso_correto_ferramentas, falhas_identificadas, atendimento_aprovado
+        )
+        select $1, 'ia', p.id, $2, $2, 'Resumo da Avaliação da IA',
+          true, true, true, true, true, false, true, true,
+          '[]'::jsonb, true
+        from prompts_ia_avaliadora p
+        where p.ativo
+        limit 1
+        returning id
+        `,
+        [atendimentoId, notaIa]
+      );
+      await queryDatabase(
+        `
+        insert into avaliacoes_curador (
+          atendimento_id, avaliacao_ia_id, autor_usuario_id, autor_usuario_nome,
+          nota, falhas_identificadas, resumo_atendimento, nota_avaliacao_ia
+        )
+        values ($1, $2, $3, $4, $5, '[]'::jsonb, 'Conferencia para filtro de nota', 8)
+        `,
+        [atendimentoId, ia.rows[0]!.id, curadorId, curadorNome, notaCurador]
+      );
+    }
+
+    await seedConferencia(atSete, 7, 5);
+    await seedConferencia(atSeis, 6.5, 10);
+    await seedConferencia(atAntiga, 8, 8);
+
+    const curador = await login(request, 'curador');
+    const headers = { authorization: `Bearer ${curador.token}` };
+
+    await queryDatabase(
+      `
+      update atendimentos
+      set concluido_em = (
+        date_trunc('month', now() at time zone 'America/Sao_Paulo') - interval '10 days'
+      ) at time zone 'America/Sao_Paulo'
+      where id = $1
+      `,
+      [atAntiga]
+    );
+
+    const invalid = await request.get(`${apiUrl}/curadorias-realizadas?notaMin=7.3`, {
+      headers
+    });
+    expect(invalid.status()).toBe(400);
+    const invalidMax = await request.get(`${apiUrl}/curadorias-realizadas?notaMin=11`, {
+      headers
+    });
+    expect(invalidMax.status()).toBe(400);
+
+    async function listedIds(query: string) {
+      const response = await request.get(`${apiUrl}/curadorias-realizadas?${query}`, {
+        headers
+      });
+      expect(response.status()).toBe(200);
+      const body = (await response.json()) as {
+        items: Array<{ conversationId: string }>;
+      };
+      return body.items.map((item) => item.conversationId);
+    }
+
+    const pisoSete = await listedIds(`conversationId=conv-real-nota-min-&notaMin=7`);
+    expect(pisoSete).toContain(convSete);
+    expect(pisoSete).not.toContain(convSeis);
+    expect(pisoSete).toContain(convAntiga);
+
+    const semDatas = await listedIds('conversationId=conv-real-nota-min-');
+    expect(semDatas).toEqual(
+      expect.arrayContaining([convSete, convSeis, convAntiga])
+    );
+
+    const pisoZero = await listedIds(`conversationId=conv-real-nota-min-&notaMin=0`);
+    expect(pisoZero).toEqual(
+      expect.arrayContaining([convSete, convSeis, convAntiga])
+    );
+
+    await page.goto('/');
+    if (await page.getByRole('button', { name: 'Sair' }).count() === 0) {
+      await loginUi(page, 'curador');
+    }
+    await page.goto('/minhas-curadorias');
+    const sliderMinhas = page.locator('#curadorias-realizadas-nota-ia-filtro');
+    await expect(sliderMinhas).toBeVisible();
+    await sliderMinhas.fill('7');
+    await expect(page.locator('.nota-ia-filtro output')).toHaveText('7');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page).toHaveURL(/\/minhas-curadorias/);
+    await expect(page).toHaveURL(/notaMin=7/);
+    await expect(page.getByRole('link', { name: convSete })).toBeVisible();
+    await expect(page.getByRole('link', { name: convAntiga })).toBeVisible();
+    await expect(page.getByRole('link', { name: convSeis })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Limpar filtros' }).click();
+    await expect(page).toHaveURL('/minhas-curadorias');
+    await expect(page).not.toHaveURL(/notaMin=/);
+    await expect(sliderMinhas).toHaveValue('0');
+    await expect(page.getByRole('link', { name: convSeis })).toBeVisible();
+    await expect(page.getByRole('link', { name: convAntiga })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Sair' }).click();
+    await loginUi(page, 'gestao');
+    await page.goto('/curadorias-realizadas');
+    const sliderRealizadas = page.locator('#curadorias-realizadas-nota-ia-filtro');
+    await expect(sliderRealizadas).toBeVisible();
+    await sliderRealizadas.fill('7');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page).toHaveURL(/\/curadorias-realizadas/);
+    await expect(page).toHaveURL(/notaMin=7/);
+    await expect(page.getByRole('link', { name: convSete })).toBeVisible();
+    await expect(page.getByRole('link', { name: convSeis })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Limpar filtros' }).click();
+    await expect(page).toHaveURL('/curadorias-realizadas');
+    await expect(page).not.toHaveURL(/notaMin=/);
+    await expect(sliderRealizadas).toHaveValue('0');
+    await expect(page.getByRole('link', { name: convSeis })).toBeVisible();
+    await expect(page.getByRole('link', { name: convAntiga })).toBeVisible();
+  });
+
   test('Gestao acessa Curadorias Realizadas na Casca e pode filtrar por curador', async ({
     page,
     request

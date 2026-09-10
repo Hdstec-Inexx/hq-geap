@@ -12,6 +12,11 @@ import { formatMotivoContato } from '../atendimentos/motivo-combobox-logic';
 import { MotivoCombobox } from '../atendimentos/MotivoCombobox';
 import { CriteriosMultiSelect } from '../atendimentos/CriteriosMultiSelect';
 import { parseCriteriaParam } from '../atendimentos/criterios-filtro-logic';
+import { NotaIaAvaliadoraFiltro } from '../atendimentos/NotaIaAvaliadoraFiltro';
+import {
+  notaMinQueryForRequest,
+  parseNotaMinParam
+} from '../atendimentos/nota-ia-filtro-logic';
 import {
   compactPageItems,
   curadoriasRealizadasHref,
@@ -51,6 +56,8 @@ export function CuradoriasRealizadasPage() {
     searchParams,
     'criteriosAtendidos'
   );
+  const notaMinParam = parseNotaMinParam(searchParams);
+  const notaMinQuery = notaMinQueryForRequest(searchParams);
   const [draftInicio, setDraftInicio] = useState(inicioParam);
   const [draftFim, setDraftFim] = useState(fimParam);
   const [draftConversationId, setDraftConversationId] = useState(conversationIdParam);
@@ -60,6 +67,7 @@ export function CuradoriasRealizadasPage() {
     useState<string[]>(criteriosNaoAtendidosParam);
   const [draftCriteriosAtendidos, setDraftCriteriosAtendidos] =
     useState<string[]>(criteriosAtendidosParam);
+  const [draftNotaMin, setDraftNotaMin] = useState(notaMinParam);
 
   const hasDraftFilters = Boolean(
     draftInicio ||
@@ -68,7 +76,8 @@ export function CuradoriasRealizadasPage() {
       draftMotivo ||
       (!isMinhas && draftCuradorId) ||
       draftCriteriosNaoAtendidos.length > 0 ||
-      draftCriteriosAtendidos.length > 0
+      draftCriteriosAtendidos.length > 0 ||
+      draftNotaMin > 0
   );
 
   const hasActiveFilters = Boolean(
@@ -79,6 +88,8 @@ export function CuradoriasRealizadasPage() {
       (!isMinhas && curadorIdParam) ||
       criteriosNaoAtendidosParam.length > 0 ||
       criteriosAtendidosParam.length > 0 ||
+      notaMinParam > 0 ||
+      Boolean(notaMinQuery) ||
       hasDraftFilters
   );
 
@@ -93,12 +104,14 @@ export function CuradoriasRealizadasPage() {
     setDraftCuradorId(curadorIdParam);
     setDraftCriteriosNaoAtendidos(criteriosNaoAtendidosParam);
     setDraftCriteriosAtendidos(criteriosAtendidosParam);
+    setDraftNotaMin(notaMinParam);
   }, [
     inicioParam,
     fimParam,
     conversationIdParam,
     motivoParam,
     curadorIdParam,
+    notaMinParam,
     searchParams
   ]);
 
@@ -117,6 +130,7 @@ export function CuradoriasRealizadasPage() {
   if (criteriosAtendidosParam.length > 0) {
     query.set('criteriosAtendidos', criteriosAtendidosParam.join(','));
   }
+  if (notaMinQuery) query.set('notaMin', notaMinQuery);
 
   const requestPath = `/curadorias-realizadas?${query.toString()}`;
   const state = useAuthenticatedResource(requestPath, curadoriasRealizadasPageSchema);
@@ -157,6 +171,7 @@ export function CuradoriasRealizadasPage() {
     if (draftCriteriosAtendidos.length > 0) {
       next.set('criteriosAtendidos', draftCriteriosAtendidos.join(','));
     }
+    if (draftNotaMin > 0) next.set('notaMin', String(draftNotaMin));
     navigate(curadoriasRealizadasHref(basePath, next, 1));
   }
 
@@ -168,6 +183,7 @@ export function CuradoriasRealizadasPage() {
     setDraftCuradorId('');
     setDraftCriteriosNaoAtendidos([]);
     setDraftCriteriosAtendidos([]);
+    setDraftNotaMin(0);
     navigate(basePath);
   }
 
@@ -284,6 +300,11 @@ export function CuradoriasRealizadasPage() {
               </select>
             </label>
           ) : null}
+          <NotaIaAvaliadoraFiltro
+            id="curadorias-realizadas-nota-ia-filtro"
+            onChange={setDraftNotaMin}
+            value={draftNotaMin}
+          />
         </div>
         <div className="curadoria-filters-actions">
           <button className="primary-action" type="submit">

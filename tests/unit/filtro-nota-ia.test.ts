@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { atendimentosQuerySchema } from '../../packages/contracts/src/atendimentos.js';
+import { curadoriasRealizadasQuerySchema } from '../../packages/contracts/src/curadoria.js';
 
 test('atendimentosQuerySchema aceita notaMin opcional em multiplos de 0,5 e trata ausente como sem piso', () => {
   const omitted = atendimentosQuerySchema.safeParse({});
@@ -32,6 +33,18 @@ test('atendimentosQuerySchema rejeita notaMin fora de 0-10 ou que nao e multiplo
   assert.equal(atendimentosQuerySchema.safeParse({ notaMin: '7.3' }).success, false);
   assert.equal(atendimentosQuerySchema.safeParse({ notaMin: 11 }).success, false);
   assert.equal(atendimentosQuerySchema.safeParse({ notaMin: -0.5 }).success, false);
+});
+
+test('curadoriasRealizadasQuerySchema aceita notaMin com a mesma semantica da Fila e de Atendimentos', () => {
+  const omitted = curadoriasRealizadasQuerySchema.parse({});
+  assert.equal(omitted.notaMin, undefined);
+
+  assert.equal(curadoriasRealizadasQuerySchema.parse({ notaMin: '0' }).notaMin, 0);
+  assert.equal(curadoriasRealizadasQuerySchema.parse({ notaMin: '6.5' }).notaMin, 6.5);
+  assert.equal(curadoriasRealizadasQuerySchema.parse({ notaMin: 10 }).notaMin, 10);
+
+  assert.equal(curadoriasRealizadasQuerySchema.safeParse({ notaMin: '7.3' }).success, false);
+  assert.equal(curadoriasRealizadasQuerySchema.safeParse({ notaMin: 11 }).success, false);
 });
 
 test('buildDetalhamentoFilters nao restringe por nota quando notaMin e 0 ou omitido', async () => {
@@ -193,8 +206,12 @@ test('Fila de Curadoria reusa o controle de Nota da IA Avaliadora e nao preenche
     ),
     'utf8'
   );
-  assert.doesNotMatch(realizadas, /NotaIaAvaliadoraFiltro/);
-  assert.doesNotMatch(realizadas, /notaMin/);
+  assert.match(realizadas, /<NotaIaAvaliadoraFiltro/);
+  assert.match(realizadas, /id="curadorias-realizadas-nota-ia-filtro"/);
+  assert.match(realizadas, /draftNotaMin/);
+  assert.match(realizadas, /parseNotaMinParam/);
+  assert.match(realizadas, /notaMinQueryForRequest/);
+  assert.match(realizadas, /notaMinParam/);
 });
 
 test('styles.css estiliza o slider de Nota da IA Avaliadora nas barras de filtro', async () => {

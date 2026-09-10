@@ -151,7 +151,8 @@ export const curadoriasRealizadasQuerySchema = z
     motivo: z.string().trim().min(1).max(200).optional(),
     curadorId: z.uuid().optional(),
     criteriosNaoAtendidos: criteriosQueryFilterSchema,
-    criteriosAtendidos: criteriosQueryFilterSchema
+    criteriosAtendidos: criteriosQueryFilterSchema,
+    notaMin: notaMinQueryFilterSchema
   })
   .superRefine(refinePeriodo)
   .transform(transformPeriodo);
