@@ -1096,8 +1096,8 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.getByRole('link', { name: 'conv-data-15' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'conv-data-20' })).toHaveCount(0);
     const periodRows = page.locator('article.curadoria-row');
-    await expect(periodRows.nth(0).getByRole('link').first()).toHaveText('conv-data-15');
-    await expect(periodRows.nth(1).getByRole('link').first()).toHaveText('conv-data-10');
+    await expect(periodRows.nth(0).getByRole('link').first()).toHaveText('conv-data-10');
+    await expect(periodRows.nth(1).getByRole('link').first()).toHaveText('conv-data-15');
 
     // Limpar filtros volta ao mês corrente com datas vazias
     await page.getByRole('button', { name: 'Limpar filtros' }).click();
@@ -1109,7 +1109,7 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.getByRole('heading', { name: 'Fila em dia' })).toBeVisible();
   });
 
-  test('Fila no mes corrente fica FIFO, inverte com periodo e filtra pelo piso da Nota da IA Avaliadora', async ({
+  test('Fila no mes corrente e com periodo fica FIFO e filtra pelo piso da Nota da IA Avaliadora', async ({
     page,
     request
   }) => {
@@ -1208,8 +1208,8 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     expect(filaPeriodo.status()).toBe(200);
     const periodo = (await filaPeriodo.json()) as { items: Array<{ conversationId: string }> };
     expect(periodo.items.map((item) => item.conversationId)).toEqual([
-      'conv-mes-nova',
-      'conv-mes-antiga'
+      'conv-mes-antiga',
+      'conv-mes-nova'
     ]);
 
     const filaNota = await request.get(`${apiUrl}/curadoria?notaMin=7`, {
@@ -1241,8 +1241,8 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await page.getByLabel('Data final (opcional)').fill(fim);
     await page.getByRole('button', { name: 'Filtrar' }).click();
     await expect(page).toHaveURL(new RegExp(`[?&]inicio=${inicio}`));
-    await expect(rows.nth(0).getByRole('link').first()).toHaveText('conv-mes-nova');
-    await expect(rows.nth(1).getByRole('link').first()).toHaveText('conv-mes-antiga');
+    await expect(rows.nth(0).getByRole('link').first()).toHaveText('conv-mes-antiga');
+    await expect(rows.nth(1).getByRole('link').first()).toHaveText('conv-mes-nova');
 
     await page.getByRole('button', { name: 'Limpar filtros' }).click();
     const slider = page.locator('#curadoria-nota-ia-filtro');
@@ -1483,16 +1483,16 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page).toHaveURL(/[?&]motivo=Rede/);
     await expect(page).toHaveURL(/[?&]page=2/);
     await expect(page.getByText('1 pendente', { exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'conv-combo-1', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'conv-combo-51' })).toBeVisible();
 
     // Clica para revisar e volta à fila preservando a página 2 e filtros
-    await page.getByRole('link', { name: 'conv-combo-1', exact: true }).click();
+    await page.getByRole('link', { name: 'conv-combo-51' }).click();
     await expect(page.getByRole('heading', { name: 'Revisar Atendimento' })).toBeVisible();
     await page.getByRole('link', { name: 'Voltar à fila' }).click();
     await expect(page).toHaveURL(/[?&]page=2/);
     await expect(page).toHaveURL(/[?&]inicio=2024-01-15/);
     await expect(page).toHaveURL(/[?&]motivo=Rede/);
-    await expect(page.getByRole('link', { name: 'conv-combo-1', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'conv-combo-51' })).toBeVisible();
   });
 
   test('endpoint GET /curadorias-realizadas lista conferencias e aplica filtros de periodo, motivo e curadorId', async ({

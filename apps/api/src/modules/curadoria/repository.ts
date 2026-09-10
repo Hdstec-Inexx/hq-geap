@@ -296,9 +296,6 @@ export function createCuradoriaRepository(db: pg.Pool) {
         countFilters.clauses.length > 0
           ? `where ${countFilters.clauses.join(' and ')}`
           : '';
-      const orderBy = query.inicio
-        ? 'a.concluido_em desc, a.id desc'
-        : 'a.concluido_em, a.id';
 
       const [count, result] = await Promise.all([
         db.query<{ total: string }>(`
@@ -320,7 +317,7 @@ export function createCuradoriaRepository(db: pg.Pool) {
           join agentes_voz agente on agente.id = a.agente_voz_id
           join avaliacoes ia on ia.atendimento_id = a.id and ia.autor = 'ia'
           ${whereClauseSelect}
-          order by ${orderBy}
+          order by a.concluido_em, a.id
           limit $1 offset $2
         `, [query.limit, query.offset, ...selectFilters.values])
       ]);

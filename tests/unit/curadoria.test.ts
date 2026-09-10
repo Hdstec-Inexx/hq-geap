@@ -248,7 +248,7 @@ test('buildCuradoriasRealizadasFilters sem datas nao aplica mes corrente implici
   assert.deepEqual(filters.values, ['conv-realizada-123']);
 });
 
-test('listPending ordena FIFO no mes implicito e do mais novo ao mais antigo com periodo', async () => {
+test('listPending ordena FIFO no mes implicito e com periodo informado', async () => {
   const { createCuradoriaRepository } = await import(
     '../../apps/api/src/modules/curadoria/repository.js'
   );
@@ -277,7 +277,8 @@ test('listPending ordena FIFO no mes implicito e do mais novo ao mais antigo com
     fim: '2025-01-31'
   });
   const periodo = captured.find((sql) => sql.includes('order by')) ?? '';
-  assert.match(periodo, /order by a\.concluido_em desc, a\.id desc/);
+  assert.match(periodo, /order by a\.concluido_em, a\.id/);
+  assert.doesNotMatch(periodo, /order by a\.concluido_em desc/);
 });
 
 test('listDistinctMotivos retorna motivos distintos e ordenados incluindo Nao informado canônico', async () => {
