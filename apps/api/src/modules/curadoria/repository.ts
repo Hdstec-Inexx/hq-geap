@@ -153,6 +153,7 @@ export type CuradoriasRealizadasFilters = {
   criteriosNaoAtendidos?: string[];
   criteriosAtendidos?: string[];
   conversationId?: string;
+  notaMin?: number;
 };
 
 export type FilaCuradoriaFilterOptions = {

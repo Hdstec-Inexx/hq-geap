@@ -80,6 +80,8 @@ test('CuradoriasRealizadasPage integra com /curadorias-realizadas, schema e filt
   assert.match(pageContent, /MotivoCombobox/);
   assert.match(pageContent, /curadorId/);
   assert.match(pageContent, /reviewHref/);
+  assert.match(pageContent, /NotaIaAvaliadoraFiltro/);
+  assert.match(pageContent, /notaMin/);
 });
 
 test('router.tsx integra rotas /minhas-curadorias e /curadorias-realizadas', async () => {
