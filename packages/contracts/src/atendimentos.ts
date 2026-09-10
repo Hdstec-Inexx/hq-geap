@@ -538,6 +538,21 @@ export const criteriosQueryFilterSchema = z.preprocess((val) => {
   return Array.from(new Set(normalized));
 }, z.array(z.uuid()).optional());
 
+function isReguaHalfPoint(value: number): boolean {
+  return Number.isFinite(value) && Math.abs(value * 2 - Math.round(value * 2)) < 1e-8;
+}
+
+/** Piso inclusivo da Nota da IA Avaliadora (0–10, passo 0,5). Ausente ou 0 = sem filtro. */
+export const notaMinQueryFilterSchema = z.preprocess((val) => {
+  if (val === undefined || val === null || val === '') return undefined;
+  return val;
+}, z.coerce
+  .number()
+  .min(0)
+  .max(10)
+  .refine(isReguaHalfPoint, { message: 'notaMin deve ser multiplo de 0,5' })
+  .optional());
+
 export const atendimentosQuerySchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -552,7 +567,8 @@ export const atendimentosQuerySchema = z
     curadoriaStatus: curadoriaStatusFilterSchema.optional(),
     curadorId: z.uuid().optional(),
     criteriosNaoAtendidos: criteriosQueryFilterSchema,
-    criteriosAtendidos: criteriosQueryFilterSchema
+    criteriosAtendidos: criteriosQueryFilterSchema,
+    notaMin: notaMinQueryFilterSchema
   })
   .superRefine((query, ctx) => {
     if (query.indicador !== undefined && (!query.inicio || !query.fim)) {

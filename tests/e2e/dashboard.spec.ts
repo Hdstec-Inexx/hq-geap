@@ -353,6 +353,8 @@ test.describe.serial('Dashboard da Gestao', () => {
       /\/atendimentos\?.*inicio=2025-01-01.*fim=2025-01-31.*indicador=resolvidas/
     );
     await expect(page.getByText('Detalhamento do Indicador')).toBeVisible();
+    await expect(page.locator('#atendimentos-nota-ia-filtro')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Filtrar' })).toHaveCount(0);
     await expect(page.getByText('Financeiro / Boletos').first()).toBeVisible();
     await expect(page.getByText('Rede credenciada')).toHaveCount(0);
 
