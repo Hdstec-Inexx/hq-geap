@@ -4,10 +4,18 @@ import {
   type AtendimentosQuery
 } from '@hq-geap/contracts/atendimentos';
 import { SLA_TME_LIMITE_SEGUNDOS } from '@hq-geap/contracts/dashboards';
+import {
+  civilDayRangeSql,
+  civilMonthBoundsAmericaSaoPaulo
+} from './civilMonthBounds.js';
 
 export type DetalhamentoSql = {
   clauses: string[];
   values: unknown[];
+};
+
+export type DetalhamentoFilterOptions = {
+  now?: Date;
 };
 
 export function canonicalMotivoSql(column = 'a.motivo_contato'): string {
@@ -32,7 +40,8 @@ function buildIaCriterioClause(criterioPlaceholder: string, estado: 'atendido' |
 
 export function buildDetalhamentoFilters(
   query: AtendimentosQuery,
-  startIndex = 1
+  startIndex = 1,
+  options: DetalhamentoFilterOptions = {}
 ): DetalhamentoSql {
   const clauses: string[] = [];
   const values: unknown[] = [];
@@ -49,7 +58,14 @@ export function buildDetalhamentoFilters(
     const inicio = param(query.inicio);
     const fim = param(query.fim);
     clauses.push(
-      `a.status = 'concluido' and a.concluido_em at time zone 'America/Sao_Paulo' >= ${inicio}::date and a.concluido_em at time zone 'America/Sao_Paulo' < ${fim}::date + interval '1 day'`
+      `a.status = 'concluido' and ${civilDayRangeSql('a.concluido_em', inicio, fim)}`
+    );
+  } else if (!query.indicador) {
+    const mes = civilMonthBoundsAmericaSaoPaulo(options.now);
+    const inicio = param(mes.inicio);
+    const fim = param(mes.fim);
+    clauses.push(
+      `((a.status = 'em_andamento' and ${civilDayRangeSql('coalesce(a.iniciado_em, a.criado_em)', inicio, fim)}) or (a.status = 'concluido' and ${civilDayRangeSql('a.concluido_em', inicio, fim)}))`
     );
   }
 

@@ -1069,24 +1069,28 @@ test('filtros SQL do Detalhamento espelham populacoes positivas do Dashboard', a
   const motivoSemAcentoNormalizado = buildDetalhamentoFilters(
     atendimentosQuerySchema.parse({
       motivo: 'Nao informado'
-    })
+    }),
+    1,
+    { now: new Date('2026-09-10T18:00:00.000Z') }
   );
   assert.match(
     motivoSemAcentoNormalizado.clauses.join(' '),
-    /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$1/
+    /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$3/
   );
-  assert.equal(motivoSemAcentoNormalizado.values[0], 'Não informado');
+  assert.equal(motivoSemAcentoNormalizado.values[2], 'Não informado');
 
   const generalMotivo = buildDetalhamentoFilters(
     atendimentosQuerySchema.parse({
       motivo: 'Financeiro/Boletos'
-    })
+    }),
+    1,
+    { now: new Date('2026-09-10T18:00:00.000Z') }
   );
   assert.match(
     generalMotivo.clauses.join(' '),
-    /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$1/
+    /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$3/
   );
-  assert.equal(generalMotivo.values[0], 'Financeiro/Boletos');
+  assert.equal(generalMotivo.values[2], 'Financeiro/Boletos');
 
   const avaliadosIa = buildDetalhamentoFilters(
     atendimentosQuerySchema.parse({
@@ -1357,24 +1361,34 @@ test('filtros SQL suportam curadoriaStatus e curadorId', async () => {
   const realizada = buildDetalhamentoFilters(
     atendimentosQuerySchema.parse({
       curadoriaStatus: 'realizada'
-    })
+    }),
+    1,
+    { now: new Date('2026-09-10T18:00:00.000Z') }
   );
   assert.match(realizada.clauses.join(' '), /cur\.id is not null/);
 
   const pendente = buildDetalhamentoFilters(
     atendimentosQuerySchema.parse({
       curadoriaStatus: 'pendente'
-    })
+    }),
+    1,
+    { now: new Date('2026-09-10T18:00:00.000Z') }
   );
   assert.match(pendente.clauses.join(' '), /a\.status = 'concluido' and cur\.id is null/);
 
   const curador = buildDetalhamentoFilters(
     atendimentosQuerySchema.parse({
       curadorId: '11111111-1111-4111-8111-111111111111'
-    })
+    }),
+    1,
+    { now: new Date('2026-09-10T18:00:00.000Z') }
   );
-  assert.match(curador.clauses.join(' '), /cur\.autor_usuario_id = \$1/);
-  assert.deepEqual(curador.values, ['11111111-1111-4111-8111-111111111111']);
+  assert.match(curador.clauses.join(' '), /cur\.autor_usuario_id = \$3/);
+  assert.deepEqual(curador.values, [
+    '2026-09-01',
+    '2026-09-30',
+    '11111111-1111-4111-8111-111111111111'
+  ]);
 });
 
 test('filtros SQL suportam criteriosAtendidos e criteriosNaoAtendidos com conjuncao AND para IA', async () => {
@@ -1390,23 +1404,26 @@ test('filtros SQL suportam criteriosAtendidos e criteriosNaoAtendidos com conjun
       ],
       criteriosNaoAtendidos: ['33333333-3333-4333-8333-333333333333']
     }),
-    1
+    1,
+    { now: new Date('2026-09-10T18:00:00.000Z') }
   );
 
-  assert.equal(filtro.clauses.length, 3);
-  assert.match(
-    filtro.clauses[0]!,
-    /ac\.criterio_id = \$1::uuid\s+and\s+ac\.estado = 'atendido'/
-  );
+  assert.equal(filtro.clauses.length, 4);
   assert.match(
     filtro.clauses[1]!,
-    /ac\.criterio_id = \$2::uuid\s+and\s+ac\.estado = 'atendido'/
+    /ac\.criterio_id = \$3::uuid\s+and\s+ac\.estado = 'atendido'/
   );
   assert.match(
     filtro.clauses[2]!,
-    /ac\.criterio_id = \$3::uuid\s+and\s+ac\.estado = 'nao_atendido'/
+    /ac\.criterio_id = \$4::uuid\s+and\s+ac\.estado = 'atendido'/
+  );
+  assert.match(
+    filtro.clauses[3]!,
+    /ac\.criterio_id = \$5::uuid\s+and\s+ac\.estado = 'nao_atendido'/
   );
   assert.deepEqual(filtro.values, [
+    '2026-09-01',
+    '2026-09-30',
     '11111111-1111-4111-8111-111111111111',
     '22222222-2222-4222-8222-222222222222',
     '33333333-3333-4333-8333-333333333333'
@@ -1422,15 +1439,16 @@ test('filtros SQL suportam conversationId com ILIKE', async () => {
     atendimentosQuerySchema.parse({
       conversationId: 'conv-abc-123'
     }),
-    1
+    1,
+    { now: new Date('2026-09-10T18:00:00.000Z') }
   );
 
-  assert.equal(filtro.clauses.length, 1);
+  assert.equal(filtro.clauses.length, 2);
   assert.match(
-    filtro.clauses[0]!,
-    /a\.elevenlabs_conversation_id ilike '%' \|\| \$1 \|\| '%'/
+    filtro.clauses[1]!,
+    /a\.elevenlabs_conversation_id ilike '%' \|\| \$3 \|\| '%'/
   );
-  assert.deepEqual(filtro.values, ['conv-abc-123']);
+  assert.deepEqual(filtro.values, ['2026-09-01', '2026-09-30', 'conv-abc-123']);
 });
 
 test('lista de Atendimentos ordena do mais antigo ao mais novo', async () => {

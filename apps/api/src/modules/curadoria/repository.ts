@@ -1,10 +1,16 @@
 import { normalizeMotivo } from '@hq-geap/contracts/atendimentos';
 import type { EstadoCriterio } from '@hq-geap/contracts/avaliacoes';
 import type pg from 'pg';
+import {
+  civilDayRangeSql,
+  civilMonthBoundsAmericaSaoPaulo
+} from '../atendimentos/civilMonthBounds.js';
 import { canonicalMotivoSql } from '../atendimentos/detalhamentoFilters.js';
 import type { AtendimentoRow } from '../atendimentos/repository.js';
 import type { AvaliacaoIaRow } from '../avaliacoes/repository.js';
 import type { CriterioConferencia } from './service.js';
+
+export { civilMonthBoundsAmericaSaoPaulo };
 
 export type FilaCuradoriaRow = {
   id: string;
@@ -161,24 +167,6 @@ export type FilaCuradoriaFilterOptions = {
   implicitCurrentMonth?: boolean;
 };
 
-export function civilMonthBoundsAmericaSaoPaulo(now = new Date()): {
-  inicio: string;
-  fim: string;
-} {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric',
-    month: 'numeric'
-  }).formatToParts(now);
-  const year = Number(parts.find((part) => part.type === 'year')?.value);
-  const month = Number(parts.find((part) => part.type === 'month')?.value);
-  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
-  return {
-    inicio: `${year}-${String(month).padStart(2, '0')}-01`,
-    fim: `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-  };
-}
-
 export function buildFilaCuradoriaFilters(
   filters: FilaCuradoriaFilters,
   startIndex = 1,
@@ -201,16 +189,12 @@ export function buildFilaCuradoriaFilters(
   if (inicio && fim) {
     const inicioPlaceholder = param(inicio);
     const fimPlaceholder = param(fim);
-    clauses.push(
-      `a.concluido_em at time zone 'America/Sao_Paulo' >= ${inicioPlaceholder}::date and a.concluido_em at time zone 'America/Sao_Paulo' < ${fimPlaceholder}::date + interval '1 day'`
-    );
+    clauses.push(civilDayRangeSql('a.concluido_em', inicioPlaceholder, fimPlaceholder));
   } else if (implicitCurrentMonth) {
     const mes = civilMonthBoundsAmericaSaoPaulo(options.now);
     const inicioPlaceholder = param(mes.inicio);
     const fimPlaceholder = param(mes.fim);
-    clauses.push(
-      `a.concluido_em at time zone 'America/Sao_Paulo' >= ${inicioPlaceholder}::date and a.concluido_em at time zone 'America/Sao_Paulo' < ${fimPlaceholder}::date + interval '1 day'`
-    );
+    clauses.push(civilDayRangeSql('a.concluido_em', inicioPlaceholder, fimPlaceholder));
   }
 
   if (filters.motivo) {
