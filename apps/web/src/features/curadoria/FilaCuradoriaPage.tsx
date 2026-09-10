@@ -9,6 +9,11 @@ import { formatDuration } from '../atendimentos/atendimento-facts-logic';
 import { useAuthenticatedResource } from '../atendimentos/api';
 import { formatMotivoContato } from '../atendimentos/motivo-combobox-logic';
 import { MotivoCombobox } from '../atendimentos/MotivoCombobox';
+import { NotaIaAvaliadoraFiltro } from '../atendimentos/NotaIaAvaliadoraFiltro';
+import {
+  notaMinQueryForRequest,
+  parseNotaMinParam
+} from '../atendimentos/nota-ia-filtro-logic';
 import {
   compactPageItems,
   FILA_PAGE_SIZE,
@@ -33,17 +38,26 @@ export function FilaCuradoriaPage() {
   const fimParam = searchParams.get('fim') ?? '';
   const conversationIdParam = searchParams.get('conversationId') ?? '';
   const motivoParam = searchParams.get('motivo') ?? '';
+  const notaMinParam = parseNotaMinParam(searchParams);
+  const notaMinQuery = notaMinQueryForRequest(searchParams);
 
   const [draftInicio, setDraftInicio] = useState(inicioParam);
   const [draftFim, setDraftFim] = useState(fimParam);
   const [draftConversationId, setDraftConversationId] = useState(conversationIdParam);
   const [draftMotivo, setDraftMotivo] = useState(motivoParam);
+  const [draftNotaMin, setDraftNotaMin] = useState(notaMinParam);
 
   const hasDraftFilters = Boolean(
-    draftInicio || draftFim || draftConversationId || draftMotivo
+    draftInicio || draftFim || draftConversationId || draftMotivo || draftNotaMin > 0
   );
   const hasActiveFilters = Boolean(
-    inicioParam || fimParam || conversationIdParam || motivoParam || hasDraftFilters
+    inicioParam ||
+      fimParam ||
+      conversationIdParam ||
+      motivoParam ||
+      notaMinParam > 0 ||
+      Boolean(notaMinQuery) ||
+      hasDraftFilters
   );
 
   useEffect(() => {
@@ -51,7 +65,8 @@ export function FilaCuradoriaPage() {
     setDraftFim(fimParam);
     setDraftConversationId(conversationIdParam);
     setDraftMotivo(motivoParam);
-  }, [inicioParam, fimParam, conversationIdParam, motivoParam]);
+    setDraftNotaMin(notaMinParam);
+  }, [inicioParam, fimParam, conversationIdParam, motivoParam, notaMinParam]);
 
   const query = new URLSearchParams({
     limit: String(FILA_PAGE_SIZE),
@@ -61,6 +76,7 @@ export function FilaCuradoriaPage() {
   if (fimParam) query.set('fim', fimParam);
   if (conversationIdParam) query.set('conversationId', conversationIdParam);
   if (motivoParam) query.set('motivo', motivoParam);
+  if (notaMinQuery) query.set('notaMin', notaMinQuery);
 
   const requestPath = `/curadoria?${query.toString()}`;
   const state = useAuthenticatedResource(requestPath, filaCuradoriaSchema);
@@ -95,6 +111,7 @@ export function FilaCuradoriaPage() {
     }
     if (draftConversationId.trim()) next.set('conversationId', draftConversationId.trim());
     if (draftMotivo.trim()) next.set('motivo', draftMotivo.trim());
+    if (draftNotaMin > 0) next.set('notaMin', String(draftNotaMin));
     navigate(filaHref(next, 1));
   }
 
@@ -103,6 +120,7 @@ export function FilaCuradoriaPage() {
     setDraftFim('');
     setDraftConversationId('');
     setDraftMotivo('');
+    setDraftNotaMin(0);
     navigate('/curadoria');
   }
 
@@ -178,6 +196,11 @@ export function FilaCuradoriaPage() {
               value={draftMotivo}
             />
           </label>
+          <NotaIaAvaliadoraFiltro
+            id="curadoria-nota-ia-filtro"
+            onChange={setDraftNotaMin}
+            value={draftNotaMin}
+          />
         </div>
         <div className="curadoria-filters-actions">
           <button className="primary-action" type="submit">

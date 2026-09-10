@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import {
   atendimentoDetailSchema,
-  criteriosQueryFilterSchema
+  criteriosQueryFilterSchema,
+  notaMinQueryFilterSchema
 } from './atendimentos.js';
 import { avaliacaoIaSchema, estadoCriterioSchema } from './avaliacoes.js';
 
@@ -82,7 +83,8 @@ export const filaCuradoriaQuerySchema = z
     inicio: isoDateSchema.optional(),
     fim: isoDateSchema.optional(),
     conversationId: z.string().trim().min(1).max(200).optional(),
-    motivo: z.string().trim().min(1).max(200).optional()
+    motivo: z.string().trim().min(1).max(200).optional(),
+    notaMin: notaMinQueryFilterSchema
   })
   .superRefine(refinePeriodo)
   .transform(transformPeriodo);
@@ -149,7 +151,8 @@ export const curadoriasRealizadasQuerySchema = z
     motivo: z.string().trim().min(1).max(200).optional(),
     curadorId: z.uuid().optional(),
     criteriosNaoAtendidos: criteriosQueryFilterSchema,
-    criteriosAtendidos: criteriosQueryFilterSchema
+    criteriosAtendidos: criteriosQueryFilterSchema,
+    notaMin: notaMinQueryFilterSchema
   })
   .superRefine(refinePeriodo)
   .transform(transformPeriodo);

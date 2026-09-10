@@ -167,23 +167,135 @@ test('filtros da Fila de Curadoria fixam dia civil America/Sao_Paulo e motivo', 
     {
       motivo: 'Nao informado'
     },
-    1
+    1,
+    { now: new Date('2026-09-10T18:00:00.000Z') }
   );
   assert.match(
     comMotivoNaoInformadoSemAcento.clauses.join(' and '),
-    /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$1/
+    /coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\) = \$3/
   );
   const comConversationId = buildFilaCuradoriaFilters(
     {
       conversationId: 'conv-fila-xyz'
     },
-    1
+    1,
+    { now: new Date('2026-09-10T18:00:00.000Z') }
   );
   assert.match(
     comConversationId.clauses.join(' and '),
-    /a\.elevenlabs_conversation_id ilike '%' \|\| \$1 \|\| '%'/
+    /a\.elevenlabs_conversation_id ilike '%' \|\| \$3 \|\| '%'/
   );
-  assert.deepEqual(comConversationId.values, ['conv-fila-xyz']);
+  assert.deepEqual(comConversationId.values, [
+    '2026-09-01',
+    '2026-09-30',
+    'conv-fila-xyz'
+  ]);
+});
+
+test('filtros da Fila sem inicio usam o mes civil corrente em America/Sao_Paulo', async () => {
+  const { buildFilaCuradoriaFilters } = await import(
+    '../../apps/api/src/modules/curadoria/repository.js'
+  );
+
+  const now = new Date('2026-09-10T18:00:00.000Z');
+  const mesCorrente = buildFilaCuradoriaFilters(
+    { conversationId: 'conv-fila-xyz' },
+    1,
+    { now }
+  );
+  assert.match(
+    mesCorrente.clauses.join(' and '),
+    /a\.concluido_em at time zone 'America\/Sao_Paulo' >= \$1::date/
+  );
+  assert.match(
+    mesCorrente.clauses.join(' and '),
+    /a\.concluido_em at time zone 'America\/Sao_Paulo' < \$2::date \+ interval '1 day'/
+  );
+  assert.deepEqual(mesCorrente.values, ['2026-09-01', '2026-09-30', 'conv-fila-xyz']);
+});
+
+test('filtros da Fila aplicam piso inclusivo de notaMin na Nota da IA Avaliadora', async () => {
+  const { buildFilaCuradoriaFilters } = await import(
+    '../../apps/api/src/modules/curadoria/repository.js'
+  );
+
+  const semPiso = buildFilaCuradoriaFilters(
+    { inicio: '2025-01-01', fim: '2025-01-31', notaMin: 0 },
+    1
+  );
+  assert.doesNotMatch(semPiso.clauses.join(' and '), /ia\.nota/);
+  assert.deepEqual(semPiso.values, ['2025-01-01', '2025-01-31']);
+
+  const comPiso = buildFilaCuradoriaFilters(
+    { inicio: '2025-01-01', fim: '2025-01-31', notaMin: 7 },
+    1
+  );
+  assert.match(comPiso.clauses.join(' and '), /ia\.nota >= \$3/);
+  assert.doesNotMatch(comPiso.clauses.join(' and '), /avaliacoes_curador/);
+  assert.deepEqual(comPiso.values, ['2025-01-01', '2025-01-31', 7]);
+});
+
+test('buildCuradoriasRealizadasFilters aplica piso inclusivo na Nota da IA Avaliadora, nao na nota do Curador', async () => {
+  const { buildCuradoriasRealizadasFilters } = await import(
+    '../../apps/api/src/modules/curadoria/repository.js'
+  );
+
+  const semPiso = buildCuradoriasRealizadasFilters({ notaMin: 0 }, 1);
+  assert.doesNotMatch(semPiso.clauses.join(' and '), /ia\.nota/);
+  assert.doesNotMatch(semPiso.clauses.join(' and '), /concluido_em/);
+  assert.deepEqual(semPiso.values, []);
+
+  const comPiso = buildCuradoriasRealizadasFilters({ notaMin: 7 }, 1);
+  assert.match(comPiso.clauses.join(' and '), /ia\.nota >= \$1/);
+  assert.doesNotMatch(comPiso.clauses.join(' and '), /cur\.nota/);
+  assert.doesNotMatch(comPiso.clauses.join(' and '), /concluido_em/);
+  assert.deepEqual(comPiso.values, [7]);
+});
+
+test('buildCuradoriasRealizadasFilters sem datas nao aplica mes corrente implicito', async () => {
+  const { buildCuradoriasRealizadasFilters } = await import(
+    '../../apps/api/src/modules/curadoria/repository.js'
+  );
+
+  const filters = buildCuradoriasRealizadasFilters(
+    { conversationId: 'conv-realizada-123' },
+    1
+  );
+  assert.doesNotMatch(filters.clauses.join(' and '), /concluido_em/);
+  assert.deepEqual(filters.values, ['conv-realizada-123']);
+});
+
+test('listPending ordena FIFO no mes implicito e com periodo informado', async () => {
+  const { createCuradoriaRepository } = await import(
+    '../../apps/api/src/modules/curadoria/repository.js'
+  );
+
+  const captured: string[] = [];
+  const mockDb = {
+    async query(sql: string) {
+      captured.push(sql);
+      return { rows: [] };
+    }
+  } as any;
+
+  const repo = createCuradoriaRepository(mockDb);
+  await repo.listPending({ limit: 50, offset: 0 });
+  const mesImplicito = captured.find((sql) => sql.includes('order by')) ?? '';
+  assert.match(mesImplicito, /order by a\.concluido_em, a\.id/);
+  assert.doesNotMatch(mesImplicito, /order by a\.concluido_em desc/);
+  const countSql = captured.find((sql) => sql.includes('select count')) ?? '';
+  assert.match(countSql, /join avaliacoes ia on ia\.atendimento_id = a\.id and ia\.autor = 'ia'/);
+
+  captured.length = 0;
+  await repo.listPending({
+    limit: 50,
+    offset: 0,
+    inicio: '2025-01-01',
+    fim: '2025-01-31'
+  });
+  const periodo = captured.find((sql) => sql.includes('order by')) ?? '';
+  assert.match(periodo, /order by a\.concluido_em, a\.id/);
+  assert.doesNotMatch(periodo, /order by a\.concluido_em desc/);
 });
 
 test('listDistinctMotivos retorna motivos distintos e ordenados incluindo Nao informado canônico', async () => {

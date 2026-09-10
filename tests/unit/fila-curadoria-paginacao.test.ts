@@ -86,6 +86,18 @@ test('query da Fila de Curadoria aceita dia unico com default fim=inicio e perio
   );
 });
 
+test('query da Fila de Curadoria aceita notaMin em multiplos de 0,5 e trata ausente ou 0 como sem piso', () => {
+  const omitted = filaCuradoriaQuerySchema.parse({});
+  assert.equal(omitted.notaMin, undefined);
+
+  assert.equal(filaCuradoriaQuerySchema.parse({ notaMin: '0' }).notaMin, 0);
+  assert.equal(filaCuradoriaQuerySchema.parse({ notaMin: '6.5' }).notaMin, 6.5);
+  assert.equal(filaCuradoriaQuerySchema.parse({ notaMin: 10 }).notaMin, 10);
+
+  assert.equal(filaCuradoriaQuerySchema.safeParse({ notaMin: '7.3' }).success, false);
+  assert.equal(filaCuradoriaQuerySchema.safeParse({ notaMin: 11 }).success, false);
+});
+
 test('query da Fila de Curadoria valida consistencia de datas e fuso', () => {
   assert.equal(
     filaCuradoriaQuerySchema.safeParse({ fim: '2024-01-15' }).success,

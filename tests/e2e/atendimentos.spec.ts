@@ -1275,6 +1275,150 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await expect(idInput).toHaveValue('');
   });
 
+  test('filtra Atendimentos pelo piso da Nota da IA Avaliadora via API e slider', async ({
+    request,
+    page
+  }) => {
+    const { token } = await login(request, 'admin');
+    const headers = { authorization: `Bearer ${token}` };
+    const stamp = Date.now();
+    const convSete = `conv-nota-min-7-${stamp}`;
+    const convSeis = `conv-nota-min-65-${stamp}`;
+    const convSem = `conv-nota-min-sem-${stamp}`;
+    const motivoSete = `Piso nota 7 ${stamp}`;
+    const motivoSeis = `Piso nota 6,5 ${stamp}`;
+    const motivoSem = `Piso sem nota ${stamp}`;
+
+    const createdSete = await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: {
+        ...atendimento,
+        conversation_id: convSete,
+        contact_reason: motivoSete,
+        completed_at: '2026-08-20T12:00:00.000Z'
+      },
+      headers: ingestionHeaders
+    });
+    expect(createdSete.status()).toBe(201);
+    const sete = (await createdSete.json()) as { id: string };
+
+    const createdSeis = await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: {
+        ...atendimento,
+        conversation_id: convSeis,
+        contact_reason: motivoSeis,
+        completed_at: '2026-08-20T12:05:00.000Z'
+      },
+      headers: ingestionHeaders
+    });
+    expect(createdSeis.status()).toBe(201);
+    const seis = (await createdSeis.json()) as { id: string };
+
+    const createdSem = await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: {
+        conversation_id: convSem,
+        agent_id: atendimento.agent_id,
+        event_timestamp: atendimento.event_timestamp,
+        status: 'em_andamento',
+        started_at: atendimento.started_at,
+        transcript: [],
+        transferred: false,
+        contact_reason: motivoSem
+      },
+      headers: ingestionHeaders
+    });
+    expect(createdSem.status()).toBe(201);
+
+    async function persistirNotaIa(atendimentoId: string, nota: number) {
+      await queryDatabase(
+        `
+        insert into avaliacoes (
+          atendimento_id, autor, prompt_id, nota, nota_qualidade, resumo_atendimento,
+          saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
+          resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
+          encerramento_geap, uso_correto_ferramentas, falhas_identificadas, atendimento_aprovado
+        )
+        select $1, 'ia', p.id, $2, $2, 'Resumo da Avaliação da IA',
+          true, true, true, true, true, false, true, true,
+          '[]'::jsonb, true
+        from prompts_ia_avaliadora p
+        where p.ativo
+        limit 1
+      `,
+        [atendimentoId, nota]
+      );
+    }
+
+    await persistirNotaIa(sete.id, 7);
+    await persistirNotaIa(seis.id, 6.5);
+
+    const invalidHalf = await request.get(`${apiUrl}/atendimentos?notaMin=7.3`, {
+      headers
+    });
+    expect(invalidHalf.status()).toBe(400);
+    const invalidMax = await request.get(`${apiUrl}/atendimentos?notaMin=11`, {
+      headers
+    });
+    expect(invalidMax.status()).toBe(400);
+
+    async function listedIds(query: string) {
+      const response = await request.get(`${apiUrl}/atendimentos?${query}`, {
+        headers
+      });
+      expect(response.status()).toBe(200);
+      const body = (await response.json()) as {
+        items: Array<{ conversationId: string }>;
+      };
+      return body.items.map((item) => item.conversationId);
+    }
+
+    const pisoSete = await listedIds(`conversationId=nota-min-&notaMin=7`);
+    expect(pisoSete).toContain(convSete);
+    expect(pisoSete).not.toContain(convSeis);
+    expect(pisoSete).not.toContain(convSem);
+
+    const semPiso = await listedIds(`conversationId=nota-min-`);
+    expect(semPiso).toEqual(expect.arrayContaining([convSete, convSeis, convSem]));
+
+    const pisoZero = await listedIds(`conversationId=nota-min-&notaMin=0`);
+    expect(pisoZero).toEqual(expect.arrayContaining([convSete, convSeis, convSem]));
+
+    const andMotivo = await listedIds(
+      `notaMin=7&motivo=${encodeURIComponent(motivoSete)}`
+    );
+    expect(andMotivo).toContain(convSete);
+    expect(andMotivo).not.toContain(convSeis);
+
+    const andMotivoSeis = await listedIds(
+      `notaMin=7&motivo=${encodeURIComponent(motivoSeis)}`
+    );
+    expect(andMotivoSeis).not.toContain(convSeis);
+    expect(andMotivoSeis).not.toContain(convSete);
+
+    await page.goto('/login');
+    await page.getByLabel('E-mail').fill('admin@hq.test');
+    await page.getByLabel('Senha').fill('senha-admin');
+    await page.getByRole('button', { name: 'Entrar' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto('/atendimentos');
+
+    const slider = page.locator('#atendimentos-nota-ia-filtro');
+    await expect(slider).toBeVisible();
+    await expect(page.getByText('Nota da IA Avaliadora').first()).toBeVisible();
+    await slider.fill('7');
+    await expect(page.locator('.nota-ia-filtro output')).toHaveText('7');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+
+    await expect(page).toHaveURL(/notaMin=7/);
+    await expect(page.getByText(motivoSete)).toBeVisible();
+    await expect(page.getByText(motivoSeis)).toHaveCount(0);
+    await expect(page.getByText(motivoSem)).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Limpar filtros' }).click();
+    await expect(page).toHaveURL('/atendimentos');
+    await expect(slider).toHaveValue('0');
+    await expect(page).not.toHaveURL(/notaMin=/);
+  });
+
   test('reconciliação de atendimento inconsistente enriquece transcrição, atualiza duração e Tempo de Espera e preserva imutabilidade da avaliação da IA', async ({
     request
   }) => {

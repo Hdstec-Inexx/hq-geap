@@ -2148,6 +2148,26 @@ h1 {
   border-radius: 2px;
 }
 
+.nota-ia-filtro {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nota-ia-filtro input[type="range"] {
+  width: 160px;
+  accent-color: #16816f;
+}
+
+.nota-ia-filtro output {
+  min-width: 2.2rem;
+  color: #123b4a;
+  font-family: Consolas, monospace;
+  font-size: 0.9rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .curadoria-filters-arrow,
 .atendimentos-filters-arrow {
   padding-bottom: 8px;

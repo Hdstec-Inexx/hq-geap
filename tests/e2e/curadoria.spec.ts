@@ -100,7 +100,10 @@ async function seedFilaPendentes(prefix: string, count: number) {
         '[{"role":"agent","message":"Ola","time_in_call_secs":0}]'::jsonb,
         'atendimentos/teste.mp3',
         false,
-        timestamptz '2024-01-01T00:00:00Z' + (gs * interval '1 minute'),
+        (
+          date_trunc('month', now() at time zone 'America/Sao_Paulo')
+          + (gs * interval '1 minute')
+        ) at time zone 'America/Sao_Paulo',
         42,
         'Rede credenciada'
       from agentes_voz agente
@@ -1067,7 +1070,11 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
 
     await loginUi(page, 'curador');
     await page.goto('/curadoria');
-    await expect(page.getByText('3 pendentes')).toBeVisible();
+    await expect(page.getByLabel('Data inicial')).toHaveValue('');
+    await expect(page.getByLabel('Data final (opcional)')).toHaveValue('');
+    await expect(page.getByRole('link', { name: 'conv-data-10' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'conv-data-15' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'conv-data-20' })).toHaveCount(0);
 
     // Filtro de dia único (só Data inicial preenchida)
     await page.getByLabel('Data inicial').fill('2024-01-15');
@@ -1088,11 +1095,165 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.getByRole('link', { name: 'conv-data-10' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'conv-data-15' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'conv-data-20' })).toHaveCount(0);
+    const periodRows = page.locator('article.curadoria-row');
+    await expect(periodRows.nth(0).getByRole('link').first()).toHaveText('conv-data-10');
+    await expect(periodRows.nth(1).getByRole('link').first()).toHaveText('conv-data-15');
 
-    // Limpar filtros restaura lista completa
+    // Limpar filtros volta ao mês corrente com datas vazias
     await page.getByRole('button', { name: 'Limpar filtros' }).click();
     await expect(page).toHaveURL('/curadoria');
-    await expect(page.getByText('3 pendentes')).toBeVisible();
+    await expect(page.getByLabel('Data inicial')).toHaveValue('');
+    await expect(page.getByLabel('Data final (opcional)')).toHaveValue('');
+    await expect(page.getByRole('link', { name: 'conv-data-10' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'conv-data-15' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Fila em dia' })).toBeVisible();
+  });
+
+  test('Fila no mes corrente e com periodo fica FIFO e filtra pelo piso da Nota da IA Avaliadora', async ({
+    page,
+    request
+  }) => {
+    await esvaziarFila();
+    await queryDatabase(`
+      with inserted as (
+        insert into atendimentos (
+          agente_voz_id, elevenlabs_conversation_id, status, transcricao,
+          audio_url, houve_transferencia, concluido_em, duracao_segundos,
+          motivo_contato
+        )
+        select
+          agente.id,
+          t.conv_id,
+          'concluido',
+          '[{"role":"agent","message":"Ola","time_in_call_secs":0}]'::jsonb,
+          'atendimentos/teste.mp3',
+          false,
+          t.concluido,
+          42,
+          t.motivo
+        from agentes_voz agente
+        cross join (
+          values
+            (
+              'conv-mes-antiga',
+              (
+                date_trunc('month', now() at time zone 'America/Sao_Paulo')
+                + interval '1 day'
+              ) at time zone 'America/Sao_Paulo',
+              'Rede credenciada'::text
+            ),
+            (
+              'conv-mes-nova',
+              (
+                date_trunc('month', now() at time zone 'America/Sao_Paulo')
+                + interval '2 days'
+              ) at time zone 'America/Sao_Paulo',
+              'Rede credenciada'::text
+            ),
+            (
+              'conv-mes-passado',
+              (
+                date_trunc('month', now() at time zone 'America/Sao_Paulo')
+                - interval '5 days'
+              ) at time zone 'America/Sao_Paulo',
+              'Cancelamento'::text
+            )
+        ) as t(conv_id, concluido, motivo)
+        where agente.elevenlabs_agent_id = 'agent-livia-curadoria'
+        returning id, elevenlabs_conversation_id as conv_id
+      )
+      insert into avaliacoes (
+        atendimento_id, autor, prompt_id, nota,
+        saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
+        resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
+        encerramento_geap, uso_correto_ferramentas, atendimento_aprovado,
+        nota_qualidade
+      )
+      select
+        inserted.id, 'ia', p.id,
+        case inserted.conv_id
+          when 'conv-mes-antiga' then 6.5
+          when 'conv-mes-nova' then 7
+          else 10
+        end,
+        true, true, true, true, true, true, true, true, true, 10
+      from inserted
+      cross join (select id from prompts_ia_avaliadora where ativo limit 1) p
+    `);
+
+    const curador = await login(request, 'curador');
+    const filaPadrao = await request.get(`${apiUrl}/curadoria`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    });
+    expect(filaPadrao.status()).toBe(200);
+    const padrao = (await filaPadrao.json()) as { items: Array<{ conversationId: string }> };
+    expect(padrao.items.map((item) => item.conversationId)).toEqual([
+      'conv-mes-antiga',
+      'conv-mes-nova'
+    ]);
+
+    const month = await queryDatabase<{ inicio: string; fim: string }>(`
+      select
+        to_char(date_trunc('month', now() at time zone 'America/Sao_Paulo'), 'YYYY-MM-DD') as inicio,
+        to_char(
+          (date_trunc('month', now() at time zone 'America/Sao_Paulo') + interval '1 month - 1 day'),
+          'YYYY-MM-DD'
+        ) as fim
+    `);
+    const { inicio, fim } = month.rows[0]!;
+    const filaPeriodo = await request.get(
+      `${apiUrl}/curadoria?inicio=${inicio}&fim=${fim}`,
+      { headers: { authorization: `Bearer ${curador.token}` } }
+    );
+    expect(filaPeriodo.status()).toBe(200);
+    const periodo = (await filaPeriodo.json()) as { items: Array<{ conversationId: string }> };
+    expect(periodo.items.map((item) => item.conversationId)).toEqual([
+      'conv-mes-antiga',
+      'conv-mes-nova'
+    ]);
+
+    const filaNota = await request.get(`${apiUrl}/curadoria?notaMin=7`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    });
+    expect(filaNota.status()).toBe(200);
+    const notas = (await filaNota.json()) as { items: Array<{ conversationId: string }> };
+    expect(notas.items.map((item) => item.conversationId)).toEqual(['conv-mes-nova']);
+
+    const invalid = await request.get(`${apiUrl}/curadoria?notaMin=7.3`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    });
+    expect(invalid.status()).toBe(400);
+
+    const realizadas = await request.get(`${apiUrl}/curadorias-realizadas`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    });
+    expect(realizadas.status()).toBe(200);
+
+    await loginUi(page, 'curador');
+    await page.goto('/curadoria');
+    await expect(page.getByLabel('Data inicial')).toHaveValue('');
+    const rows = page.locator('article.curadoria-row');
+    await expect(rows.nth(0).getByRole('link').first()).toHaveText('conv-mes-antiga');
+    await expect(rows.nth(1).getByRole('link').first()).toHaveText('conv-mes-nova');
+    await expect(page.getByRole('link', { name: 'conv-mes-passado' })).toHaveCount(0);
+
+    await page.getByLabel('Data inicial').fill(inicio);
+    await page.getByLabel('Data final (opcional)').fill(fim);
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page).toHaveURL(new RegExp(`[?&]inicio=${inicio}`));
+    await expect(rows.nth(0).getByRole('link').first()).toHaveText('conv-mes-antiga');
+    await expect(rows.nth(1).getByRole('link').first()).toHaveText('conv-mes-nova');
+
+    await page.getByRole('button', { name: 'Limpar filtros' }).click();
+    const slider = page.locator('#curadoria-nota-ia-filtro');
+    await expect(slider).toBeVisible();
+    await slider.fill('7');
+    await expect(page.locator('.nota-ia-filtro output')).toHaveText('7');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page).toHaveURL(/notaMin=7/);
+    await expect(page.getByRole('link', { name: 'conv-mes-nova' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'conv-mes-antiga' })).toHaveCount(0);
+    await expect(page.getByLabel('Data inicial')).toHaveValue('');
   });
 
   test('filtro de dia respeita o dia civil de America/Sao_Paulo', async ({
@@ -1458,6 +1619,155 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(backLink).toBeVisible();
     await backLink.click();
     await expect(page).toHaveURL('/minhas-curadorias');
+  });
+
+  test('Curadorias Realizadas e Minhas Curadorias filtram pelo piso da Nota da IA Avaliadora', async ({
+    page,
+    request
+  }) => {
+    test.setTimeout(60_000);
+    const convSete = 'conv-real-nota-min-7';
+    const convSeis = 'conv-real-nota-min-65';
+    const convAntiga = 'conv-real-nota-min-antiga';
+    const atSete = await createAtendimento(convSete);
+    const atSeis = await createAtendimento(convSeis);
+    const atAntiga = await createAtendimento(convAntiga);
+    const curadorUser = await queryDatabase<{ id: string; nome: string }>(
+      "select id, nome from usuarios where email = 'curador@hq.test'"
+    );
+    const curadorId = curadorUser.rows[0]!.id;
+    const curadorNome = curadorUser.rows[0]!.nome;
+
+    async function seedConferencia(atendimentoId: string, notaIa: number, notaCurador: number) {
+      const ia = await queryDatabase<{ id: string }>(
+        `
+        insert into avaliacoes (
+          atendimento_id, autor, prompt_id, nota, nota_qualidade, resumo_atendimento,
+          saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
+          resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
+          encerramento_geap, uso_correto_ferramentas, falhas_identificadas, atendimento_aprovado
+        )
+        select $1, 'ia', p.id, $2, $2, 'Resumo da Avaliação da IA',
+          true, true, true, true, true, false, true, true,
+          '[]'::jsonb, true
+        from prompts_ia_avaliadora p
+        where p.ativo
+        limit 1
+        returning id
+        `,
+        [atendimentoId, notaIa]
+      );
+      await queryDatabase(
+        `
+        insert into avaliacoes_curador (
+          atendimento_id, avaliacao_ia_id, autor_usuario_id, autor_usuario_nome,
+          nota, falhas_identificadas, resumo_atendimento, nota_avaliacao_ia
+        )
+        values ($1, $2, $3, $4, $5, '[]'::jsonb, 'Conferencia para filtro de nota', 8)
+        `,
+        [atendimentoId, ia.rows[0]!.id, curadorId, curadorNome, notaCurador]
+      );
+    }
+
+    await seedConferencia(atSete, 7, 5);
+    await seedConferencia(atSeis, 6.5, 10);
+    await seedConferencia(atAntiga, 8, 8);
+
+    const curador = await login(request, 'curador');
+    const headers = { authorization: `Bearer ${curador.token}` };
+
+    await queryDatabase(
+      `
+      update atendimentos
+      set concluido_em = (
+        date_trunc('month', now() at time zone 'America/Sao_Paulo') - interval '10 days'
+      ) at time zone 'America/Sao_Paulo'
+      where id = $1
+      `,
+      [atAntiga]
+    );
+
+    const invalid = await request.get(`${apiUrl}/curadorias-realizadas?notaMin=7.3`, {
+      headers
+    });
+    expect(invalid.status()).toBe(400);
+    const invalidMax = await request.get(`${apiUrl}/curadorias-realizadas?notaMin=11`, {
+      headers
+    });
+    expect(invalidMax.status()).toBe(400);
+
+    async function listedIds(query: string) {
+      const response = await request.get(`${apiUrl}/curadorias-realizadas?${query}`, {
+        headers
+      });
+      expect(response.status()).toBe(200);
+      const body = (await response.json()) as {
+        items: Array<{ conversationId: string }>;
+      };
+      return body.items.map((item) => item.conversationId);
+    }
+
+    const pisoSete = await listedIds(`conversationId=conv-real-nota-min-&notaMin=7`);
+    expect(pisoSete).toContain(convSete);
+    expect(pisoSete).not.toContain(convSeis);
+    expect(pisoSete).toContain(convAntiga);
+
+    const semDatas = await listedIds('conversationId=conv-real-nota-min-');
+    expect(semDatas).toEqual(
+      expect.arrayContaining([convSete, convSeis, convAntiga])
+    );
+
+    const pisoZero = await listedIds(`conversationId=conv-real-nota-min-&notaMin=0`);
+    expect(pisoZero).toEqual(
+      expect.arrayContaining([convSete, convSeis, convAntiga])
+    );
+
+    await page.goto('/');
+    if (await page.getByRole('button', { name: 'Sair' }).count() === 0) {
+      await loginUi(page, 'curador');
+    }
+    await page.goto('/minhas-curadorias');
+    const sliderMinhas = page.locator('#curadorias-realizadas-nota-ia-filtro');
+    await expect(sliderMinhas).toBeVisible();
+    await sliderMinhas.fill('7');
+    await expect(page.locator('.nota-ia-filtro output')).toHaveText('7');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page).toHaveURL(/\/minhas-curadorias/);
+    await expect(page).toHaveURL(/notaMin=7/);
+    await expect(page.getByRole('link', { name: convSete })).toBeVisible();
+    await expect(page.getByRole('link', { name: convAntiga })).toBeVisible();
+    await expect(page.getByRole('link', { name: convSeis })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Limpar filtros' }).click();
+    await expect(page).toHaveURL('/minhas-curadorias');
+    await expect(page).not.toHaveURL(/notaMin=/);
+    await expect(sliderMinhas).toHaveValue('0');
+    await expect(page.getByRole('link', { name: convSeis })).toBeVisible();
+    await expect(page.getByRole('link', { name: convAntiga })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Sair' }).click();
+    await loginUi(page, 'gestao');
+    await page.goto('/curadorias-realizadas');
+    const sliderRealizadas = page.locator('#curadorias-realizadas-nota-ia-filtro');
+    await expect(sliderRealizadas).toBeVisible();
+    await page.locator('#curadorias-realizadas-conversation-id-filtro').fill(
+      'conv-real-nota-min-'
+    );
+    await sliderRealizadas.fill('7');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page).toHaveURL(/\/curadorias-realizadas/);
+    await expect(page).toHaveURL(/notaMin=7/);
+    await expect(page).toHaveURL(/conversationId=conv-real-nota-min-/);
+    await expect(page.getByRole('link', { name: convSete })).toBeVisible();
+    await expect(page.getByRole('link', { name: convAntiga })).toBeVisible();
+    await expect(page.getByRole('link', { name: convSeis })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Limpar filtros' }).click();
+    await expect(page).toHaveURL('/curadorias-realizadas');
+    await expect(page).not.toHaveURL(/notaMin=/);
+    await expect(sliderRealizadas).toHaveValue('0');
+    await expect(page.getByRole('link', { name: convSeis })).toBeVisible();
+    await expect(page.getByRole('link', { name: convAntiga })).toBeVisible();
   });
 
   test('Gestao acessa Curadorias Realizadas na Casca e pode filtrar por curador', async ({
