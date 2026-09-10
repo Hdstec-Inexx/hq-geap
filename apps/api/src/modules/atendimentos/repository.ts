@@ -218,7 +218,7 @@ export function createAtendimentosRepository(db: pg.Pool) {
         db.query<AtendimentoSummaryRow>(`
           ${selectAtendimentoSummary}
           where ${clauses.join(' and ')}
-          order by a.criado_em desc, a.id desc
+          order by coalesce(a.concluido_em, a.iniciado_em, a.criado_em) asc, a.id asc
           limit $1 offset $2
         `, [
           query.limit,

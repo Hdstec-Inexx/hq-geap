@@ -62,7 +62,7 @@ A exportação do arquivo de áudio (`.mp3`) do Atendimento. Acesso restrito aos
 O veredito sobre um Atendimento, produzido pela IA Avaliadora ou pelo Curador — as duas coexistem lado a lado quando ambas existem, sem hierarquia, e são snapshots imutáveis. A da IA é gerada para todo Atendimento concluído e carrega: checklist de critérios, **Nota da IA Avaliadora**, falhas identificadas e resumo do atendimento. A do Curador é a **conferência da avaliação da IA** em registro separado: ele confirma ou corrige o shape espelho (checklist, falhas e resumo), sua nota deriva da mesma soma da Régua, registra a **Nota da Avaliação da IA** (0–10, qualidade da própria IA Avaliadora) e pode adicionar um comentário opcional na revisão. Enquanto a conferência humana não for realizada, o painel do Curador não é exibido (sem renderizar card vazio nem mensagem de placeholder) e o painel da Avaliação da IA se expande para ocupar a largura total do container. Quando a avaliação do Curador existir, ambos os painéis coexistem lado a lado. Concordância não é flag gravada — deriva da comparação dos dois snapshots.
 
 **Nota da IA Avaliadora**:
-Nota de 0–10 do Atendimento na Régua, produzida pela Avaliação da IA (soma dos critérios atendidos). Distinta da **Nota da Avaliação da IA**.
+Nota de 0–10 do Atendimento na Régua, produzida pela Avaliação da IA (soma dos critérios atendidos). Distinta da **Nota da Avaliação da IA**. Nas listagens (Atendimentos, Fila de Curadoria, Curadorias Realizadas e Minhas Curadorias) o slider filtra pela **nota exata** selecionada; 0 ou parâmetro omitido não restringe. Atendimentos sem essa nota saem da lista quando o filtro está ativo.
 _Avoid_: Nota IA (ambíguo com Nota da Avaliação da IA)
 
 **Nota da Avaliação da IA**:
@@ -104,7 +104,10 @@ Anotação sobre um Atendimento, usada como insumo para ajustes e melhorias do A
 ### Operação
 
 **Fila de Curadoria**:
-A lista de Atendimentos concluídos e já avaliados pela IA, da qual o Curador escolhe livremente quais revisar (modelo pull, sem gatilho automático). Sem período informado, observa o **mês civil corrente** (America/Sao_Paulo); com período informado, aquele intervalo. Em ambos os casos a lista vai do mais antigo ao mais novo.
+A lista de Atendimentos concluídos e já avaliados pela IA, da qual o Curador escolhe livremente quais revisar (modelo pull, sem gatilho automático). Sem período informado, observa o **mês civil corrente** (America/Sao_Paulo); com período informado, aquele intervalo. Em ambos os casos a lista vai do mais antigo ao mais novo (`concluido_em` crescente).
+
+**Listagem de Atendimentos**:
+A lista operacional de Atendimentos. Vai do mais antigo ao mais novo (`concluido_em`, ou início/criação quando ainda está em andamento).
 
 **Minhas Curadorias**:
 A lista de Atendimentos concluídos que já receberam conferência humana. Permite ao Curador consultar suas próprias revisões (e aos perfis de Gestão e Admin, auditar o histórico de conferências realizadas sob o nome "Curadorias Realizadas").

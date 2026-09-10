@@ -86,7 +86,7 @@ test('query da Fila de Curadoria aceita dia unico com default fim=inicio e perio
   );
 });
 
-test('query da Fila de Curadoria aceita notaMin em multiplos de 0,5 e trata ausente ou 0 como sem piso', () => {
+test('query da Fila de Curadoria aceita notaMin em multiplos de 0,5 e trata ausente ou 0 como sem filtro', () => {
   const omitted = filaCuradoriaQuerySchema.parse({});
   assert.equal(omitted.notaMin, undefined);
 
