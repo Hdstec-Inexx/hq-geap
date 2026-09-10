@@ -100,7 +100,10 @@ async function seedFilaPendentes(prefix: string, count: number) {
         '[{"role":"agent","message":"Ola","time_in_call_secs":0}]'::jsonb,
         'atendimentos/teste.mp3',
         false,
-        timestamptz '2024-01-01T00:00:00Z' + (gs * interval '1 minute'),
+        (
+          date_trunc('month', now() at time zone 'America/Sao_Paulo')
+          + (gs * interval '1 minute')
+        ) at time zone 'America/Sao_Paulo',
         42,
         'Rede credenciada'
       from agentes_voz agente
@@ -1067,7 +1070,11 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
 
     await loginUi(page, 'curador');
     await page.goto('/curadoria');
-    await expect(page.getByText('3 pendentes')).toBeVisible();
+    await expect(page.getByLabel('Data inicial')).toHaveValue('');
+    await expect(page.getByLabel('Data final (opcional)')).toHaveValue('');
+    await expect(page.getByRole('link', { name: 'conv-data-10' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'conv-data-15' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'conv-data-20' })).toHaveCount(0);
 
     // Filtro de dia único (só Data inicial preenchida)
     await page.getByLabel('Data inicial').fill('2024-01-15');
@@ -1088,11 +1095,165 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
     await expect(page.getByRole('link', { name: 'conv-data-10' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'conv-data-15' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'conv-data-20' })).toHaveCount(0);
+    const periodRows = page.locator('article.curadoria-row');
+    await expect(periodRows.nth(0).getByRole('link').first()).toHaveText('conv-data-10');
+    await expect(periodRows.nth(1).getByRole('link').first()).toHaveText('conv-data-15');
 
-    // Limpar filtros restaura lista completa
+    // Limpar filtros volta ao mês corrente com datas vazias
     await page.getByRole('button', { name: 'Limpar filtros' }).click();
     await expect(page).toHaveURL('/curadoria');
-    await expect(page.getByText('3 pendentes')).toBeVisible();
+    await expect(page.getByLabel('Data inicial')).toHaveValue('');
+    await expect(page.getByLabel('Data final (opcional)')).toHaveValue('');
+    await expect(page.getByRole('link', { name: 'conv-data-10' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'conv-data-15' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Fila em dia' })).toBeVisible();
+  });
+
+  test('Fila no mes corrente e com periodo fica FIFO e filtra pelo piso da Nota da IA Avaliadora', async ({
+    page,
+    request
+  }) => {
+    await esvaziarFila();
+    await queryDatabase(`
+      with inserted as (
+        insert into atendimentos (
+          agente_voz_id, elevenlabs_conversation_id, status, transcricao,
+          audio_url, houve_transferencia, concluido_em, duracao_segundos,
+          motivo_contato
+        )
+        select
+          agente.id,
+          t.conv_id,
+          'concluido',
+          '[{"role":"agent","message":"Ola","time_in_call_secs":0}]'::jsonb,
+          'atendimentos/teste.mp3',
+          false,
+          t.concluido,
+          42,
+          t.motivo
+        from agentes_voz agente
+        cross join (
+          values
+            (
+              'conv-mes-antiga',
+              (
+                date_trunc('month', now() at time zone 'America/Sao_Paulo')
+                + interval '1 day'
+              ) at time zone 'America/Sao_Paulo',
+              'Rede credenciada'::text
+            ),
+            (
+              'conv-mes-nova',
+              (
+                date_trunc('month', now() at time zone 'America/Sao_Paulo')
+                + interval '2 days'
+              ) at time zone 'America/Sao_Paulo',
+              'Rede credenciada'::text
+            ),
+            (
+              'conv-mes-passado',
+              (
+                date_trunc('month', now() at time zone 'America/Sao_Paulo')
+                - interval '5 days'
+              ) at time zone 'America/Sao_Paulo',
+              'Cancelamento'::text
+            )
+        ) as t(conv_id, concluido, motivo)
+        where agente.elevenlabs_agent_id = 'agent-livia-curadoria'
+        returning id, elevenlabs_conversation_id as conv_id
+      )
+      insert into avaliacoes (
+        atendimento_id, autor, prompt_id, nota,
+        saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
+        resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
+        encerramento_geap, uso_correto_ferramentas, atendimento_aprovado,
+        nota_qualidade
+      )
+      select
+        inserted.id, 'ia', p.id,
+        case inserted.conv_id
+          when 'conv-mes-antiga' then 6.5
+          when 'conv-mes-nova' then 7
+          else 10
+        end,
+        true, true, true, true, true, true, true, true, true, 10
+      from inserted
+      cross join (select id from prompts_ia_avaliadora where ativo limit 1) p
+    `);
+
+    const curador = await login(request, 'curador');
+    const filaPadrao = await request.get(`${apiUrl}/curadoria`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    });
+    expect(filaPadrao.status()).toBe(200);
+    const padrao = (await filaPadrao.json()) as { items: Array<{ conversationId: string }> };
+    expect(padrao.items.map((item) => item.conversationId)).toEqual([
+      'conv-mes-antiga',
+      'conv-mes-nova'
+    ]);
+
+    const month = await queryDatabase<{ inicio: string; fim: string }>(`
+      select
+        to_char(date_trunc('month', now() at time zone 'America/Sao_Paulo'), 'YYYY-MM-DD') as inicio,
+        to_char(
+          (date_trunc('month', now() at time zone 'America/Sao_Paulo') + interval '1 month - 1 day'),
+          'YYYY-MM-DD'
+        ) as fim
+    `);
+    const { inicio, fim } = month.rows[0]!;
+    const filaPeriodo = await request.get(
+      `${apiUrl}/curadoria?inicio=${inicio}&fim=${fim}`,
+      { headers: { authorization: `Bearer ${curador.token}` } }
+    );
+    expect(filaPeriodo.status()).toBe(200);
+    const periodo = (await filaPeriodo.json()) as { items: Array<{ conversationId: string }> };
+    expect(periodo.items.map((item) => item.conversationId)).toEqual([
+      'conv-mes-antiga',
+      'conv-mes-nova'
+    ]);
+
+    const filaNota = await request.get(`${apiUrl}/curadoria?notaMin=7`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    });
+    expect(filaNota.status()).toBe(200);
+    const notas = (await filaNota.json()) as { items: Array<{ conversationId: string }> };
+    expect(notas.items.map((item) => item.conversationId)).toEqual(['conv-mes-nova']);
+
+    const invalid = await request.get(`${apiUrl}/curadoria?notaMin=7.3`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    });
+    expect(invalid.status()).toBe(400);
+
+    const realizadas = await request.get(`${apiUrl}/curadorias-realizadas`, {
+      headers: { authorization: `Bearer ${curador.token}` }
+    });
+    expect(realizadas.status()).toBe(200);
+
+    await loginUi(page, 'curador');
+    await page.goto('/curadoria');
+    await expect(page.getByLabel('Data inicial')).toHaveValue('');
+    const rows = page.locator('article.curadoria-row');
+    await expect(rows.nth(0).getByRole('link').first()).toHaveText('conv-mes-antiga');
+    await expect(rows.nth(1).getByRole('link').first()).toHaveText('conv-mes-nova');
+    await expect(page.getByRole('link', { name: 'conv-mes-passado' })).toHaveCount(0);
+
+    await page.getByLabel('Data inicial').fill(inicio);
+    await page.getByLabel('Data final (opcional)').fill(fim);
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page).toHaveURL(new RegExp(`[?&]inicio=${inicio}`));
+    await expect(rows.nth(0).getByRole('link').first()).toHaveText('conv-mes-antiga');
+    await expect(rows.nth(1).getByRole('link').first()).toHaveText('conv-mes-nova');
+
+    await page.getByRole('button', { name: 'Limpar filtros' }).click();
+    const slider = page.locator('#curadoria-nota-ia-filtro');
+    await expect(slider).toBeVisible();
+    await slider.fill('7');
+    await expect(page.locator('.nota-ia-filtro output')).toHaveText('7');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page).toHaveURL(/notaMin=7/);
+    await expect(page.getByRole('link', { name: 'conv-mes-nova' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'conv-mes-antiga' })).toHaveCount(0);
+    await expect(page.getByLabel('Data inicial')).toHaveValue('');
   });
 
   test('filtro de dia respeita o dia civil de America/Sao_Paulo', async ({

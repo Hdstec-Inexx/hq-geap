@@ -171,6 +171,32 @@ test('listagem de Atendimentos usa o controle reutilizavel de Nota da IA Avaliad
   assert.doesNotMatch(detalhamento, /notaMin/);
 });
 
+test('Fila de Curadoria reusa o controle de Nota da IA Avaliadora e nao preenche datas do mes implicito', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const page = await readFile(
+    new URL('../../apps/web/src/features/curadoria/FilaCuradoriaPage.tsx', import.meta.url),
+    'utf8'
+  );
+  assert.match(page, /<NotaIaAvaliadoraFiltro/);
+  assert.match(page, /id="curadoria-nota-ia-filtro"/);
+  assert.match(page, /draftNotaMin/);
+  assert.match(page, /parseNotaMinParam/);
+  assert.match(page, /notaMinQueryForRequest/);
+  assert.match(page, /notaMinParam/);
+  assert.match(page, /navigate\('\/curadoria'\)/);
+  assert.doesNotMatch(page, /civilMonthBoundsAmericaSaoPaulo/);
+
+  const realizadas = await readFile(
+    new URL(
+      '../../apps/web/src/features/curadoria/CuradoriasRealizadasPage.tsx',
+      import.meta.url
+    ),
+    'utf8'
+  );
+  assert.doesNotMatch(realizadas, /NotaIaAvaliadoraFiltro/);
+  assert.doesNotMatch(realizadas, /notaMin/);
+});
+
 test('styles.css estiliza o slider de Nota da IA Avaliadora nas barras de filtro', async () => {
   const { readFile } = await import('node:fs/promises');
   const css = await readFile(
