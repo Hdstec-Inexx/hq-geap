@@ -1296,7 +1296,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
         ...atendimento,
         conversation_id: convSete,
         contact_reason: motivoSete,
-        completed_at: '2026-08-20T12:00:00.000Z'
+        completed_at: new Date().toISOString()
       },
       headers: ingestionHeaders
     });
@@ -1308,7 +1308,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
         ...atendimento,
         conversation_id: convSeis,
         contact_reason: motivoSeis,
-        completed_at: '2026-08-20T12:05:00.000Z'
+        completed_at: new Date(Date.now() + 5 * 60_000).toISOString()
       },
       headers: ingestionHeaders
     });
@@ -1320,7 +1320,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
         ...atendimento,
         conversation_id: convOito,
         contact_reason: motivoOito,
-        completed_at: '2026-08-20T12:10:00.000Z'
+        completed_at: new Date(Date.now() + 10 * 60_000).toISOString()
       },
       headers: ingestionHeaders
     });
@@ -1333,7 +1333,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
         agent_id: atendimento.agent_id,
         event_timestamp: atendimento.event_timestamp,
         status: 'em_andamento',
-        started_at: atendimento.started_at,
+        started_at: new Date().toISOString(),
         transcript: [],
         transferred: false,
         contact_reason: motivoSem

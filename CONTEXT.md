@@ -107,7 +107,7 @@ Anotação sobre um Atendimento, usada como insumo para ajustes e melhorias do A
 A lista de Atendimentos concluídos e já avaliados pela IA, da qual o Curador escolhe livremente quais revisar (modelo pull, sem gatilho automático). Sem período informado, observa o **mês civil corrente** (America/Sao_Paulo); com período informado, aquele intervalo. Em ambos os casos a lista vai do mais antigo ao mais novo (`concluido_em` crescente).
 
 **Listagem de Atendimentos**:
-A lista operacional de Atendimentos. Vai do mais antigo ao mais novo (`concluido_em`, ou início/criação quando ainda está em andamento).
+A lista operacional de Atendimentos. Sem período informado, observa o **mês civil corrente** (America/Sao_Paulo), com datas vazias na UI — Atendimentos `em_andamento` entram pelo início/criação nesse mês; os `concluido` pelo `concluido_em`. Com período informado, aquele intervalo. Em ambos os casos a lista vai do mais antigo ao mais novo.
 
 **Minhas Curadorias**:
 A lista de Atendimentos concluídos que já receberam conferência humana. Permite ao Curador consultar suas próprias revisões (e aos perfis de Gestão e Admin, auditar o histórico de conferências realizadas sob o nome "Curadorias Realizadas").

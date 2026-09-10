@@ -47,16 +47,30 @@ test('curadoriasRealizadasQuerySchema aceita notaMin com a mesma semantica da Fi
   assert.equal(curadoriasRealizadasQuerySchema.safeParse({ notaMin: 11 }).success, false);
 });
 
-test('buildDetalhamentoFilters nao restringe por nota quando notaMin e 0 ou omitido', async () => {
+test('buildDetalhamentoFilters sem datas observa o mes civil corrente', async () => {
   const { buildDetalhamentoFilters } = await import(
     '../../apps/api/src/modules/atendimentos/detalhamentoFilters.js'
   );
+  const now = new Date('2026-09-10T18:00:00.000Z');
 
-  const omitted = buildDetalhamentoFilters(atendimentosQuerySchema.parse({}));
-  assert.equal(omitted.clauses.length, 0);
+  const omitted = buildDetalhamentoFilters(
+    atendimentosQuerySchema.parse({}),
+    1,
+    { now }
+  );
+  assert.equal(omitted.clauses.length, 1);
+  assert.match(omitted.clauses[0]!, /a\.status = 'em_andamento'/);
+  assert.match(omitted.clauses[0]!, /a\.status = 'concluido'/);
+  assert.deepEqual(omitted.values, ['2026-09-01', '2026-09-30']);
 
-  const zero = buildDetalhamentoFilters(atendimentosQuerySchema.parse({ notaMin: 0 }));
-  assert.equal(zero.clauses.length, 0);
+  const zero = buildDetalhamentoFilters(
+    atendimentosQuerySchema.parse({ notaMin: 0 }),
+    1,
+    { now }
+  );
+  assert.equal(zero.clauses.length, 1);
+  assert.doesNotMatch(zero.clauses.join(' '), /ia\.nota/);
+  assert.deepEqual(zero.values, ['2026-09-01', '2026-09-30']);
 });
 
 test('buildDetalhamentoFilters aplica igualdade da Nota da IA Avaliadora', async () => {
@@ -66,15 +80,17 @@ test('buildDetalhamentoFilters aplica igualdade da Nota da IA Avaliadora', async
 
   const filtro = buildDetalhamentoFilters(
     atendimentosQuerySchema.parse({ notaMin: 7 }),
-    1
+    1,
+    { now: new Date('2026-09-10T18:00:00.000Z') }
   );
 
-  assert.equal(filtro.clauses.length, 1);
-  assert.match(filtro.clauses[0]!, /ia\.autor = 'ia'/);
-  assert.match(filtro.clauses[0]!, /ia\.nota = \$1/);
-  assert.doesNotMatch(filtro.clauses[0]!, /ia\.nota >=/);
-  assert.doesNotMatch(filtro.clauses[0]!, /avaliacoes_curador/);
-  assert.deepEqual(filtro.values, [7]);
+  assert.equal(filtro.clauses.length, 2);
+  assert.match(filtro.clauses[0]!, /a\.status = 'concluido'/);
+  assert.match(filtro.clauses[1]!, /ia\.autor = 'ia'/);
+  assert.match(filtro.clauses[1]!, /ia\.nota = \$3/);
+  assert.doesNotMatch(filtro.clauses[1]!, /ia\.nota >=/);
+  assert.doesNotMatch(filtro.clauses[1]!, /avaliacoes_curador/);
+  assert.deepEqual(filtro.values, ['2026-09-01', '2026-09-30', 7]);
 });
 
 test('buildDetalhamentoFilters combina notaMin com conversationId em AND', async () => {
@@ -87,13 +103,14 @@ test('buildDetalhamentoFilters combina notaMin com conversationId em AND', async
       conversationId: 'conv-123',
       notaMin: 6.5
     }),
-    1
+    1,
+    { now: new Date('2026-09-10T18:00:00.000Z') }
   );
 
-  assert.equal(filtro.clauses.length, 2);
-  assert.match(filtro.clauses[0]!, /elevenlabs_conversation_id/);
-  assert.match(filtro.clauses[1]!, /ia\.nota = \$2/);
-  assert.deepEqual(filtro.values, ['conv-123', 6.5]);
+  assert.equal(filtro.clauses.length, 3);
+  assert.match(filtro.clauses[1]!, /elevenlabs_conversation_id/);
+  assert.match(filtro.clauses[2]!, /ia\.nota = \$4/);
+  assert.deepEqual(filtro.values, ['2026-09-01', '2026-09-30', 'conv-123', 6.5]);
 });
 
 test('buildDetalhamentoFilters nao aplica notaMin no Detalhamento do Indicador', async () => {

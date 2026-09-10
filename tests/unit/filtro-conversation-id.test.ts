@@ -78,15 +78,16 @@ test('buildDetalhamentoFilters aplica filtro SQL ILIKE para conversationId', asy
     atendimentosQuerySchema.parse({
       conversationId: 'conv-123'
     }),
-    1
+    1,
+    { now: new Date('2026-09-10T18:00:00.000Z') }
   );
 
-  assert.equal(filtro.clauses.length, 1);
+  assert.equal(filtro.clauses.length, 2);
   assert.match(
-    filtro.clauses[0]!,
-    /a\.elevenlabs_conversation_id ilike '%' \|\| \$1 \|\| '%'/
+    filtro.clauses[1]!,
+    /a\.elevenlabs_conversation_id ilike '%' \|\| \$3 \|\| '%'/
   );
-  assert.deepEqual(filtro.values, ['conv-123']);
+  assert.deepEqual(filtro.values, ['2026-09-01', '2026-09-30', 'conv-123']);
 });
 
 test('buildFilaCuradoriaFilters aplica filtro SQL ILIKE para conversationId', async () => {
