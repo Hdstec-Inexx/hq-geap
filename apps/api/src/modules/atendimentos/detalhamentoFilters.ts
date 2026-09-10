@@ -86,6 +86,17 @@ export function buildDetalhamentoFilters(
     }
   }
 
+  if (!query.indicador && query.notaMin && query.notaMin > 0) {
+    const notaMin = param(query.notaMin);
+    clauses.push(`exists (
+      select 1
+      from avaliacoes ia
+      where ia.atendimento_id = a.id
+        and ia.autor = 'ia'
+        and ia.nota >= ${notaMin}
+    )`);
+  }
+
   switch (query.indicador) {
     case undefined:
       break;

@@ -10,6 +10,8 @@ import { formatMotivoContato } from './motivo-combobox-logic';
 import { MotivoCombobox } from './MotivoCombobox';
 import { CriteriosMultiSelect } from './CriteriosMultiSelect';
 import { parseCriteriaParam } from './criterios-filtro-logic';
+import { parseNotaMinParam, notaMinQueryForRequest } from './nota-ia-filtro-logic';
+import { NotaIaAvaliadoraFiltro } from './NotaIaAvaliadoraFiltro';
 import { detalhamentoQueryFromSearch } from '../dashboards/detalhamento';
 import {
   compactPageItems,
@@ -76,6 +78,8 @@ export function AtendimentosPage() {
     searchParams,
     'criteriosAtendidos'
   );
+  const notaMinParam = parseNotaMinParam(searchParams);
+  const notaMinQuery = notaMinQueryForRequest(searchParams);
   const indicador = searchParams.get('indicador');
   const isDetalhamento = Boolean(indicador && inicioParam && fimParam);
   const [draftInicio, setDraftInicio] = useState(inicioParam);
@@ -88,6 +92,7 @@ export function AtendimentosPage() {
     useState<string[]>(criteriosNaoAtendidosParam);
   const [draftCriteriosAtendidos, setDraftCriteriosAtendidos] =
     useState<string[]>(criteriosAtendidosParam);
+  const [draftNotaMin, setDraftNotaMin] = useState(notaMinParam);
 
   const hasDraftFilters = Boolean(
     draftInicio ||
@@ -97,7 +102,8 @@ export function AtendimentosPage() {
       draftCuradoriaStatus ||
       draftCuradorId ||
       draftCriteriosNaoAtendidos.length > 0 ||
-      draftCriteriosAtendidos.length > 0
+      draftCriteriosAtendidos.length > 0 ||
+      draftNotaMin > 0
   );
 
   const hasActiveFilters = Boolean(
@@ -110,6 +116,8 @@ export function AtendimentosPage() {
         curadorIdParam ||
         criteriosNaoAtendidosParam.length > 0 ||
         criteriosAtendidosParam.length > 0 ||
+        notaMinParam > 0 ||
+        Boolean(notaMinQuery) ||
         hasDraftFilters)
   );
 
@@ -125,6 +133,7 @@ export function AtendimentosPage() {
     setDraftCuradorId(curadorIdParam);
     setDraftCriteriosNaoAtendidos(criteriosNaoAtendidosParam);
     setDraftCriteriosAtendidos(criteriosAtendidosParam);
+    setDraftNotaMin(notaMinParam);
   }, [
     inicioParam,
     fimParam,
@@ -132,6 +141,7 @@ export function AtendimentosPage() {
     motivoParam,
     curadoriaStatusParam,
     curadorIdParam,
+    notaMinParam,
     searchParams
   ]);
 
@@ -155,6 +165,9 @@ export function AtendimentosPage() {
     }
     if (criteriosAtendidosParam.length > 0) {
       listQuery.set('criteriosAtendidos', criteriosAtendidosParam.join(','));
+    }
+    if (notaMinQuery) {
+      listQuery.set('notaMin', notaMinQuery);
     }
   }
   const requestPath = `/atendimentos?${listQuery.toString()}`;
@@ -192,6 +205,9 @@ export function AtendimentosPage() {
     if (draftCriteriosAtendidos.length > 0) {
       next.set('criteriosAtendidos', draftCriteriosAtendidos.join(','));
     }
+    if (draftNotaMin > 0) {
+      next.set('notaMin', String(draftNotaMin));
+    }
     navigate(paginationHref(next, 1));
   }
 
@@ -204,6 +220,7 @@ export function AtendimentosPage() {
     setDraftCuradorId('');
     setDraftCriteriosNaoAtendidos([]);
     setDraftCriteriosAtendidos([]);
+    setDraftNotaMin(0);
     navigate('/atendimentos');
   }
 
@@ -342,6 +359,11 @@ export function AtendimentosPage() {
                 ))}
               </select>
             </label>
+            <NotaIaAvaliadoraFiltro
+              id="atendimentos-nota-ia-filtro"
+              onChange={setDraftNotaMin}
+              value={draftNotaMin}
+            />
           </div>
           <div className="atendimentos-filters-actions">
             <button className="primary-action" type="submit">
