@@ -10,7 +10,7 @@ import { formatMotivoContato } from './motivo-combobox-logic';
 import { MotivoCombobox } from './MotivoCombobox';
 import { CriteriosMultiSelect } from './CriteriosMultiSelect';
 import { parseCriteriaParam } from './criterios-filtro-logic';
-import { parseNotaMinParam } from './nota-ia-filtro-logic';
+import { parseNotaMinParam, notaMinQueryForRequest } from './nota-ia-filtro-logic';
 import { NotaIaAvaliadoraFiltro } from './NotaIaAvaliadoraFiltro';
 import { detalhamentoQueryFromSearch } from '../dashboards/detalhamento';
 import {
@@ -79,6 +79,7 @@ export function AtendimentosPage() {
     'criteriosAtendidos'
   );
   const notaMinParam = parseNotaMinParam(searchParams);
+  const notaMinQuery = notaMinQueryForRequest(searchParams);
   const indicador = searchParams.get('indicador');
   const isDetalhamento = Boolean(indicador && inicioParam && fimParam);
   const [draftInicio, setDraftInicio] = useState(inicioParam);
@@ -116,6 +117,7 @@ export function AtendimentosPage() {
         criteriosNaoAtendidosParam.length > 0 ||
         criteriosAtendidosParam.length > 0 ||
         notaMinParam > 0 ||
+        Boolean(notaMinQuery) ||
         hasDraftFilters)
   );
 
@@ -164,8 +166,8 @@ export function AtendimentosPage() {
     if (criteriosAtendidosParam.length > 0) {
       listQuery.set('criteriosAtendidos', criteriosAtendidosParam.join(','));
     }
-    if (notaMinParam > 0) {
-      listQuery.set('notaMin', String(notaMinParam));
+    if (notaMinQuery) {
+      listQuery.set('notaMin', notaMinQuery);
     }
   }
   const requestPath = `/atendimentos?${listQuery.toString()}`;

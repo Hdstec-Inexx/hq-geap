@@ -100,6 +100,18 @@ test('buildDetalhamentoFilters nao aplica notaMin no Detalhamento do Indicador',
   assert.deepEqual(filtro.values, ['2025-01-01', '2025-01-31']);
 });
 
+test('notaMinQueryForRequest envia o parametro cru da URL inclusive quando invalido, e omite 0', async () => {
+  const { notaMinQueryForRequest } = await import(
+    '../../apps/web/src/features/atendimentos/nota-ia-filtro-logic.js'
+  );
+
+  assert.equal(notaMinQueryForRequest(new URLSearchParams()), undefined);
+  assert.equal(notaMinQueryForRequest(new URLSearchParams('notaMin=0')), undefined);
+  assert.equal(notaMinQueryForRequest(new URLSearchParams('notaMin=7')), '7');
+  assert.equal(notaMinQueryForRequest(new URLSearchParams('notaMin=7.3')), '7.3');
+  assert.equal(notaMinQueryForRequest(new URLSearchParams('notaMin=11')), '11');
+});
+
 test('parseNotaMinParam le o piso da URL e volta a 0 quando ausente ou invalido', async () => {
   const { parseNotaMinParam } = await import(
     '../../apps/web/src/features/atendimentos/nota-ia-filtro-logic.js'
@@ -134,6 +146,7 @@ test('listagem de Atendimentos usa o controle reutilizavel de Nota da IA Avaliad
   assert.match(page, /id="atendimentos-nota-ia-filtro"/);
   assert.match(page, /draftNotaMin/);
   assert.match(page, /parseNotaMinParam/);
+  assert.match(page, /notaMinQueryForRequest/);
   assert.match(page, /notaMinParam/);
 
   const control = await readFile(
@@ -166,6 +179,7 @@ test('styles.css estiliza o slider de Nota da IA Avaliadora nas barras de filtro
   );
   assert.match(
     css,
-    /\.curadoria-filters-fields input\[type="range"\],\s*\.atendimentos-filters-fields input\[type="range"\]/
+    /\.nota-ia-filtro input\[type="range"\]/
   );
+  assert.doesNotMatch(css, /\.curadoria-filters-fields input\[type="range"\]/);
 });

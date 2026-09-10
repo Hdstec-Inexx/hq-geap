@@ -538,7 +538,7 @@ export const criteriosQueryFilterSchema = z.preprocess((val) => {
   return Array.from(new Set(normalized));
 }, z.array(z.uuid()).optional());
 
-function isReguaHalfPoint(value: number): boolean {
+function isHalfPointScore(value: number): boolean {
   return Number.isFinite(value) && Math.abs(value * 2 - Math.round(value * 2)) < 1e-8;
 }
 
@@ -550,7 +550,7 @@ export const notaMinQueryFilterSchema = z.preprocess((val) => {
   .number()
   .min(0)
   .max(10)
-  .refine(isReguaHalfPoint, { message: 'notaMin deve ser multiplo de 0,5' })
+  .refine(isHalfPointScore, { message: 'notaMin deve ser multiplo de 0,5' })
   .optional());
 
 export const atendimentosQuerySchema = z

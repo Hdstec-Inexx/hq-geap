@@ -2148,16 +2148,15 @@ h1 {
   border-radius: 2px;
 }
 
-.curadoria-filters-fields input[type="range"],
-.atendimentos-filters-fields input[type="range"] {
-  width: 160px;
-  accent-color: #16816f;
-}
-
 .nota-ia-filtro {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.nota-ia-filtro input[type="range"] {
+  width: 160px;
+  accent-color: #16816f;
 }
 
 .nota-ia-filtro output {

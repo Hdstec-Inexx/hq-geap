@@ -10,6 +10,16 @@ export function parseNotaMinParam(searchParams: URLSearchParams): number {
   return parsed.data;
 }
 
+export function notaMinQueryForRequest(
+  searchParams: URLSearchParams
+): string | undefined {
+  const raw = searchParams.get('notaMin');
+  if (raw === null || raw === '' || raw === '0') {
+    return undefined;
+  }
+  return raw;
+}
+
 export function formatNotaMinDisplay(notaMin: number): string {
   return notaMin.toLocaleString('pt-BR');
 }
