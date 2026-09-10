@@ -104,7 +104,7 @@ Anotação sobre um Atendimento, usada como insumo para ajustes e melhorias do A
 ### Operação
 
 **Fila de Curadoria**:
-A lista de Atendimentos concluídos e já avaliados pela IA, da qual o Curador escolhe livremente quais revisar (modelo pull, sem gatilho automático).
+A lista de Atendimentos concluídos e já avaliados pela IA, da qual o Curador escolhe livremente quais revisar (modelo pull, sem gatilho automático). Sem período informado, observa o **mês civil corrente** (America/Sao_Paulo), do mais antigo ao mais novo. Com período informado, lista aquele intervalo do mais novo ao mais antigo.
 
 **Minhas Curadorias**:
 A lista de Atendimentos concluídos que já receberam conferência humana. Permite ao Curador consultar suas próprias revisões (e aos perfis de Gestão e Admin, auditar o histórico de conferências realizadas sob o nome "Curadorias Realizadas").

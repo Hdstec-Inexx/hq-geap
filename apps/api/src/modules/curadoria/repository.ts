@@ -142,6 +142,7 @@ export type FilaCuradoriaFilters = {
   fim?: string;
   motivo?: string;
   conversationId?: string;
+  notaMin?: number;
 };
 
 export type CuradoriasRealizadasFilters = {
@@ -154,9 +155,33 @@ export type CuradoriasRealizadasFilters = {
   conversationId?: string;
 };
 
+export type FilaCuradoriaFilterOptions = {
+  now?: Date;
+  implicitCurrentMonth?: boolean;
+};
+
+export function civilMonthBoundsAmericaSaoPaulo(now = new Date()): {
+  inicio: string;
+  fim: string;
+} {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: 'numeric'
+  }).formatToParts(now);
+  const year = Number(parts.find((part) => part.type === 'year')?.value);
+  const month = Number(parts.find((part) => part.type === 'month')?.value);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return {
+    inicio: `${year}-${String(month).padStart(2, '0')}-01`,
+    fim: `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+  };
+}
+
 export function buildFilaCuradoriaFilters(
   filters: FilaCuradoriaFilters,
-  startIndex = 1
+  startIndex = 1,
+  options: FilaCuradoriaFilterOptions = {}
 ) {
   const clauses: string[] = [];
   const values: unknown[] = [];
@@ -171,9 +196,17 @@ export function buildFilaCuradoriaFilters(
 
   const inicio = filters.inicio;
   const fim = filters.fim ?? filters.inicio;
+  const implicitCurrentMonth = options.implicitCurrentMonth ?? true;
   if (inicio && fim) {
     const inicioPlaceholder = param(inicio);
     const fimPlaceholder = param(fim);
+    clauses.push(
+      `a.concluido_em at time zone 'America/Sao_Paulo' >= ${inicioPlaceholder}::date and a.concluido_em at time zone 'America/Sao_Paulo' < ${fimPlaceholder}::date + interval '1 day'`
+    );
+  } else if (implicitCurrentMonth) {
+    const mes = civilMonthBoundsAmericaSaoPaulo(options.now);
+    const inicioPlaceholder = param(mes.inicio);
+    const fimPlaceholder = param(mes.fim);
     clauses.push(
       `a.concluido_em at time zone 'America/Sao_Paulo' >= ${inicioPlaceholder}::date and a.concluido_em at time zone 'America/Sao_Paulo' < ${fimPlaceholder}::date + interval '1 day'`
     );
@@ -187,6 +220,11 @@ export function buildFilaCuradoriaFilters(
   if (filters.conversationId) {
     const conversationId = param(filters.conversationId);
     clauses.push(`a.elevenlabs_conversation_id ilike '%' || ${conversationId} || '%'`);
+  }
+
+  if (filters.notaMin && filters.notaMin > 0) {
+    const notaMin = param(filters.notaMin);
+    clauses.push(`ia.nota >= ${notaMin}`);
   }
 
   return { clauses, values };
@@ -206,7 +244,9 @@ export function buildCuradoriasRealizadasFilters(
   filters: CuradoriasRealizadasFilters,
   startIndex = 1
 ) {
-  const base = buildFilaCuradoriaFilters(filters, startIndex);
+  const base = buildFilaCuradoriaFilters(filters, startIndex, {
+    implicitCurrentMonth: false
+  });
   const clauses = [...base.clauses];
   const values = [...base.values];
   let next = startIndex + base.values.length;
@@ -256,11 +296,15 @@ export function createCuradoriaRepository(db: pg.Pool) {
         countFilters.clauses.length > 0
           ? `where ${countFilters.clauses.join(' and ')}`
           : '';
+      const orderBy = query.inicio
+        ? 'a.concluido_em desc, a.id desc'
+        : 'a.concluido_em, a.id';
 
       const [count, result] = await Promise.all([
         db.query<{ total: string }>(`
           select count(*)::text as total
           from fila_curadoria a
+          join avaliacoes ia on ia.atendimento_id = a.id and ia.autor = 'ia'
           ${whereClauseCount}
         `, countFilters.values),
         db.query<FilaCuradoriaRow>(`
@@ -276,7 +320,7 @@ export function createCuradoriaRepository(db: pg.Pool) {
           join agentes_voz agente on agente.id = a.agente_voz_id
           join avaliacoes ia on ia.atendimento_id = a.id and ia.autor = 'ia'
           ${whereClauseSelect}
-          order by a.concluido_em, a.id
+          order by ${orderBy}
           limit $1 offset $2
         `, [query.limit, query.offset, ...selectFilters.values])
       ]);

@@ -98,7 +98,8 @@ test('buildFilaCuradoriaFilters aplica filtro SQL ILIKE para conversationId', as
     {
       conversationId: 'fila-abc'
     },
-    2
+    2,
+    { implicitCurrentMonth: false }
   );
 
   assert.equal(filtro.clauses.length, 1);
