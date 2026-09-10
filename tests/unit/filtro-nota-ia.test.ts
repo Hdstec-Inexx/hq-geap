@@ -113,7 +113,7 @@ test('buildDetalhamentoFilters nao aplica notaMin no Detalhamento do Indicador',
   assert.deepEqual(filtro.values, ['2025-01-01', '2025-01-31']);
 });
 
-test('notaMinQueryForRequest envia o parametro cru da URL inclusive quando invalido, e omite 0', async () => {
+test('notaMinQueryForRequest envia so piso valido e omite 0 ou invalido', async () => {
   const { notaMinQueryForRequest } = await import(
     '../../apps/web/src/features/atendimentos/nota-ia-filtro-logic.js'
   );
@@ -121,8 +121,9 @@ test('notaMinQueryForRequest envia o parametro cru da URL inclusive quando inval
   assert.equal(notaMinQueryForRequest(new URLSearchParams()), undefined);
   assert.equal(notaMinQueryForRequest(new URLSearchParams('notaMin=0')), undefined);
   assert.equal(notaMinQueryForRequest(new URLSearchParams('notaMin=7')), '7');
-  assert.equal(notaMinQueryForRequest(new URLSearchParams('notaMin=7.3')), '7.3');
-  assert.equal(notaMinQueryForRequest(new URLSearchParams('notaMin=11')), '11');
+  assert.equal(notaMinQueryForRequest(new URLSearchParams('notaMin=6.5')), '6.5');
+  assert.equal(notaMinQueryForRequest(new URLSearchParams('notaMin=7.3')), undefined);
+  assert.equal(notaMinQueryForRequest(new URLSearchParams('notaMin=11')), undefined);
 });
 
 test('parseNotaMinParam le o piso da URL e volta a 0 quando ausente ou invalido', async () => {

@@ -13,11 +13,11 @@ export function parseNotaMinParam(searchParams: URLSearchParams): number {
 export function notaMinQueryForRequest(
   searchParams: URLSearchParams
 ): string | undefined {
-  const raw = searchParams.get('notaMin');
-  if (raw === null || raw === '' || raw === '0') {
+  const parsed = parseNotaMinParam(searchParams);
+  if (parsed <= 0) {
     return undefined;
   }
-  return raw;
+  return String(parsed);
 }
 
 export function formatNotaMinDisplay(notaMin: number): string {

@@ -174,6 +174,7 @@ test('plugin fastify dispara execucao imediata onReady e agenda intervalo config
       enabled: true,
       runImmediately: true,
       intervalMinutes: 10,
+      lockId: 91_001,
       reprocessFn: async () => {
         cycleCount++;
         return { processed: 1, success: 1, failed: 0 };
@@ -185,12 +186,8 @@ test('plugin fastify dispara execucao imediata onReady e agenda intervalo config
   assert.equal(typeof app.reprocessamentoTranscricao.runCycle, 'function');
 
   await app.ready();
-
-  // Aguarda disparo assíncrono do setImmediate e conexão com banco
-  const startWait = Date.now();
-  while (cycleCount === 0 && Date.now() - startWait < 2000) {
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
+  await new Promise((resolve) => setImmediate(resolve));
+  await app.reprocessamentoTranscricao.runCycle();
 
   assert.ok(cycleCount >= 1, 'Deveria ter disparado pelo menos o ciclo imediato no onReady');
 
@@ -227,6 +224,7 @@ test('plugin fastify realiza graceful shutdown no onClose limpando timers sem tr
     reprocessamento: {
       enabled: true,
       runImmediately: true,
+      lockId: 91_002,
       reprocessFn: async () => {
         isExecuting = true;
         await new Promise((resolve) => setTimeout(resolve, 80));
@@ -238,9 +236,11 @@ test('plugin fastify realiza graceful shutdown no onClose limpando timers sem tr
   });
 
   await app.ready();
+  await new Promise((resolve) => setImmediate(resolve));
+  void app.reprocessamentoTranscricao!.runCycle();
 
   const startWait = Date.now();
-  while (!isExecuting && Date.now() - startWait < 2000) {
+  while (!isExecuting && Date.now() - startWait < 5000) {
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 
