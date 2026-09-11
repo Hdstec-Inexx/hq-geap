@@ -25,20 +25,21 @@ export async function getDashboard(
   countElevenLabsVolume?: CountElevenLabsVolume
 ): Promise<Dashboard> {
   const kpis = await repository.getKpis(periodo);
+  const elevenLabsVolumePromise = countElevenLabsVolume
+    ? countElevenLabsVolume(periodo)
+    : Promise.resolve(null);
   const motivos = await repository.listMotivos(periodo);
   const criterios = await repository.listCriterios(periodo);
   const concordancia = await repository.getConcordancia(periodo);
   const porCriterio = await repository.listConcordanciaPorCriterio(periodo);
   const criteriosNaoConformidade = await repository.listCriteriosNaoConformidade(periodo);
   const piores = await repository.listPiores(periodo);
+  const elevenLabsVolume = await elevenLabsVolumePromise;
 
   const volumeHq = Number(kpis.volume);
   let volume = volumeHq;
-  if (countElevenLabsVolume) {
-    const elevenLabsVolume = await countElevenLabsVolume(periodo);
-    if (elevenLabsVolume !== null) {
-      volume = elevenLabsVolume;
-    }
+  if (elevenLabsVolume !== null) {
+    volume = elevenLabsVolume;
   }
   const resolvidas = Number(kpis.resolvidas);
   const dentroSla = Number(kpis.dentroSla);

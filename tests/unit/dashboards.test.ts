@@ -606,8 +606,38 @@ test('contador ElevenLabs soma paginas e ignora agent_id nao cadastrado', async 
 
   assert.equal(total, 3);
   assert.equal(requested.length, 2);
+  assert.match(requested[0]!, /agent_id=agent-hq/);
   assert.match(requested[0]!, /call_start_after_unix=1735700400/);
   assert.match(requested[0]!, /call_start_before_unix=1738378800/);
+});
+
+test('contador ElevenLabs falha ao estourar o teto de paginas', async () => {
+  const { countElevenLabsConversations } = await import(
+    '../../apps/api/src/modules/dashboards/elevenLabsVolume.js'
+  );
+
+  const fetchImpl = async () =>
+    new Response(
+      JSON.stringify({
+        conversations: [{ conversation_id: 'a', agent_id: 'agent-hq' }],
+        has_more: true,
+        next_cursor: 'more'
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } }
+    );
+
+  await assert.rejects(
+    () =>
+      countElevenLabsConversations({
+        apiBaseUrl: 'https://api.elevenlabs.io',
+        apiKey: 'sk_test',
+        agentIds: ['agent-hq'],
+        periodo: { inicio: '2025-01-01', fim: '2025-01-31' },
+        fetchImpl,
+        maxPages: 2
+      }),
+    /teto de paginas/i
+  );
 });
 
 test('janela civil America/Sao_Paulo vira unix do inicio do dia inicio ate o inicio do dia seguinte a fim', async () => {
@@ -650,4 +680,72 @@ test('card Taxa de Resolvidas expoe quantidade no hover e no foco', async () => 
     css,
     /\.dashboard-kpi-resolvidas:focus-visible \.dashboard-kpi-hover-detail/
   );
+});
+
+test('GET /dashboards/gestao cai no HQ quando a chave falta ou a listagem falha', async () => {
+  const { resolveElevenLabsDashboardVolume } = await import(
+    '../../apps/api/src/modules/dashboards/elevenLabsVolume.js'
+  );
+  const periodo = { inicio: '2025-01-01', fim: '2025-01-31' };
+  let listed = 0;
+  const listAgentIds = async () => {
+    listed += 1;
+    return ['agent-hq'];
+  };
+
+  assert.equal(
+    await resolveElevenLabsDashboardVolume({
+      apiKey: '  ',
+      apiBaseUrl: 'https://api.elevenlabs.io',
+      periodo,
+      listAgentIds
+    }),
+    null
+  );
+  assert.equal(listed, 0);
+
+  assert.equal(
+    await resolveElevenLabsDashboardVolume({
+      apiKey: 'sk_test',
+      apiBaseUrl: 'https://api.elevenlabs.io',
+      periodo,
+      listAgentIds,
+      count: async () => {
+        throw new Error('upstream');
+      }
+    }),
+    null
+  );
+
+  assert.equal(
+    await resolveElevenLabsDashboardVolume({
+      apiKey: 'sk_test',
+      apiBaseUrl: 'https://api.elevenlabs.io',
+      periodo,
+      listAgentIds,
+      count: async () => 100
+    }),
+    100
+  );
+});
+
+test('CONTEXT.md e ADRs separam volume ElevenLabs do denominador HQ de SLA e taxa', async () => {
+  const fs = await import('node:fs/promises');
+  const path = await import('node:path');
+  const context = await fs.readFile(
+    path.resolve(process.cwd(), 'CONTEXT.md'),
+    'utf8'
+  );
+  const adr0012 = await fs.readFile(
+    path.resolve(
+      process.cwd(),
+      'docs/adr/0012-tempo-espera-tme-sla-no-dashboard.md'
+    ),
+    'utf8'
+  );
+
+  assert.match(context, /Pulso da operação/);
+  assert.match(context, /concluídos no HQ/);
+  assert.match(adr0012, /concluídos no HQ/);
+  assert.match(adr0012, /não\*\* altera o denominador do SLA/);
 });

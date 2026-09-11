@@ -130,5 +130,8 @@ _Avoid_: Fila (colide com Fila de Curadoria), instante absoluto desde o início 
 Tempo Médio de Espera: a média dos Tempos de Espera dos Atendimentos que **têm** Tempo de Espera. Distinto do Tempo de Espera individual (fato do Atendimento). Não é gravado na finalização do Atendimento e **não** é indicador do dashboard.
 
 **SLA**:
-Percentual, no dashboard e no período filtrado, dos Atendimentos cujo Tempo de Espera está dentro do prazo (Tempo de Espera ≤ **150 segundos**), sobre o **total** de Atendimentos do período. Atendimento sem Tempo de Espera mensurável não conta como dentro do prazo. O limite define “dentro do prazo”; não é um segundo indicador nem medida de inatividade. A meta de referência é **80%**.
+Percentual, no dashboard e no período filtrado, dos Atendimentos **concluídos no HQ** cujo Tempo de Espera está dentro do prazo (Tempo de Espera ≤ **150 segundos**), sobre esse volume HQ — não sobre o Total de Atendimentos da ElevenLabs no Pulso. Atendimento sem Tempo de Espera mensurável não conta como dentro do prazo. O limite define “dentro do prazo”; não é um segundo indicador nem medida de inatividade. A meta de referência é **80%**.
 _Avoid_: Inatividade, solicitação (use Atendimento)
+
+**Pulso da operação**:
+Leitura gerencial (Gestão e Admin) na mesma janela civil. O **Total de Atendimentos** é o volume na ElevenLabs dos Agentes de Voz cadastrados; **Taxa de Resolvidas** e **SLA** usam só Atendimentos concluídos do HQ. Sem chave ou com falha na listagem ElevenLabs, o Pulso carrega e o total cai no count HQ.

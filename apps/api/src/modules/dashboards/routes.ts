@@ -1,39 +1,14 @@
 import {
   dashboardPeriodSchema,
-  type Dashboard,
-  type DashboardPeriod
+  type Dashboard
 } from '@hq-geap/contracts/dashboards';
 import type { FastifyPluginAsync } from 'fastify';
-import { countElevenLabsConversations } from './elevenLabsVolume.js';
+import { resolveElevenLabsDashboardVolume } from './elevenLabsVolume.js';
 import { createDashboardRepository } from './repository.js';
 import { getDashboard } from './service.js';
 
 const routes: FastifyPluginAsync = async (app) => {
   const repository = createDashboardRepository(app.db);
-
-  async function countElevenLabsVolume(
-    periodo: DashboardPeriod
-  ): Promise<number | null> {
-    const apiKey = app.config.ELEVENLABS_API_KEY?.trim();
-    if (!apiKey) {
-      return null;
-    }
-    try {
-      const agentIds = await repository.listElevenLabsAgentIds();
-      return await countElevenLabsConversations({
-        apiBaseUrl: app.config.ELEVENLABS_API_URL,
-        apiKey,
-        agentIds,
-        periodo
-      });
-    } catch (error) {
-      app.log.warn(
-        { err: error },
-        'Falha ao contar Atendimentos na ElevenLabs para o Pulso'
-      );
-      return null;
-    }
-  }
 
   app.get<{ Querystring: { inicio?: string; fim?: string } }>(
     '/dashboards/gestao',
@@ -45,7 +20,20 @@ const routes: FastifyPluginAsync = async (app) => {
           periodo.error.issues[0]?.message ?? 'Periodo invalido'
         );
       }
-      return getDashboard(repository, periodo.data, countElevenLabsVolume);
+      return getDashboard(repository, periodo.data, (window) =>
+        resolveElevenLabsDashboardVolume({
+          apiKey: app.config.ELEVENLABS_API_KEY,
+          apiBaseUrl: app.config.ELEVENLABS_API_URL,
+          periodo: window,
+          listAgentIds: () => repository.listElevenLabsAgentIds(),
+          onFailure: (error) => {
+            app.log.warn(
+              { err: error },
+              'Falha ao contar Atendimentos na ElevenLabs para o Pulso'
+            );
+          }
+        })
+      );
     }
   );
 };
