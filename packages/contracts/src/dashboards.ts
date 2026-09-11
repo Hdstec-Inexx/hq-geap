@@ -31,6 +31,7 @@ export const dashboardKpisSchema = z.object({
   volume: z.number().int().nonnegative(),
   tmaSegundos: z.number().nonnegative().nullable(),
   taxaResolvidas: percentageSchema,
+  resolvidas: z.number().int().nonnegative(),
   sla: percentageSchema,
   slaMeta: z.literal(SLA_META_PERCENTUAL),
   notaMediaIa: z.number().min(0).max(10).nullable(),
@@ -104,3 +105,19 @@ export const dashboardSchema = z.object({
 
 export type DashboardPeriod = z.infer<typeof dashboardPeriodSchema>;
 export type Dashboard = z.infer<typeof dashboardSchema>;
+
+export function dashboardFallbackPeriod(now = new Date()): DashboardPeriod {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(now);
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const day = parts.find((part) => part.type === 'day')?.value;
+  return {
+    inicio: `${year}-${month}-01`,
+    fim: `${year}-${month}-${day}`
+  };
+}

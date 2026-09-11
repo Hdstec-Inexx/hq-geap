@@ -37,7 +37,8 @@ test('contrato de KPIs expoe o strip operacional acordado', () => {
     avaliadosIa: 10,
     avaliadosCurador: 4,
     taxaPromessasCumpridas: 100,
-    tempoMedioAteResolucao: 60
+    tempoMedioAteResolucao: 60,
+    resolvidas: 7
   });
 
   assert.deepEqual(Object.keys(parsed).sort(), [
@@ -45,6 +46,7 @@ test('contrato de KPIs expoe o strip operacional acordado', () => {
     'avaliadosIa',
     'notaMediaCurador',
     'notaMediaIa',
+    'resolvidas',
     'sla',
     'slaMeta',
     'taxaPromessasCumpridas',
@@ -53,6 +55,7 @@ test('contrato de KPIs expoe o strip operacional acordado', () => {
     'tmaSegundos',
     'volume'
   ]);
+  assert.equal(parsed.resolvidas, 7);
   assert.equal('tmeSegundos' in parsed, false);
   assert.equal('transferencias' in parsed, false);
   assert.equal('custoTotal' in parsed, false);
@@ -116,7 +119,8 @@ test('consulta as partes do dashboard sem ocupar varias conexoes simultaneamente
     avaliadosIa: 2,
     avaliadosCurador: 1,
     taxaPromessasCumpridas: 66.7,
-    tempoMedioAteResolucao: 60
+    tempoMedioAteResolucao: 60,
+    resolvidas: 1
   });
 });
 
@@ -164,7 +168,8 @@ test('KPIs nulos quando nao ha amostra para media ou taxa', async () => {
     avaliadosIa: 0,
     avaliadosCurador: 0,
     taxaPromessasCumpridas: null,
-    tempoMedioAteResolucao: null
+    tempoMedioAteResolucao: null,
+    resolvidas: 0
   });
 });
 
@@ -342,7 +347,8 @@ test('dashboardSchema valida e expoe criteriosNaoConformidade', () => {
       avaliadosIa: 0,
       avaliadosCurador: 0,
       taxaPromessasCumpridas: null,
-      tempoMedioAteResolucao: null
+      tempoMedioAteResolucao: null,
+      resolvidas: 0
     },
     motivosContato: [{ motivo: 'Financeiro / Boletos', total: 1 }],
     criterios: [],
@@ -466,5 +472,182 @@ test('listMotivos agrupa com Não informado canônico e acentuado', async () => 
   assert.match(
     executedSql,
     /group by coalesce\(nullif\(nullif\(trim\(a\.motivo_contato\), ''\), 'Nao informado'\), 'Não informado'\)/i
+  );
+});
+
+function emptyDashboardParts() {
+  return {
+    listMotivos: async () => [],
+    listCriterios: async () => [],
+    getConcordancia: async () => ({
+      notasConcordantes: '0',
+      totalNotas: '0',
+      criteriosConcordantes: '0',
+      totalCriterios: '0'
+    }),
+    listConcordanciaPorCriterio: async () => [],
+    listCriteriosNaoConformidade: async () => [],
+    listPiores: async () => []
+  };
+}
+
+test('fallback do pulso e o mes civil corrente ate hoje em America/Sao_Paulo', async () => {
+  const { dashboardFallbackPeriod } = await import(
+    '../../packages/contracts/src/dashboards.js'
+  );
+
+  assert.deepEqual(
+    dashboardFallbackPeriod(new Date('2026-09-11T16:00:00Z')),
+    { inicio: '2026-09-01', fim: '2026-09-11' }
+  );
+});
+
+test('getDashboard usa volume ElevenLabs e expoe resolvidas HQ sem mudar a taxa', async () => {
+  const repository = {
+    getKpis: async () => ({
+      volume: '2',
+      tmaSegundos: '90',
+      resolvidas: '1',
+      dentroSla: '1',
+      notaMediaIa: '7',
+      notaMediaCurador: '6.5',
+      avaliadosIa: '2',
+      avaliadosCurador: '1',
+      toolsTotal: '3',
+      toolsSuccessful: '2',
+      tempoMedioAteResolucao: '60'
+    }),
+    ...emptyDashboardParts()
+  } as unknown as DashboardRepository;
+
+  const dashboard = await getDashboard(
+    repository,
+    { inicio: '2025-01-01', fim: '2025-01-31' },
+    async () => 100
+  );
+
+  assert.equal(dashboard.kpis.volume, 100);
+  assert.equal(dashboard.kpis.resolvidas, 1);
+  assert.equal(dashboard.kpis.taxaResolvidas, 50);
+  assert.equal(dashboard.kpis.sla, 50);
+});
+
+test('sem chave ou falha na ElevenLabs o volume cai no count HQ', async () => {
+  const repository = {
+    getKpis: async () => ({
+      volume: '2',
+      tmaSegundos: '90',
+      resolvidas: '1',
+      dentroSla: '1',
+      notaMediaIa: '7',
+      notaMediaCurador: '6.5',
+      avaliadosIa: '2',
+      avaliadosCurador: '1',
+      toolsTotal: '3',
+      toolsSuccessful: '2',
+      tempoMedioAteResolucao: '60'
+    }),
+    ...emptyDashboardParts()
+  } as unknown as DashboardRepository;
+
+  const dashboard = await getDashboard(
+    repository,
+    { inicio: '2025-01-01', fim: '2025-01-31' },
+    async () => null
+  );
+
+  assert.equal(dashboard.kpis.volume, 2);
+  assert.equal(dashboard.kpis.taxaResolvidas, 50);
+  assert.equal(dashboard.kpis.sla, 50);
+  assert.equal(dashboard.kpis.resolvidas, 1);
+});
+
+test('contador ElevenLabs soma paginas e ignora agent_id nao cadastrado', async () => {
+  const { countElevenLabsConversations } = await import(
+    '../../apps/api/src/modules/dashboards/elevenLabsVolume.js'
+  );
+
+  const pages = [
+    {
+      conversations: [
+        { conversation_id: 'a', agent_id: 'agent-hq' },
+        { conversation_id: 'b', agent_id: 'agent-other' },
+        { conversation_id: 'c', agent_id: 'agent-hq' }
+      ],
+      has_more: true,
+      next_cursor: 'page-2'
+    },
+    {
+      conversations: [{ conversation_id: 'd', agent_id: 'agent-hq' }],
+      has_more: false,
+      next_cursor: null
+    }
+  ];
+
+  const requested: string[] = [];
+  const fetchImpl = async (input: RequestInfo | URL) => {
+    const url = new URL(String(input));
+    requested.push(url.toString());
+    const cursor = url.searchParams.get('cursor');
+    const page = cursor ? pages[1]! : pages[0]!;
+    return new Response(JSON.stringify(page), {
+      status: 200,
+      headers: { 'content-type': 'application/json' }
+    });
+  };
+
+  const total = await countElevenLabsConversations({
+    apiBaseUrl: 'https://api.elevenlabs.io',
+    apiKey: 'sk_test',
+    agentIds: ['agent-hq'],
+    periodo: { inicio: '2025-01-01', fim: '2025-01-31' },
+    fetchImpl
+  });
+
+  assert.equal(total, 3);
+  assert.equal(requested.length, 2);
+  assert.match(requested[0]!, /call_start_after_unix=1735700400/);
+  assert.match(requested[0]!, /call_start_before_unix=1738378800/);
+});
+
+test('janela civil America/Sao_Paulo vira unix do inicio do dia inicio ate o inicio do dia seguinte a fim', async () => {
+  const { civilPeriodUnixBounds } = await import(
+    '../../apps/api/src/modules/dashboards/civilPeriodUnix.js'
+  );
+
+  assert.deepEqual(
+    civilPeriodUnixBounds({ inicio: '2025-01-01', fim: '2025-01-31' }),
+    {
+      callStartAfterUnix: 1735700400,
+      callStartBeforeUnix: 1738378800
+    }
+  );
+});
+
+test('card Taxa de Resolvidas expoe quantidade no hover e no foco', async () => {
+  const fs = await import('node:fs/promises');
+  const path = await import('node:path');
+  const kpis = await fs.readFile(
+    path.resolve(process.cwd(), 'apps/web/src/features/dashboards/components/Kpis.tsx'),
+    'utf8'
+  );
+  const css = await fs.readFile(
+    path.resolve(process.cwd(), 'apps/web/src/styles.css'),
+    'utf8'
+  );
+
+  assert.match(
+    kpis,
+    /Detalhar Taxa de Resolvidas, \$\{kpis\.resolvidas\} resolvidas sem transferência/
+  );
+  assert.match(kpis, /title=\{hoverDetail\}/);
+  assert.match(kpis, /dashboard-kpi-resolvidas/);
+  assert.match(
+    css,
+    /\.dashboard-kpi-resolvidas:hover \.dashboard-kpi-hover-detail/
+  );
+  assert.match(
+    css,
+    /\.dashboard-kpi-resolvidas:focus-visible \.dashboard-kpi-hover-detail/
   );
 });

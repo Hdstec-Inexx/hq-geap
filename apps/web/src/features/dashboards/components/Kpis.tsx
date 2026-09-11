@@ -33,7 +33,9 @@ function KpiLink({
   label,
   value,
   hint,
-  ariaLabel
+  ariaLabel,
+  hoverDetail,
+  className
 }: {
   inicio: string;
   fim: string;
@@ -42,17 +44,23 @@ function KpiLink({
   value: string;
   hint?: ReactNode;
   ariaLabel: string;
+  hoverDetail?: string;
+  className?: string;
 }) {
   return (
     <Link
       aria-label={ariaLabel}
-      className="dashboard-kpi-link"
+      className={['dashboard-kpi-link', className].filter(Boolean).join(' ')}
+      title={hoverDetail}
       to={detalhamentoListPath({ inicio, fim, indicador })}
     >
       <article>
         <span>{label}</span>
         <strong>{value}</strong>
         {hint ? <small>{hint}</small> : null}
+        {hoverDetail ? (
+          <span className="dashboard-kpi-hover-detail">{hoverDetail}</span>
+        ) : null}
       </article>
     </Link>
   );
@@ -143,8 +151,10 @@ export function Kpis({
         value={valueOrDash(kpis.tmaSegundos, formatDuration)}
       />
       <KpiLink
-        ariaLabel="Detalhar Taxa de Resolvidas"
+        ariaLabel={`Detalhar Taxa de Resolvidas, ${kpis.resolvidas} resolvidas sem transferência`}
+        className="dashboard-kpi-resolvidas"
         fim={fim}
+        hoverDetail={`${kpis.resolvidas} resolvidas sem transferência`}
         indicador="resolvidas"
         inicio={inicio}
         label="Taxa de Resolvidas"

@@ -3454,11 +3454,31 @@ h1 {
 .dashboard-kpi-link {
   color: inherit;
   text-decoration: none;
+  position: relative;
 }
 
 .dashboard-kpi-link:focus-visible {
   outline: 3px solid #e5b85c;
   outline-offset: -2px;
+}
+
+.dashboard-kpi-hover-detail {
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  bottom: 14px;
+  opacity: 0;
+  pointer-events: none;
+  color: var(--dashboard-muted);
+  font-family: Consolas, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+
+.dashboard-kpi-resolvidas:hover .dashboard-kpi-hover-detail,
+.dashboard-kpi-resolvidas:focus-visible .dashboard-kpi-hover-detail,
+.dashboard-kpi-resolvidas:focus-within .dashboard-kpi-hover-detail {
+  opacity: 1;
 }
 
 .dashboard-kpis article {
