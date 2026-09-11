@@ -10,7 +10,13 @@ import { formatMotivoContato } from './motivo-combobox-logic';
 import { MotivoCombobox } from './MotivoCombobox';
 import { CriteriosMultiSelect } from './CriteriosMultiSelect';
 import { parseCriteriaParam } from './criterios-filtro-logic';
-import { parseNotaMinParam, notaMinQueryForRequest } from './nota-ia-filtro-logic';
+import {
+  applyDraftNotaMin,
+  applyNotaMinQuery,
+  notaMinFilterActive,
+  parseNotaMinParam,
+  stripInvalidNotaMin
+} from './nota-ia-filtro-logic';
 import { NotaIaAvaliadoraFiltro } from './NotaIaAvaliadoraFiltro';
 import { detalhamentoQueryFromSearch } from '../dashboards/detalhamento';
 import {
@@ -79,7 +85,6 @@ export function AtendimentosPage() {
     'criteriosAtendidos'
   );
   const notaMinParam = parseNotaMinParam(searchParams);
-  const notaMinQuery = notaMinQueryForRequest(searchParams);
   const indicador = searchParams.get('indicador');
   const isDetalhamento = Boolean(indicador && inicioParam && fimParam);
   const [draftInicio, setDraftInicio] = useState(inicioParam);
@@ -116,13 +121,23 @@ export function AtendimentosPage() {
         curadorIdParam ||
         criteriosNaoAtendidosParam.length > 0 ||
         criteriosAtendidosParam.length > 0 ||
-        notaMinParam > 0 ||
-        Boolean(notaMinQuery) ||
+        notaMinFilterActive(notaMinParam) ||
         hasDraftFilters)
   );
 
   const curadoresState = useAuthenticatedResource('/curadores', curadoresListSchema);
   const curadores = curadoresState.status === 'ready' ? curadoresState.data : [];
+
+  useEffect(() => {
+    if (isDetalhamento) {
+      return;
+    }
+    const cleaned = stripInvalidNotaMin(searchParams);
+    if (!cleaned) {
+      return;
+    }
+    navigate(paginationHref(cleaned, pageFromSearch(cleaned)), { replace: true });
+  }, [isDetalhamento, navigate, searchParams]);
 
   useEffect(() => {
     setDraftInicio(inicioParam);
@@ -166,9 +181,7 @@ export function AtendimentosPage() {
     if (criteriosAtendidosParam.length > 0) {
       listQuery.set('criteriosAtendidos', criteriosAtendidosParam.join(','));
     }
-    if (notaMinQuery) {
-      listQuery.set('notaMin', notaMinQuery);
-    }
+    applyNotaMinQuery(listQuery, searchParams);
   }
   const requestPath = `/atendimentos?${listQuery.toString()}`;
   const state = useAuthenticatedResource(requestPath, atendimentoListSchema);
@@ -205,9 +218,7 @@ export function AtendimentosPage() {
     if (draftCriteriosAtendidos.length > 0) {
       next.set('criteriosAtendidos', draftCriteriosAtendidos.join(','));
     }
-    if (draftNotaMin > 0) {
-      next.set('notaMin', String(draftNotaMin));
-    }
+    applyDraftNotaMin(next, draftNotaMin);
     navigate(paginationHref(next, 1));
   }
 

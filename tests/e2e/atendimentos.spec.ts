@@ -1286,10 +1286,12 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     const convSeis = `conv-nota-min-65-${stamp}`;
     const convOito = `conv-nota-min-8-${stamp}`;
     const convSem = `conv-nota-min-sem-${stamp}`;
+    const convAntiga = `conv-nota-min-antiga-${stamp}`;
     const motivoSete = `Nota exata 7 ${stamp}`;
     const motivoSeis = `Nota exata 6,5 ${stamp}`;
     const motivoOito = `Nota exata 8 ${stamp}`;
     const motivoSem = `Sem nota ${stamp}`;
+    const motivoAntiga = `Mes anterior ${stamp}`;
 
     const createdSete = await request.post(`${apiUrl}/atendimentos/ingestao`, {
       data: {
@@ -1341,6 +1343,28 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       headers: ingestionHeaders
     });
     expect(createdSem.status()).toBe(201);
+
+    const createdAntiga = await request.post(`${apiUrl}/atendimentos/ingestao`, {
+      data: {
+        ...atendimento,
+        conversation_id: convAntiga,
+        contact_reason: motivoAntiga,
+        completed_at: new Date().toISOString()
+      },
+      headers: ingestionHeaders
+    });
+    expect(createdAntiga.status()).toBe(201);
+    const antiga = (await createdAntiga.json()) as { id: string };
+    await queryDatabase(
+      `
+      update atendimentos
+      set concluido_em = (
+        date_trunc('month', now() at time zone 'America/Sao_Paulo') - interval '10 days'
+      ) at time zone 'America/Sao_Paulo'
+      where id = $1
+      `,
+      [antiga.id]
+    );
 
     async function persistirNotaIa(atendimentoId: string, nota: number) {
       await queryDatabase(
@@ -1396,11 +1420,31 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     expect(semFiltro).toEqual(
       expect.arrayContaining([convSete, convSeis, convOito, convSem])
     );
+    expect(semFiltro).not.toContain(convAntiga);
+
+    const mesAnterior = await queryDatabase<{ inicio: string; fim: string }>(`
+      select to_char(
+        (date_trunc('month', now() at time zone 'America/Sao_Paulo') - interval '1 month')::date,
+        'YYYY-MM-DD'
+      ) as inicio,
+      to_char(
+        (
+          date_trunc('month', now() at time zone 'America/Sao_Paulo') - interval '1 day'
+        )::date,
+        'YYYY-MM-DD'
+      ) as fim
+    `);
+    const periodoAnterior = await listedIds(
+      `conversationId=nota-min-&inicio=${mesAnterior.rows[0]!.inicio}&fim=${mesAnterior.rows[0]!.fim}`
+    );
+    expect(periodoAnterior).toContain(convAntiga);
+    expect(periodoAnterior).not.toContain(convSete);
 
     const notaZero = await listedIds(`conversationId=nota-min-&notaMin=0`);
     expect(notaZero).toEqual(
       expect.arrayContaining([convSete, convSeis, convOito, convSem])
     );
+    expect(notaZero).not.toContain(convAntiga);
 
     const andMotivo = await listedIds(
       `notaMin=7&motivo=${encodeURIComponent(motivoSete)}`

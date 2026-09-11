@@ -71,6 +71,30 @@ test('buildDetalhamentoFilters sem datas observa o mes civil corrente', async ()
   assert.equal(zero.clauses.length, 1);
   assert.doesNotMatch(zero.clauses.join(' '), /ia\.nota/);
   assert.deepEqual(zero.values, ['2026-09-01', '2026-09-30']);
+
+  const comPeriodo = buildDetalhamentoFilters(
+    atendimentosQuerySchema.parse({ inicio: '2026-08-01', fim: '2026-08-31' }),
+    1,
+    { now }
+  );
+  assert.match(comPeriodo.clauses[0]!, /a\.status = 'concluido'/);
+  assert.doesNotMatch(comPeriodo.clauses[0]!, /em_andamento/);
+  assert.deepEqual(comPeriodo.values, ['2026-08-01', '2026-08-31']);
+});
+
+test('civilMonthBoundsAmericaSaoPaulo cobre virada de ano e dezembro', async () => {
+  const { civilMonthBoundsAmericaSaoPaulo } = await import(
+    '../../apps/api/src/modules/atendimentos/civilMonthBounds.js'
+  );
+
+  assert.deepEqual(
+    civilMonthBoundsAmericaSaoPaulo(new Date('2026-01-01T02:00:00.000Z')),
+    { inicio: '2025-12-01', fim: '2025-12-31' }
+  );
+  assert.deepEqual(
+    civilMonthBoundsAmericaSaoPaulo(new Date('2026-01-01T03:00:00.000Z')),
+    { inicio: '2026-01-01', fim: '2026-01-31' }
+  );
 });
 
 test('buildDetalhamentoFilters aplica igualdade da Nota da IA Avaliadora', async () => {
@@ -131,7 +155,7 @@ test('buildDetalhamentoFilters nao aplica notaMin no Detalhamento do Indicador',
   assert.deepEqual(filtro.values, ['2025-01-01', '2025-01-31']);
 });
 
-test('notaMinQueryForRequest envia so piso valido e omite 0 ou invalido', async () => {
+test('notaMinQueryForRequest envia so nota exata valida e omite 0 ou invalido', async () => {
   const { notaMinQueryForRequest } = await import(
     '../../apps/web/src/features/atendimentos/nota-ia-filtro-logic.js'
   );
@@ -144,7 +168,48 @@ test('notaMinQueryForRequest envia so piso valido e omite 0 ou invalido', async 
   assert.equal(notaMinQueryForRequest(new URLSearchParams('notaMin=11')), undefined);
 });
 
-test('parseNotaMinParam le o piso da URL e volta a 0 quando ausente ou invalido', async () => {
+test('stripInvalidNotaMin remove notaMin invalido da query e preserva o restante', async () => {
+  const {
+    isInvalidNotaMinParam,
+    stripInvalidNotaMin,
+    applyNotaMinQuery,
+    applyDraftNotaMin,
+    notaMinFilterActive
+  } = await import('../../apps/web/src/features/atendimentos/nota-ia-filtro-logic.js');
+
+  assert.equal(isInvalidNotaMinParam(new URLSearchParams()), false);
+  assert.equal(isInvalidNotaMinParam(new URLSearchParams('notaMin=7')), false);
+  assert.equal(isInvalidNotaMinParam(new URLSearchParams('notaMin=7.3')), true);
+  assert.equal(isInvalidNotaMinParam(new URLSearchParams('notaMin=11')), true);
+
+  assert.equal(stripInvalidNotaMin(new URLSearchParams('notaMin=7')), null);
+
+  const cleaned = stripInvalidNotaMin(
+    new URLSearchParams('conversationId=abc&notaMin=7.3&page=2')
+  );
+  assert.ok(cleaned);
+  assert.equal(cleaned.get('notaMin'), null);
+  assert.equal(cleaned.get('conversationId'), 'abc');
+  assert.equal(cleaned.get('page'), '2');
+
+  const invalidRequest = new URLSearchParams();
+  applyNotaMinQuery(invalidRequest, new URLSearchParams('notaMin=7.3'));
+  assert.equal(invalidRequest.get('notaMin'), null);
+
+  const request = new URLSearchParams();
+  applyNotaMinQuery(request, new URLSearchParams('notaMin=6.5'));
+  assert.equal(request.get('notaMin'), '6.5');
+
+  const draft = new URLSearchParams();
+  applyDraftNotaMin(draft, 0);
+  applyDraftNotaMin(draft, 7);
+  assert.equal(draft.get('notaMin'), '7');
+
+  assert.equal(notaMinFilterActive(0), false);
+  assert.equal(notaMinFilterActive(7), true);
+});
+
+test('parseNotaMinParam le a nota exata da URL e volta a 0 quando ausente ou invalido', async () => {
   const { parseNotaMinParam } = await import(
     '../../apps/web/src/features/atendimentos/nota-ia-filtro-logic.js'
   );
@@ -157,7 +222,7 @@ test('parseNotaMinParam le o piso da URL e volta a 0 quando ausente ou invalido'
   assert.equal(parseNotaMinParam(new URLSearchParams('notaMin=11')), 0);
 });
 
-test('formatNotaMinDisplay formata o piso em pt-BR', async () => {
+test('formatNotaMinDisplay formata a Nota da IA Avaliadora em pt-BR', async () => {
   const { formatNotaMinDisplay } = await import(
     '../../apps/web/src/features/atendimentos/nota-ia-filtro-logic.js'
   );
@@ -178,7 +243,9 @@ test('listagem de Atendimentos usa o controle reutilizavel de Nota da IA Avaliad
   assert.match(page, /id="atendimentos-nota-ia-filtro"/);
   assert.match(page, /draftNotaMin/);
   assert.match(page, /parseNotaMinParam/);
-  assert.match(page, /notaMinQueryForRequest/);
+  assert.match(page, /applyNotaMinQuery/);
+  assert.match(page, /applyDraftNotaMin/);
+  assert.match(page, /stripInvalidNotaMin/);
   assert.match(page, /notaMinParam/);
 
   const control = await readFile(
@@ -213,7 +280,9 @@ test('Fila de Curadoria reusa o controle de Nota da IA Avaliadora e nao preenche
   assert.match(page, /id="curadoria-nota-ia-filtro"/);
   assert.match(page, /draftNotaMin/);
   assert.match(page, /parseNotaMinParam/);
-  assert.match(page, /notaMinQueryForRequest/);
+  assert.match(page, /applyNotaMinQuery/);
+  assert.match(page, /applyDraftNotaMin/);
+  assert.match(page, /stripInvalidNotaMin/);
   assert.match(page, /notaMinParam/);
   assert.match(page, /navigate\('\/curadoria'\)/);
   assert.doesNotMatch(page, /civilMonthBoundsAmericaSaoPaulo/);
@@ -229,7 +298,9 @@ test('Fila de Curadoria reusa o controle de Nota da IA Avaliadora e nao preenche
   assert.match(realizadas, /id="curadorias-realizadas-nota-ia-filtro"/);
   assert.match(realizadas, /draftNotaMin/);
   assert.match(realizadas, /parseNotaMinParam/);
-  assert.match(realizadas, /notaMinQueryForRequest/);
+  assert.match(realizadas, /applyNotaMinQuery/);
+  assert.match(realizadas, /applyDraftNotaMin/);
+  assert.match(realizadas, /stripInvalidNotaMin/);
   assert.match(realizadas, /notaMinParam/);
 });
 

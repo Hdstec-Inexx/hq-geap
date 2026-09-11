@@ -14,8 +14,11 @@ import { CriteriosMultiSelect } from '../atendimentos/CriteriosMultiSelect';
 import { parseCriteriaParam } from '../atendimentos/criterios-filtro-logic';
 import { NotaIaAvaliadoraFiltro } from '../atendimentos/NotaIaAvaliadoraFiltro';
 import {
-  notaMinQueryForRequest,
-  parseNotaMinParam
+  applyDraftNotaMin,
+  applyNotaMinQuery,
+  notaMinFilterActive,
+  parseNotaMinParam,
+  stripInvalidNotaMin
 } from '../atendimentos/nota-ia-filtro-logic';
 import {
   compactPageItems,
@@ -57,7 +60,6 @@ export function CuradoriasRealizadasPage() {
     'criteriosAtendidos'
   );
   const notaMinParam = parseNotaMinParam(searchParams);
-  const notaMinQuery = notaMinQueryForRequest(searchParams);
   const [draftInicio, setDraftInicio] = useState(inicioParam);
   const [draftFim, setDraftFim] = useState(fimParam);
   const [draftConversationId, setDraftConversationId] = useState(conversationIdParam);
@@ -88,13 +90,22 @@ export function CuradoriasRealizadasPage() {
       (!isMinhas && curadorIdParam) ||
       criteriosNaoAtendidosParam.length > 0 ||
       criteriosAtendidosParam.length > 0 ||
-      notaMinParam > 0 ||
-      Boolean(notaMinQuery) ||
+      notaMinFilterActive(notaMinParam) ||
       hasDraftFilters
   );
 
   const curadoresState = useAuthenticatedResource('/curadores', curadoresListSchema);
   const curadores = curadoresState.status === 'ready' ? curadoresState.data : [];
+
+  useEffect(() => {
+    const cleaned = stripInvalidNotaMin(searchParams);
+    if (!cleaned) {
+      return;
+    }
+    navigate(curadoriasRealizadasHref(basePath, cleaned, pageFromSearch(cleaned)), {
+      replace: true
+    });
+  }, [basePath, navigate, searchParams]);
 
   useEffect(() => {
     setDraftInicio(inicioParam);
@@ -130,7 +141,7 @@ export function CuradoriasRealizadasPage() {
   if (criteriosAtendidosParam.length > 0) {
     query.set('criteriosAtendidos', criteriosAtendidosParam.join(','));
   }
-  if (notaMinQuery) query.set('notaMin', notaMinQuery);
+  applyNotaMinQuery(query, searchParams);
 
   const requestPath = `/curadorias-realizadas?${query.toString()}`;
   const state = useAuthenticatedResource(requestPath, curadoriasRealizadasPageSchema);
@@ -171,7 +182,7 @@ export function CuradoriasRealizadasPage() {
     if (draftCriteriosAtendidos.length > 0) {
       next.set('criteriosAtendidos', draftCriteriosAtendidos.join(','));
     }
-    if (draftNotaMin > 0) next.set('notaMin', String(draftNotaMin));
+    applyDraftNotaMin(next, draftNotaMin);
     navigate(curadoriasRealizadasHref(basePath, next, 1));
   }
 

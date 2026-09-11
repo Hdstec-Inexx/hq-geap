@@ -11,8 +11,11 @@ import { formatMotivoContato } from '../atendimentos/motivo-combobox-logic';
 import { MotivoCombobox } from '../atendimentos/MotivoCombobox';
 import { NotaIaAvaliadoraFiltro } from '../atendimentos/NotaIaAvaliadoraFiltro';
 import {
-  notaMinQueryForRequest,
-  parseNotaMinParam
+  applyDraftNotaMin,
+  applyNotaMinQuery,
+  notaMinFilterActive,
+  parseNotaMinParam,
+  stripInvalidNotaMin
 } from '../atendimentos/nota-ia-filtro-logic';
 import {
   compactPageItems,
@@ -39,7 +42,6 @@ export function FilaCuradoriaPage() {
   const conversationIdParam = searchParams.get('conversationId') ?? '';
   const motivoParam = searchParams.get('motivo') ?? '';
   const notaMinParam = parseNotaMinParam(searchParams);
-  const notaMinQuery = notaMinQueryForRequest(searchParams);
 
   const [draftInicio, setDraftInicio] = useState(inicioParam);
   const [draftFim, setDraftFim] = useState(fimParam);
@@ -55,10 +57,17 @@ export function FilaCuradoriaPage() {
       fimParam ||
       conversationIdParam ||
       motivoParam ||
-      notaMinParam > 0 ||
-      Boolean(notaMinQuery) ||
+      notaMinFilterActive(notaMinParam) ||
       hasDraftFilters
   );
+
+  useEffect(() => {
+    const cleaned = stripInvalidNotaMin(searchParams);
+    if (!cleaned) {
+      return;
+    }
+    navigate(filaHref(cleaned, pageFromSearch(cleaned)), { replace: true });
+  }, [navigate, searchParams]);
 
   useEffect(() => {
     setDraftInicio(inicioParam);
@@ -76,7 +85,7 @@ export function FilaCuradoriaPage() {
   if (fimParam) query.set('fim', fimParam);
   if (conversationIdParam) query.set('conversationId', conversationIdParam);
   if (motivoParam) query.set('motivo', motivoParam);
-  if (notaMinQuery) query.set('notaMin', notaMinQuery);
+  applyNotaMinQuery(query, searchParams);
 
   const requestPath = `/curadoria?${query.toString()}`;
   const state = useAuthenticatedResource(requestPath, filaCuradoriaSchema);
@@ -111,7 +120,7 @@ export function FilaCuradoriaPage() {
     }
     if (draftConversationId.trim()) next.set('conversationId', draftConversationId.trim());
     if (draftMotivo.trim()) next.set('motivo', draftMotivo.trim());
-    if (draftNotaMin > 0) next.set('notaMin', String(draftNotaMin));
+    applyDraftNotaMin(next, draftNotaMin);
     navigate(filaHref(next, 1));
   }
 
