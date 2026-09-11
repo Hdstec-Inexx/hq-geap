@@ -1721,18 +1721,18 @@ test.describe.serial('Fila de Curadoria e conferencia humana', () => {
       return body.items.map((item) => item.conversationId);
     }
 
-    const pisoSete = await listedIds(`conversationId=conv-real-nota-min-&notaMin=7`);
-    expect(pisoSete).toContain(convSete);
-    expect(pisoSete).not.toContain(convSeis);
-    expect(pisoSete).toContain(convAntiga);
+    const notaSete = await listedIds(`conversationId=conv-real-nota-min-&notaMin=7`);
+    expect(notaSete).toContain(convSete);
+    expect(notaSete).not.toContain(convSeis);
+    expect(notaSete).toContain(convAntiga);
 
     const semDatas = await listedIds('conversationId=conv-real-nota-min-');
     expect(semDatas).toEqual(
       expect.arrayContaining([convSete, convSeis, convAntiga])
     );
 
-    const pisoZero = await listedIds(`conversationId=conv-real-nota-min-&notaMin=0`);
-    expect(pisoZero).toEqual(
+    const notaZero = await listedIds(`conversationId=conv-real-nota-min-&notaMin=0`);
+    expect(notaZero).toEqual(
       expect.arrayContaining([convSete, convSeis, convAntiga])
     );
 

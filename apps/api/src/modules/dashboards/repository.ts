@@ -3,6 +3,7 @@ import {
   type DashboardPeriod
 } from '@hq-geap/contracts/dashboards';
 import type pg from 'pg';
+import { civilDayRangeSql } from '../atendimentos/civilMonthBounds.js';
 import { canonicalMotivoSql } from '../atendimentos/detalhamentoFilters.js';
 
 export type DashboardKpisRow = {
@@ -65,8 +66,7 @@ export type PiorAtendimentoRow = {
 
 const periodFilter = `
   a.status = 'concluido'
-  and a.concluido_em >= $1::date
-  and a.concluido_em < $2::date + interval '1 day'
+  and ${civilDayRangeSql('a.concluido_em', '$1', '$2')}
 `;
 
 export function createDashboardRepository(db: pg.Pool) {
@@ -256,6 +256,14 @@ export function createDashboardRepository(db: pg.Pool) {
         limit 10
       `, [periodo.inicio, periodo.fim]);
       return result.rows;
+    },
+
+    async listElevenLabsAgentIds(): Promise<string[]> {
+      const result = await db.query<{ agentId: string }>(`
+        select elevenlabs_agent_id as "agentId"
+        from agentes_voz
+      `);
+      return result.rows.map((row) => row.agentId);
     }
   };
 }

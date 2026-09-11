@@ -3,6 +3,7 @@ import {
   type Dashboard
 } from '@hq-geap/contracts/dashboards';
 import type { FastifyPluginAsync } from 'fastify';
+import { resolveElevenLabsDashboardVolume } from './elevenLabsVolume.js';
 import { createDashboardRepository } from './repository.js';
 import { getDashboard } from './service.js';
 
@@ -19,7 +20,20 @@ const routes: FastifyPluginAsync = async (app) => {
           periodo.error.issues[0]?.message ?? 'Periodo invalido'
         );
       }
-      return getDashboard(repository, periodo.data);
+      return getDashboard(repository, periodo.data, (window) =>
+        resolveElevenLabsDashboardVolume({
+          apiKey: app.config.ELEVENLABS_API_KEY,
+          apiBaseUrl: app.config.ELEVENLABS_API_URL,
+          periodo: window,
+          listAgentIds: () => repository.listElevenLabsAgentIds(),
+          onFailure: (error) => {
+            app.log.warn(
+              { err: error },
+              'Falha ao contar Atendimentos na ElevenLabs para o Pulso'
+            );
+          }
+        })
+      );
     }
   );
 };
