@@ -6,6 +6,10 @@ import {
 } from '@hq-geap/contracts/dashboards';
 import type { DashboardRepository } from './repository.js';
 
+export type CountElevenLabsVolume = (
+  periodo: DashboardPeriod
+) => Promise<number | null>;
+
 function numberOrNull(value: string | null, decimals = 2) {
   if (value === null) return null;
   return Number(Number(value).toFixed(decimals));
@@ -17,17 +21,26 @@ function percentage(part: number, total: number) {
 
 export async function getDashboard(
   repository: DashboardRepository,
-  periodo: DashboardPeriod
+  periodo: DashboardPeriod,
+  countElevenLabsVolume?: CountElevenLabsVolume
 ): Promise<Dashboard> {
   const kpis = await repository.getKpis(periodo);
+  const elevenLabsVolumePromise = countElevenLabsVolume
+    ? countElevenLabsVolume(periodo)
+    : Promise.resolve(null);
   const motivos = await repository.listMotivos(periodo);
   const criterios = await repository.listCriterios(periodo);
   const concordancia = await repository.getConcordancia(periodo);
   const porCriterio = await repository.listConcordanciaPorCriterio(periodo);
   const criteriosNaoConformidade = await repository.listCriteriosNaoConformidade(periodo);
   const piores = await repository.listPiores(periodo);
+  const elevenLabsVolume = await elevenLabsVolumePromise;
 
-  const volume = Number(kpis.volume);
+  const volumeHq = Number(kpis.volume);
+  let volume = volumeHq;
+  if (elevenLabsVolume !== null) {
+    volume = elevenLabsVolume;
+  }
   const resolvidas = Number(kpis.resolvidas);
   const dentroSla = Number(kpis.dentroSla);
   const avaliadosIa = Number(kpis.avaliadosIa);
@@ -44,8 +57,9 @@ export async function getDashboard(
     kpis: {
       volume,
       tmaSegundos: numberOrNull(kpis.tmaSegundos, 0),
-      taxaResolvidas: percentage(resolvidas, volume),
-      sla: percentage(dentroSla, volume),
+      taxaResolvidas: percentage(resolvidas, volumeHq),
+      resolvidas,
+      sla: percentage(dentroSla, volumeHq),
       slaMeta: SLA_META_PERCENTUAL,
       notaMediaIa: numberOrNull(kpis.notaMediaIa),
       notaMediaCurador: numberOrNull(kpis.notaMediaCurador),

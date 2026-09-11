@@ -1,4 +1,7 @@
-import { dashboardSchema } from '@hq-geap/contracts/dashboards';
+import {
+  dashboardFallbackPeriod,
+  dashboardSchema
+} from '@hq-geap/contracts/dashboards';
 import { useEffect, useState } from 'react';
 import { Form, Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuthenticatedResource } from '../atendimentos/api';
@@ -9,21 +12,6 @@ import { CriteriosNaoConformidadeChart } from './components/CriteriosNaoConformi
 import { Kpis } from './components/Kpis';
 import { MotivosContatoChart } from './components/MotivosContatoChart';
 
-function dateInputValue(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function defaultPeriod() {
-  const today = new Date();
-  return {
-    inicio: dateInputValue(new Date(today.getFullYear(), today.getMonth(), 1)),
-    fim: dateInputValue(today)
-  };
-}
-
 const dateTime = new Intl.DateTimeFormat('pt-BR', {
   dateStyle: 'short',
   timeStyle: 'short'
@@ -32,7 +20,7 @@ const dateTime = new Intl.DateTimeFormat('pt-BR', {
 export function DashboardPage() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  const fallback = defaultPeriod();
+  const fallback = dashboardFallbackPeriod();
   const inicioParam = searchParams.get('inicio');
   const fimParam = searchParams.get('fim');
   const inicio = inicioParam ?? fallback.inicio;

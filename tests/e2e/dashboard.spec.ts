@@ -217,6 +217,7 @@ test.describe.serial('Dashboard da Gestao', () => {
       volume: 3,
       tmaSegundos: 80,
       taxaResolvidas: 66.7,
+      resolvidas: 2,
       sla: 66.7,
       slaMeta: 80,
       notaMediaIa: 6,
