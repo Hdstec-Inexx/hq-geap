@@ -43,5 +43,5 @@ test('MonitoramentoLivePage renderiza botao de favoritar visivel e desabilitado 
     'utf8'
   );
   assert.match(buttonComponent, /disabled=\{isDisabled\}/);
-  assert.match(buttonComponent, /A conversa ainda não foi persistida no HQ/);
+  assert.match(buttonComponent, /O Atendimento ainda não foi persistido no HQ/);
 });

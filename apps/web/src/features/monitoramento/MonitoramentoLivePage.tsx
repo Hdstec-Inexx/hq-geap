@@ -218,7 +218,10 @@ export function MonitoramentoLivePage() {
         if (!res.ok) return;
         const data = await res.json();
         if (data.items && data.items.length > 0 && !cancelled) {
-          const item = data.items[0];
+          const item = data.items.find(
+            (candidate: { conversationId: string }) => candidate.conversationId === conversationId
+          );
+          if (!item) return;
           try {
             const detailRes = await fetch(`${apiUrl}/atendimentos/${item.id}`, {
               headers: { authorization: `Bearer ${session.token}` }

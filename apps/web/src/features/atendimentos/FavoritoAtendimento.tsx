@@ -1,8 +1,7 @@
-import { useState } from 'react';
-import type { FavoritosInfo, MutacaoFavoritoResponse } from '@hq-geap/contracts/atendimentos';
+import type { FavoritosInfo } from '@hq-geap/contracts/atendimentos';
 import { usePerfil } from '../auth/perfil-context';
-import { apiUrl, getSession } from '../auth/session';
 import { formatPerfisFavoritos } from './favorito-logic';
+import { useToggleFavorito } from './useToggleFavorito';
 
 type FavoritoAtendimentoProps = {
   atendimentoId: string;
@@ -16,49 +15,19 @@ export function FavoritoAtendimento({
   favoritos
 }: FavoritoAtendimentoProps) {
   const perfil = usePerfil();
-  const [favoritado, setFavoritado] = useState<boolean>(Boolean(favoritadoPeloUsuario));
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { favoritado, isSubmitting, toggle } = useToggleFavorito(
+    atendimentoId,
+    Boolean(favoritadoPeloUsuario)
+  );
 
   const role = perfil?.role;
 
   if (role === 'curador') {
-    async function handleToggle() {
-      const session = getSession();
-      if (!session || isSubmitting) return;
-
-      const nextFavoritado = !favoritado;
-      setIsSubmitting(true);
-      // Optimistic update
-      setFavoritado(nextFavoritado);
-
-      try {
-        const method = nextFavoritado ? 'POST' : 'DELETE';
-        const response = await fetch(`${apiUrl}/atendimentos/${atendimentoId}/favorito`, {
-          method,
-          headers: {
-            authorization: `Bearer ${session.token}`
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error(`Request failed with status ${response.status}`);
-        }
-
-        const data: MutacaoFavoritoResponse = await response.json();
-        setFavoritado(data.favoritadoPeloUsuario);
-      } catch {
-        // Rollback on error
-        setFavoritado(!nextFavoritado);
-      } finally {
-        setIsSubmitting(false);
-      }
-    }
-
     return (
       <button
         type="button"
         className={`favorito-star-button ${favoritado ? 'active' : ''}`}
-        onClick={handleToggle}
+        onClick={toggle}
         disabled={isSubmitting}
         aria-pressed={favoritado}
         aria-label={favoritado ? 'Desfavoritar atendimento' : 'Favoritar atendimento'}

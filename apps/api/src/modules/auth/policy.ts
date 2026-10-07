@@ -7,7 +7,7 @@ export function canUseMethod(role: UserRole, method: string) {
 }
 
 export function canAccessRoles(role: UserRole, allowedRoles?: UserRole[]) {
-  return !allowedRoles || allowedRoles.includes(role);
+  return role === 'admin' || !allowedRoles || allowedRoles.includes(role);
 }
 
 function withoutCost(value: unknown): unknown {

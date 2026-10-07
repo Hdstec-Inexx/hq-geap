@@ -86,6 +86,11 @@ const routes: FastifyPluginAsync = async (app) => {
       auth: {
         roles: ['curador' as const]
       }
+    },
+    preHandler: async (request: { authUser: { role: string } | null }) => {
+      if (request.authUser?.role !== 'curador') {
+        throw app.httpErrors.forbidden('Role does not have permission');
+      }
     }
   };
 
