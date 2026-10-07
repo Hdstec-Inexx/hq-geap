@@ -9,10 +9,6 @@ import {
 } from '../../apps/api/src/modules/atendimentos/repository.js';
 import { isCuradorRole } from '../../apps/api/src/modules/atendimentos/routes.js';
 import { toAtendimentoDetail } from '../../apps/api/src/modules/atendimentos/service.js';
-import {
-  atendimentoDetailCuradorSchema,
-  atendimentoDetailGestaoAdminSchema
-} from '../../packages/contracts/src/atendimentos.js';
 
 test('autorizacao de favoritos: apenas Curador pode mutar, Gestao e Admin recebem 403', async () => {
   // 1. Gestao tem acesso somente leitura (bloqueado nos metodos de mutacao)
@@ -118,7 +114,6 @@ test('toAtendimentoDetail mapeia favoritadoPeloUsuario para Curador e favoritos 
   });
   assert.equal(curadorDetail.favoritadoPeloUsuario, true);
   assert.equal(curadorDetail.favoritos, undefined);
-  assert.ok(atendimentoDetailCuradorSchema.parse(curadorDetail));
 
   // Gestao/Admin: retorna favoritos { count, perfis }
   const gestaoDetail = toAtendimentoDetail(row, 'https://example.com/audio.mp3', {
@@ -132,5 +127,4 @@ test('toAtendimentoDetail mapeia favoritadoPeloUsuario para Curador e favoritos 
     count: 1,
     perfis: [{ id: '11111111-1111-4111-8111-111111111111', nome: 'Carlos Curador' }]
   });
-  assert.ok(atendimentoDetailGestaoAdminSchema.parse(gestaoDetail));
 });

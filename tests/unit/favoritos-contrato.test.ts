@@ -1,8 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  atendimentoDetailCuradorSchema,
-  atendimentoDetailGestaoAdminSchema,
   atendimentoDetailSchema,
   favoritoPerfilSchema,
   favoritosInfoSchema,
@@ -60,37 +58,6 @@ test('mutacaoFavoritoResponseSchema valida favoritadoPeloUsuario boolean', () =>
   assert.deepEqual(mutacaoFavoritoResponseSchema.parse({ favoritadoPeloUsuario: false }), {
     favoritadoPeloUsuario: false
   });
-});
-
-test('atendimentoDetailCuradorSchema exige favoritadoPeloUsuario booleano', () => {
-  const curadorData = {
-    ...baseAtendimentoDetail,
-    favoritadoPeloUsuario: true
-  };
-  const parsed = atendimentoDetailCuradorSchema.parse(curadorData);
-  assert.equal(parsed.favoritadoPeloUsuario, true);
-
-  // Sem favoritadoPeloUsuario deve falhar
-  assert.throws(() => atendimentoDetailCuradorSchema.parse(baseAtendimentoDetail));
-});
-
-test('atendimentoDetailGestaoAdminSchema exige favoritos com count e perfis', () => {
-  const gestaoData = {
-    ...baseAtendimentoDetail,
-    favoritos: {
-      count: 2,
-      perfis: [
-        { id: 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', nome: 'Carlos Curador' },
-        { id: 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a44', nome: 'Maria Curadora' }
-      ]
-    }
-  };
-  const parsed = atendimentoDetailGestaoAdminSchema.parse(gestaoData);
-  assert.equal(parsed.favoritos.count, 2);
-  assert.equal(parsed.favoritos.perfis.length, 2);
-
-  // Sem favoritos deve falhar
-  assert.throws(() => atendimentoDetailGestaoAdminSchema.parse(baseAtendimentoDetail));
 });
 
 test('atendimentoDetailSchema tolera campos de favoritos opcionais', () => {

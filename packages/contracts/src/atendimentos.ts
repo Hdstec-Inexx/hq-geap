@@ -506,14 +506,6 @@ export const atendimentoDetailSchema = atendimentoSummarySchema.extend({
   favoritos: favoritosInfoSchema.optional()
 });
 
-export const atendimentoDetailCuradorSchema = atendimentoDetailSchema.extend({
-  favoritadoPeloUsuario: z.boolean()
-});
-
-export const atendimentoDetailGestaoAdminSchema = atendimentoDetailSchema.extend({
-  favoritos: favoritosInfoSchema
-});
-
 export const atendimentoListSchema = z.object({
   items: z.array(atendimentoSummarySchema),
   total: z.number().int().min(0)
@@ -671,5 +663,3 @@ export type CuradoriaAtendimentoSummary = z.infer<typeof curadoriaAtendimentoSum
 export type FavoritoPerfil = z.infer<typeof favoritoPerfilSchema>;
 export type FavoritosInfo = z.infer<typeof favoritosInfoSchema>;
 export type MutacaoFavoritoResponse = z.infer<typeof mutacaoFavoritoResponseSchema>;
-export type AtendimentoDetailCurador = z.infer<typeof atendimentoDetailCuradorSchema>;
-export type AtendimentoDetailGestaoAdmin = z.infer<typeof atendimentoDetailGestaoAdminSchema>;
