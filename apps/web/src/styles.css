@@ -3992,3 +3992,77 @@ h1 {
     animation: none;
   }
 }
+
+/* Favoritos (Issue #252) */
+.atendimento-title-favorite {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.favorito-star-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+  padding: 4px 12px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-muted, #94a3b8);
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.favorito-star-button:hover:not(:disabled) {
+  border-color: #f59e0b;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.favorito-star-button.active {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.favorito-star-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.favorito-star-button .favorito-star-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.favorito-star-button.active .favorito-star-icon {
+  color: #f59e0b;
+}
+
+.favoritos-readonly-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.8125rem;
+  color: #94a3b8;
+}
+
+.favoritos-readonly-indicator .favorito-star-icon {
+  color: #f59e0b;
+  font-size: 0.9375rem;
+  line-height: 1;
+}
+
+.favoritos-readonly-text {
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

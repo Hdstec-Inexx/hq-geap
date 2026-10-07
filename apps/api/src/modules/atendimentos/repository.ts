@@ -1,6 +1,7 @@
 import type {
   AtendimentoSummary,
   AtendimentosQuery,
+  FavoritosInfo,
   IngestAtendimento
 } from '@hq-geap/contracts/atendimentos';
 import type pg from 'pg';
@@ -248,6 +249,45 @@ export function createAtendimentosRepository(db: pg.Pool) {
         order by motivo
       `);
       return result.rows.map((row) => row.motivo);
+    },
+
+    async addFavorito(atendimentoId: string, perfilId: string): Promise<void> {
+      await db.query(`
+        insert into favoritos (perfil_id, atendimento_id)
+        values ($1, $2)
+        on conflict (perfil_id, atendimento_id) do nothing
+      `, [perfilId, atendimentoId]);
+    },
+
+    async removeFavorito(atendimentoId: string, perfilId: string): Promise<void> {
+      await db.query(`
+        delete from favoritos
+        where atendimento_id = $1 and perfil_id = $2
+      `, [atendimentoId, perfilId]);
+    },
+
+    async isFavoritadoByPerfil(atendimentoId: string, perfilId: string): Promise<boolean> {
+      const result = await db.query<{ exists: boolean }>(`
+        select exists(
+          select 1 from favoritos
+          where atendimento_id = $1 and perfil_id = $2
+        ) as exists
+      `, [atendimentoId, perfilId]);
+      return Boolean(result.rows[0]?.exists);
+    },
+
+    async findFavoritos(atendimentoId: string): Promise<FavoritosInfo> {
+      const result = await db.query<{ id: string; nome: string }>(`
+        select u.id, u.nome
+        from favoritos f
+        join usuarios u on u.id = f.perfil_id
+        where f.atendimento_id = $1
+        order by f.favoritado_em asc, u.nome asc
+      `, [atendimentoId]);
+      return {
+        count: result.rows.length,
+        perfis: result.rows
+      };
     }
   };
 }

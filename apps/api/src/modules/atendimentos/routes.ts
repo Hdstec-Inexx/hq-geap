@@ -2,7 +2,9 @@ import {
   ingestAtendimentoSchema,
   atendimentosQuerySchema,
   type AtendimentoDetail,
-  type AtendimentoList
+  type AtendimentoList,
+  type FavoritosInfo,
+  type MutacaoFavoritoResponse
 } from '@hq-geap/contracts/atendimentos';
 import type { FastifyPluginAsync } from 'fastify';
 import { isDetalhamentoQuery } from './detalhamentoFilters.js';
@@ -79,6 +81,46 @@ const routes: FastifyPluginAsync = async (app) => {
     return repository.listDistinctMotivos();
   });
 
+  const curadorOnly = {
+    config: {
+      auth: {
+        roles: ['curador' as const]
+      }
+    }
+  };
+
+  app.post<{ Params: { id: string } }>(
+    '/atendimentos/:id/favorito',
+    curadorOnly,
+    async (request): Promise<MutacaoFavoritoResponse> => {
+      if (request.authUser?.role !== 'curador') {
+        throw app.httpErrors.forbidden('Role does not have permission');
+      }
+      const row = await repository.findById(request.params.id);
+      if (!row) {
+        throw app.httpErrors.notFound('Atendimento not found');
+      }
+      await repository.addFavorito(row.id, request.authUser.id);
+      return { favoritadoPeloUsuario: true };
+    }
+  );
+
+  app.delete<{ Params: { id: string } }>(
+    '/atendimentos/:id/favorito',
+    curadorOnly,
+    async (request): Promise<MutacaoFavoritoResponse> => {
+      if (request.authUser?.role !== 'curador') {
+        throw app.httpErrors.forbidden('Role does not have permission');
+      }
+      const row = await repository.findById(request.params.id);
+      if (!row) {
+        throw app.httpErrors.notFound('Atendimento not found');
+      }
+      await repository.removeFavorito(row.id, request.authUser.id);
+      return { favoritadoPeloUsuario: false };
+    }
+  );
+
   app.get<{ Params: { id: string } }>(
     '/atendimentos/:id',
     async (request): Promise<AtendimentoDetail> => {
@@ -95,7 +137,21 @@ const routes: FastifyPluginAsync = async (app) => {
           'Failed to resolve Atendimento audio URL'
         );
       }
-      return toAtendimentoDetail(row, audioUrl);
+
+      let favoritadoPeloUsuario: boolean | undefined;
+      let favoritos: FavoritosInfo | undefined;
+
+      const user = request.authUser;
+      if (user?.role === 'curador') {
+        favoritadoPeloUsuario = await repository.isFavoritadoByPerfil(row.id, user.id);
+      } else if (user?.role === 'gestao' || user?.role === 'admin') {
+        favoritos = await repository.findFavoritos(row.id);
+      }
+
+      return toAtendimentoDetail(row, audioUrl, {
+        favoritadoPeloUsuario,
+        favoritos
+      });
     }
   );
 };
