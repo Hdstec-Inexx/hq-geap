@@ -212,35 +212,19 @@ export function MonitoramentoLivePage() {
       const session = getSession();
       if (!session) return;
       try {
-        const res = await fetch(`${apiUrl}/atendimentos?conversationId=${encodeURIComponent(conversationId)}`, {
+        const res = await fetch(`${apiUrl}/atendimentos/by-conversation/${encodeURIComponent(conversationId)}`, {
           headers: { authorization: `Bearer ${session.token}` }
         });
-        if (!res.ok) return;
+        if (!res.ok || cancelled) return;
         const data = await res.json();
-        if (data.items && data.items.length > 0 && !cancelled) {
-          const item = data.items.find(
-            (candidate: { conversationId: string }) => candidate.conversationId === conversationId
-          );
-          if (!item) return;
+        if (!cancelled) {
           try {
-            const detailRes = await fetch(`${apiUrl}/atendimentos/${item.id}`, {
-              headers: { authorization: `Bearer ${session.token}` }
+            setAtendimento({
+              id: data.id,
+              favoritadoPeloUsuario: data.favoritadoPeloUsuario
             });
-            if (detailRes.ok) {
-              const detailData = await detailRes.json();
-              if (!cancelled) {
-                setAtendimento({
-                  id: item.id,
-                  favoritadoPeloUsuario: detailData.favoritadoPeloUsuario
-                });
-              }
-              return;
-            }
           } catch {
             // fallback
-          }
-          if (!cancelled) {
-            setAtendimento({ id: item.id, favoritadoPeloUsuario: false });
           }
         }
       } catch {

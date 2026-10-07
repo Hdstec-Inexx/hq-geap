@@ -85,6 +85,33 @@ const routes: FastifyPluginAsync = async (app) => {
     return repository.listDistinctMotivos();
   });
 
+  app.get<{ Params: { conversationId: string } }>(
+    '/atendimentos/by-conversation/:conversationId',
+    async (request): Promise<AtendimentoDetail> => {
+      const row = await repository.findByConversationId(request.params.conversationId);
+      if (!row) {
+        throw app.httpErrors.notFound('Atendimento not found');
+      }
+      let audioUrl: string | null = null;
+      try {
+        audioUrl = await app.storage.resolveAudioUrl(row.audioReference);
+      } catch {
+        request.log.warn(
+          { atendimentoId: row.id },
+          'Failed to resolve Atendimento audio URL'
+        );
+      }
+
+      const user = request.authUser;
+      const options = user?.role === 'curador'
+        ? { favoritadoPeloUsuario: await repository.isFavoritadoByPerfil(row.id, user.id) }
+        : user?.role === 'gestao' || user?.role === 'admin'
+          ? { favoritos: await repository.findFavoritos(row.id) }
+          : undefined;
+      return toAtendimentoDetail(row, audioUrl, options);
+    }
+  );
+
   const curadorOnly = {
     config: {
       auth: {

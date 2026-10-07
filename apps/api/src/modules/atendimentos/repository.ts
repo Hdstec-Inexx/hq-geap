@@ -242,6 +242,14 @@ export function createAtendimentosRepository(db: pg.Pool) {
       return result.rows[0] ?? null;
     },
 
+    async findByConversationId(conversationId: string): Promise<AtendimentoRow | null> {
+      const result = await db.query<AtendimentoRow>(
+        `${selectAtendimento} where a.elevenlabs_conversation_id = $1`,
+        [conversationId]
+      );
+      return result.rows[0] ?? null;
+    },
+
     async listDistinctMotivos(): Promise<string[]> {
       const result = await db.query<{ motivo: string }>(`
         select distinct ${canonicalMotivoSql('motivo_contato')} as motivo

@@ -25,6 +25,7 @@ async function queryDatabase<T extends pg.QueryResultRow>(
 test.describe.serial('Favoritar e desfavoritar no detalhe e no Monitoramento ao Vivo', () => {
   let agenteVozId: string;
   let atendimentoId: string;
+  let livePersistedAtendimentoId: string;
   const convDetailId = 'conv-favorito-detail-e2e';
   const convLivePersistedId = 'conv-favorito-live-persisted-e2e';
   const convLiveNotPersistedId = 'conv-favorito-live-not-persisted-e2e';
@@ -52,7 +53,7 @@ test.describe.serial('Favoritar e desfavoritar no detalhe e no Monitoramento ao 
     `, [agenteVozId, convDetailId]);
     atendimentoId = atendimento.rows[0]!.id;
 
-    await queryDatabase(`
+    const liveAtendimento = await queryDatabase<{ id: string }>(`
       insert into atendimentos (
         agente_voz_id, elevenlabs_conversation_id, status, iniciado_em,
         transcricao, motivo_contato, houve_transferencia
@@ -61,8 +62,10 @@ test.describe.serial('Favoritar e desfavoritar no detalhe e no Monitoramento ao 
         '[{"role":"agent","message":"Bom dia","time_in_call_secs":0}]'::jsonb,
         'Informações', false
       )
-      on conflict (elevenlabs_conversation_id) do nothing
+      on conflict (elevenlabs_conversation_id) do update set status = 'em_andamento'
+      returning id
     `, [agenteVozId, convLivePersistedId]);
+    livePersistedAtendimentoId = liveAtendimento.rows[0]!.id;
   });
 
   test('Curador pode marcar e desmarcar favorito no detalhe do Atendimento', async ({
@@ -104,6 +107,14 @@ test.describe.serial('Favoritar e desfavoritar no detalhe e no Monitoramento ao 
       [atendimentoId, curadorId]
     );
     expect(dbCheck2.rows[0]?.count).toBe('0');
+
+    for (const role of ['gestao', 'admin'] as const) {
+      const session = await loginApi(request, role);
+      const forbidden = await request.post(`${apiUrl}/atendimentos/${atendimentoId}/favorito`, {
+        headers: { authorization: `Bearer ${session.token}` }
+      });
+      expect(forbidden.status()).toBe(403);
+    }
   });
 
   test('Gestão e Admin veem indicação somente leitura no detalhe sem poder marcar', async ({
@@ -149,8 +160,18 @@ test.describe.serial('Favoritar e desfavoritar no detalhe e no Monitoramento ao 
     // Curador alterna favorito no Monitoramento ao Vivo
     await liveButtonEnabled.click();
     await expect(liveButtonEnabled).toHaveAttribute('aria-pressed', 'true');
+    const liveFavorito = await queryDatabase<{ count: string }>(
+      'select count(*) from favoritos where atendimento_id = $1',
+      [livePersistedAtendimentoId]
+    );
+    expect(liveFavorito.rows[0]?.count).toBe('1');
 
     await liveButtonEnabled.click();
     await expect(liveButtonEnabled).toHaveAttribute('aria-pressed', 'false');
+    const liveDesfavorito = await queryDatabase<{ count: string }>(
+      'select count(*) from favoritos where atendimento_id = $1',
+      [livePersistedAtendimentoId]
+    );
+    expect(liveDesfavorito.rows[0]?.count).toBe('0');
   });
 });
