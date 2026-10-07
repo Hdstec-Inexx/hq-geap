@@ -137,7 +137,7 @@ test.describe.serial('Favoritar e desfavoritar no detalhe e no Monitoramento ao 
     await expect(liveButtonDisabled).toBeDisabled();
     await expect(liveButtonDisabled).toHaveAttribute(
       'title',
-      'A conversa ainda não foi persistida no HQ'
+      'O Atendimento ainda não foi persistido no HQ'
     );
 
     // 2. Chamada persistida no HQ -> botão habilitado

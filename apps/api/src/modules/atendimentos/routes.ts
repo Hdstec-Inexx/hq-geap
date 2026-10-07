@@ -16,6 +16,10 @@ import {
 } from './repository.js';
 import { toAtendimentoDetail, toAtendimentoSummary } from './service.js';
 
+export function isCuradorRole(authUser: { role: string } | null | undefined): boolean {
+  return authUser?.role === 'curador';
+}
+
 const routes: FastifyPluginAsync = async (app) => {
   const repository = createAtendimentosRepository(app.db);
 
@@ -88,7 +92,7 @@ const routes: FastifyPluginAsync = async (app) => {
       }
     },
     preHandler: async (request: { authUser: { role: string } | null }) => {
-      if (request.authUser?.role !== 'curador') {
+      if (!isCuradorRole(request.authUser)) {
         throw app.httpErrors.forbidden('Role does not have permission');
       }
     }
@@ -98,14 +102,15 @@ const routes: FastifyPluginAsync = async (app) => {
     '/atendimentos/:id/favorito',
     curadorOnly,
     async (request): Promise<MutacaoFavoritoResponse> => {
-      if (request.authUser?.role !== 'curador') {
-        throw app.httpErrors.forbidden('Role does not have permission');
-      }
       const row = await repository.findById(request.params.id);
       if (!row) {
         throw app.httpErrors.notFound('Atendimento not found');
       }
-      await repository.addFavorito(row.id, request.authUser.id);
+      const perfil = request.authUser;
+      if (!perfil) {
+        throw app.httpErrors.unauthorized('Authentication required');
+      }
+      await repository.addFavorito(row.id, perfil.id);
       return { favoritadoPeloUsuario: true };
     }
   );
@@ -114,14 +119,15 @@ const routes: FastifyPluginAsync = async (app) => {
     '/atendimentos/:id/favorito',
     curadorOnly,
     async (request): Promise<MutacaoFavoritoResponse> => {
-      if (request.authUser?.role !== 'curador') {
-        throw app.httpErrors.forbidden('Role does not have permission');
-      }
       const row = await repository.findById(request.params.id);
       if (!row) {
         throw app.httpErrors.notFound('Atendimento not found');
       }
-      await repository.removeFavorito(row.id, request.authUser.id);
+      const perfil = request.authUser;
+      if (!perfil) {
+        throw app.httpErrors.unauthorized('Authentication required');
+      }
+      await repository.removeFavorito(row.id, perfil.id);
       return { favoritadoPeloUsuario: false };
     }
   );

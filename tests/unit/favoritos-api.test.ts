@@ -7,6 +7,7 @@ import {
   createAtendimentosRepository,
   type AtendimentoRow
 } from '../../apps/api/src/modules/atendimentos/repository.js';
+import { isCuradorRole } from '../../apps/api/src/modules/atendimentos/routes.js';
 import { toAtendimentoDetail } from '../../apps/api/src/modules/atendimentos/service.js';
 import {
   atendimentoDetailCuradorSchema,
@@ -20,22 +21,11 @@ test('autorizacao de favoritos: apenas Curador pode mutar, Gestao e Admin recebe
   assert.equal(canUseMethod('curador', 'POST'), true, 'Curador pode fazer POST');
   assert.equal(canUseMethod('curador', 'DELETE'), true, 'Curador pode fazer DELETE');
 
-  // 2. Verificacao de papel restrita nos endpoints de favoritos
-  function verifyCuradorOnly(role: string | null | undefined) {
-    if (role !== 'curador') {
-      const error = new Error('Role does not have permission') as any;
-      error.statusCode = 403;
-      throw error;
-    }
-  }
-
-  // Curador passa
-  assert.doesNotThrow(() => verifyCuradorOnly('curador'));
-
-  // Gestao e Admin recebem 403
-  assert.throws(() => verifyCuradorOnly('gestao'), (err: any) => err.statusCode === 403);
-  assert.throws(() => verifyCuradorOnly('admin'), (err: any) => err.statusCode === 403);
-  assert.throws(() => verifyCuradorOnly(null), (err: any) => err.statusCode === 403);
+  // 2. Verificacao real de papel usada pelo preHandler da rota
+  assert.equal(isCuradorRole({ role: 'curador' }), true);
+  assert.equal(isCuradorRole({ role: 'gestao' }), false);
+  assert.equal(isCuradorRole({ role: 'admin' }), false);
+  assert.equal(isCuradorRole(null), false);
 });
 
 test('repository de favoritos garante unicidade (on conflict) e delecao individual', async () => {

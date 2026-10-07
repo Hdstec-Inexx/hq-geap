@@ -269,7 +269,6 @@ export function MonitoramentoLivePage() {
           <div className="atendimento-title-favorite">
             <h1>Transcrição em tempo real</h1>
             <FavoritoLiveButton
-              conversationId={conversationId}
               isPersisted={Boolean(atendimento)}
               atendimentoId={atendimento?.id}
               initialFavoritado={atendimento?.favoritadoPeloUsuario ?? false}

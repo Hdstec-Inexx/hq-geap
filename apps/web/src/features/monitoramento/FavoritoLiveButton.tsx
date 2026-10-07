@@ -2,7 +2,6 @@ import { usePerfil } from '../auth/perfil-context';
 import { useToggleFavorito } from '../atendimentos/useToggleFavorito';
 
 type FavoritoLiveButtonProps = {
-  conversationId: string;
   isPersisted: boolean;
   atendimentoId?: string | null;
   initialFavoritado?: boolean;
