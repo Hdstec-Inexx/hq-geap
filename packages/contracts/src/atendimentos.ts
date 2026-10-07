@@ -485,9 +485,25 @@ export const atendimentoSummarySchema = z.object({
   curadoria: curadoriaAtendimentoSummarySchema
 });
 
+export const favoritoPerfilSchema = z.object({
+  id: z.uuid(),
+  nome: z.string()
+});
+
+export const favoritosInfoSchema = z.object({
+  count: z.number().int().min(0),
+  perfis: z.array(favoritoPerfilSchema)
+});
+
+export const mutacaoFavoritoResponseSchema = z.object({
+  favoritadoPeloUsuario: z.boolean()
+});
+
 export const atendimentoDetailSchema = atendimentoSummarySchema.extend({
   transcricao: z.array(transcriptEntrySchema),
-  audioUrl: z.url().nullable()
+  audioUrl: z.url().nullable(),
+  favoritadoPeloUsuario: z.boolean().optional(),
+  favoritos: favoritosInfoSchema.optional()
 });
 
 export const atendimentoListSchema = z.object({
@@ -644,3 +660,6 @@ export type AtendimentoDetail = z.infer<typeof atendimentoDetailSchema>;
 export type MotivosAtendimentos = z.infer<typeof motivosAtendimentosSchema>;
 export type CuradoriaStatusFilter = z.infer<typeof curadoriaStatusFilterSchema>;
 export type CuradoriaAtendimentoSummary = z.infer<typeof curadoriaAtendimentoSummarySchema>;
+export type FavoritoPerfil = z.infer<typeof favoritoPerfilSchema>;
+export type FavoritosInfo = z.infer<typeof favoritosInfoSchema>;
+export type MutacaoFavoritoResponse = z.infer<typeof mutacaoFavoritoResponseSchema>;

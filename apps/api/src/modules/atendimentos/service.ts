@@ -3,7 +3,8 @@ import {
   atendimentoSummarySchema,
   normalizeTranscricao,
   type AtendimentoDetail,
-  type AtendimentoSummary
+  type AtendimentoSummary,
+  type FavoritosInfo
 } from '@hq-geap/contracts/atendimentos';
 import { z } from 'zod';
 import type { AtendimentoRow, AtendimentoSummaryRow } from './repository.js';
@@ -86,11 +87,21 @@ export function toAtendimentoSummary(row: AtendimentoSummaryRow): AtendimentoSum
 
 export function toAtendimentoDetail(
   row: AtendimentoRow,
-  audioUrl: string | null
+  audioUrl: string | null,
+  options?: {
+    favoritadoPeloUsuario?: boolean;
+    favoritos?: FavoritosInfo;
+  }
 ): AtendimentoDetail {
   return atendimentoDetailSchema.parse({
     ...summaryValues(row),
     transcricao: normalizeTranscricao(row.transcricao),
-    audioUrl: safeAudioUrl(audioUrl)
+    audioUrl: safeAudioUrl(audioUrl),
+    ...(options?.favoritadoPeloUsuario !== undefined
+      ? { favoritadoPeloUsuario: options.favoritadoPeloUsuario }
+      : {}),
+    ...(options?.favoritos !== undefined
+      ? { favoritos: options.favoritos }
+      : {})
   });
 }
