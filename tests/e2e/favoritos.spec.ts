@@ -212,4 +212,33 @@ test.describe.serial('Favoritar e desfavoritar no detalhe e no Monitoramento ao 
       await queryDatabase('update usuarios set ativo = true where id = $1', [session.user.id]);
     }
   });
+
+  test('Curador alterna favorito na linha e Gestão vê contagem com nomes no tooltip', async ({
+    page,
+    request
+  }) => {
+    const curador = await loginApi(request, 'curador');
+    await queryDatabase(
+      'delete from favoritos where atendimento_id = $1 and perfil_id = $2',
+      [atendimentoId, curador.user.id]
+    );
+
+    await loginPage(page, 'curador');
+    await page.goto('/atendimentos');
+    const row = page.locator('.atendimento-row').filter({ hasText: convDetailId });
+    const button = row.getByTestId('favorito-list-button');
+    await expect(button).toHaveAttribute('aria-pressed', 'false');
+    await button.click();
+    await expect(button).toHaveAttribute('aria-pressed', 'true');
+
+    for (const role of ['gestao', 'admin'] as const) {
+      await loginPage(page, role);
+      await page.goto('/atendimentos');
+      const row = page.locator('.atendimento-row').filter({ hasText: convDetailId });
+      const readonly = row.getByTestId('favoritos-list-readonly');
+      await expect(readonly).toHaveText('1');
+      await expect(readonly).toHaveAttribute('title', /Favoritado por:.*Curador/);
+      await expect(row.getByTestId('favorito-list-button')).toHaveCount(0);
+    }
+  });
 });

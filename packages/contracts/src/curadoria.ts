@@ -24,7 +24,10 @@ export const filaCuradoriaItemSchema = z.object({
   concluidoEm: z.iso.datetime(),
   duracaoSegundos: z.number().int().nonnegative().nullable(),
   motivoContato: z.string().nullable(),
-  notaIa: z.number().min(0).max(10)
+  notaIa: z.number().min(0).max(10),
+  favoritadoPeloUsuario: z.boolean().optional(),
+  favoritosCount: z.number().int().min(0).optional(),
+  favoritosPerfis: z.array(z.string()).optional()
 });
 
 export const filaCuradoriaSchema = z.object({
@@ -169,7 +172,10 @@ export const curadoriaRealizadaItemSchema = z.object({
   curadorId: z.uuid(),
   curadorNome: z.string(),
   notaCurador: z.number().min(0).max(10),
-  realizadaEm: z.iso.datetime()
+  realizadaEm: z.iso.datetime(),
+  favoritadoPeloUsuario: z.boolean().optional(),
+  favoritosCount: z.number().int().min(0).optional(),
+  favoritosPerfis: z.array(z.string()).optional()
 });
 
 export const curadoriasRealizadasPageSchema = z.object({

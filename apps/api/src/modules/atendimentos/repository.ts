@@ -27,6 +27,9 @@ export type AtendimentoSummaryRow = {
   curadorNome: string | null;
   curadoriaNota: string | null;
   curadoriaRealizadaEm: Date | null;
+  favoritadoPeloUsuario?: boolean;
+  favoritosCount?: number;
+  favoritosPerfis?: string[];
 };
 
 export type AtendimentoRow = AtendimentoSummaryRow & {
@@ -73,6 +76,22 @@ const selectAtendimento = `
   from (${selectAtendimentoSummary}) summary
   join atendimentos a on a.id = summary.id
 `;
+
+const selectAtendimentoSummaryWithFavoritos = (perfilPlaceholder: string) =>
+  selectAtendimentoSummary.replace(
+    'from atendimentos a',
+    `,
+    exists (
+      select 1 from favoritos f_usuario
+      where f_usuario.atendimento_id = a.id
+        and f_usuario.perfil_id = ${perfilPlaceholder}
+    ) as "favoritadoPeloUsuario",
+    (select count(*)::int from favoritos f_count where f_count.atendimento_id = a.id) as "favoritosCount",
+    (select coalesce(array_agg(u.nome order by f.favoritado_em asc, u.nome asc), '{}')
+     from favoritos f join usuarios u on u.id = f.perfil_id
+     where f.atendimento_id = a.id) as "favoritosPerfis"
+   from atendimentos a`
+  );
 
 export function createAtendimentosRepository(db: pg.Pool) {
   return {
@@ -197,7 +216,8 @@ export function createAtendimentosRepository(db: pg.Pool) {
     },
 
     async list(
-      query: AtendimentosQuery
+      query: AtendimentosQuery,
+      perfilId: string | null = null
     ): Promise<{ items: AtendimentoSummaryRow[]; total: number }> {
       const detalhamento = buildDetalhamentoFilters(query, 4);
       const clauses = [
@@ -218,7 +238,7 @@ export function createAtendimentosRepository(db: pg.Pool) {
           where ${countClauses.join(' and ')}
         `, [query.status ?? null, ...countDetalhamento.values]),
         db.query<AtendimentoSummaryRow>(`
-          ${selectAtendimentoSummary}
+          ${selectAtendimentoSummaryWithFavoritos(`$${4 + detalhamento.values.length}`)}
           where ${clauses.join(' and ')}
           order by coalesce(a.concluido_em, a.iniciado_em, a.criado_em) asc, a.id asc
           limit $1 offset $2
@@ -226,7 +246,8 @@ export function createAtendimentosRepository(db: pg.Pool) {
           query.limit,
           query.offset,
           query.status ?? null,
-          ...detalhamento.values
+           ...detalhamento.values,
+           perfilId
         ])
       ]);
       return {

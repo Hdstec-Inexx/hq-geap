@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { calcularConferencia } from '../../apps/api/src/modules/curadoria/service.js';
+import { createCuradoriaRepository } from '../../apps/api/src/modules/curadoria/repository.js';
 
 const checklistIa = [
   {
@@ -298,6 +299,42 @@ test('listPending ordena FIFO no mes implicito e com periodo informado', async (
   const periodo = captured.find((sql) => sql.includes('order by')) ?? '';
   assert.match(periodo, /order by a\.concluido_em asc nulls last, a\.id asc/);
   assert.doesNotMatch(periodo, /order by a\.concluido_em desc/);
+});
+
+test('listPending enriquece a query com o estado de Favorito do perfil', async () => {
+  const queries: Array<{ text: string; values?: unknown[] }> = [];
+  const mockDb = {
+    query: async (text: string, values?: unknown[]) => {
+      queries.push({ text, values });
+      return { rows: [{ total: '0' }] };
+    }
+  } as any;
+  const repo = createCuradoriaRepository(mockDb);
+
+  await repo.listPending({ limit: 50, offset: 0, perfilId: 'perfil-curador' } as any);
+
+  const select = queries.find((query) => query.text.includes('from fila_curadoria') && query.text.includes('favoritadoPeloUsuario'));
+  assert.ok(select);
+  assert.match(select.text, /favoritadoPeloUsuario/);
+  assert.match(select.text, /from favoritos/);
+  assert.ok(select.values?.includes('perfil-curador'));
+});
+
+test('listRealizadas enriquece a query com os metadados de Favorito', async () => {
+  const queries: string[] = [];
+  const mockDb = {
+    query: async (text: string) => {
+      queries.push(text);
+      return { rows: [{ total: '0' }] };
+    }
+  } as any;
+  const repo = createCuradoriaRepository(mockDb);
+
+  await repo.listRealizadas({ limit: 50, offset: 0, perfilId: 'perfil-curador' } as any);
+
+  const select = queries.find((query) => query.includes('from atendimentos') && query.includes('favoritosCount'));
+  assert.ok(select);
+  assert.match(select, /favoritosPerfis/);
 });
 
 test('listDistinctMotivos retorna motivos distintos e ordenados incluindo Nao informado canônico', async () => {

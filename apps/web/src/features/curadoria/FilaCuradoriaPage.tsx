@@ -10,6 +10,7 @@ import { useAuthenticatedResource } from '../atendimentos/api';
 import { formatMotivoContato } from '../atendimentos/motivo-combobox-logic';
 import { MotivoCombobox } from '../atendimentos/MotivoCombobox';
 import { NotaIaAvaliadoraFiltro } from '../atendimentos/NotaIaAvaliadoraFiltro';
+import { FavoritoListControl } from '../atendimentos/FavoritoListControl';
 import {
   applyDraftNotaMin,
   applyNotaMinQuery,
@@ -256,6 +257,13 @@ export function FilaCuradoriaPage() {
                 </Link>
                 <small>{dateTime.format(new Date(item.concluidoEm))}</small>
               </div>
+              <FavoritoListControl
+                atendimentoId={item.id}
+                favoritosCount={item.favoritosCount}
+                favoritosPerfis={item.favoritosPerfis}
+                favoritadoPeloUsuario={item.favoritadoPeloUsuario}
+                isCurador={canWrite}
+              />
               <dl>
                 <div><dt>Motivo</dt><dd>{formatMotivoContato(item.motivoContato)}</dd></div>
                 <div><dt>Duração</dt><dd>{formatDuration(item.duracaoSegundos)}</dd></div>

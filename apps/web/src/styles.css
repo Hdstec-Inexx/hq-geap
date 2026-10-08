@@ -4043,6 +4043,7 @@ h1 {
 }
 
 .favoritos-readonly-indicator {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -4052,6 +4053,32 @@ h1 {
   border: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 0.8125rem;
   color: #94a3b8;
+}
+
+.favoritos-readonly-indicator::after {
+  background: #111827;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  bottom: calc(100% + 8px);
+  color: #f8fafc;
+  content: attr(data-tooltip);
+  left: 50%;
+  max-width: min(320px, 70vw);
+  opacity: 0;
+  padding: 6px 9px;
+  pointer-events: none;
+  position: absolute;
+  transform: translate(-50%, 4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+  white-space: normal;
+  width: max-content;
+  z-index: 2;
+}
+
+.favoritos-readonly-indicator:hover::after,
+.favoritos-readonly-indicator:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 .favoritos-readonly-indicator .favorito-star-icon {

@@ -104,6 +104,20 @@ test('resumo de Atendimento inclui nota da IA Avaliadora ou nulo', () => {
   assert.equal(atendimentoSummarySchema.safeParse(atendimentoSummaryBase).success, false);
 });
 
+test('resumo de Atendimento aceita metadados de Favorito por papel', () => {
+  const parsed = atendimentoSummarySchema.parse({
+    ...atendimentoSummaryBase,
+    notaIa: 8,
+    favoritadoPeloUsuario: true,
+    favoritosCount: 2,
+    favoritosPerfis: ['Ana', 'Bruno']
+  });
+
+  assert.equal(parsed.favoritadoPeloUsuario, true);
+  assert.equal(parsed.favoritosCount, 2);
+  assert.deepEqual(parsed.favoritosPerfis, ['Ana', 'Bruno']);
+});
+
 const fixturePath = new URL(
   '../fixtures/elevenlabs/atendimento-concluido.json',
   import.meta.url
@@ -1351,6 +1365,62 @@ test('toAtendimentoSummary mapeia nota da IA Avaliadora e nulo quando ausente', 
     notaIa: '9.50'
   });
   assert.equal(comNota.notaIa, 9.5);
+});
+
+test('toAtendimentoSummary projeta favoritos conforme o papel sem cruzar metadados', () => {
+  const row: AtendimentoSummaryRow = {
+    id: '21f908bd-3728-4bfd-8035-3abd750b74d7',
+    conversationId: 'conv-favoritos',
+    agenteVozId: '11111111-1111-4111-8111-111111111111',
+    agenteVozNome: 'Lívia',
+    agentId: 'agent-livia-test',
+    status: 'concluido',
+    iniciadoEm: null,
+    concluidoEm: null,
+    duracaoSegundos: null,
+    motivoContato: null,
+    houveTransferencia: false,
+    custo: null,
+    notaIa: null,
+    eventTimestamp: null,
+    curadorId: null,
+    curadorNome: null,
+    curadoriaNota: null,
+    curadoriaRealizadaEm: null,
+    favoritadoPeloUsuario: true,
+    favoritosCount: 2,
+    favoritosPerfis: ['Ana', 'Bruno']
+  };
+
+  const curador = toAtendimentoSummary(row, { role: 'curador' });
+  const gestao = toAtendimentoSummary(row, { role: 'gestao' });
+  assert.deepEqual(curador.favoritadoPeloUsuario, true);
+  assert.equal(curador.favoritosCount, undefined);
+  assert.deepEqual(gestao.favoritosPerfis, ['Ana', 'Bruno']);
+  assert.equal(gestao.favoritadoPeloUsuario, undefined);
+});
+
+test('lista de Atendimentos enriquece a query com favoritos do perfil autenticado', async () => {
+  const { createAtendimentosRepository } = await import(
+    '../../apps/api/src/modules/atendimentos/repository.js'
+  );
+  const queries: Array<{ text: string; values?: unknown[] }> = [];
+  const mockDb = {
+    query: async (text: string, values?: unknown[]) => {
+      queries.push({ text, values });
+      return { rows: text.includes('count(*)') ? [{ total: '0' }] : [] };
+    }
+  } as any;
+
+  await createAtendimentosRepository(mockDb).list(
+    atendimentosQuerySchema.parse({ limit: 50, offset: 0 }),
+    'perfil-curador'
+  );
+
+  const select = queries.find((query) => query.text.includes('favoritadosCount') || query.text.includes('favoritosCount'));
+  assert.ok(select);
+  assert.match(select.text, /favoritadoPeloUsuario/);
+  assert.ok(select.values?.includes('perfil-curador'));
 });
 
 test('filtros SQL suportam curadoriaStatus e curadorId', async () => {

@@ -81,9 +81,10 @@ const routes: FastifyPluginAsync = async (app) => {
         throw app.httpErrors.forbidden('Role does not have permission');
       }
     }
-    const list = await repository.list(query.data);
+    const user = request.authUser;
+    const list = await repository.list(query.data, user?.role === 'curador' ? user.id : null);
     return {
-      items: list.items.map(toAtendimentoSummary),
+      items: list.items.map((row) => toAtendimentoSummary(row, { role: user?.role })),
       total: list.total
     };
   });

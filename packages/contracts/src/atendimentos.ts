@@ -482,7 +482,10 @@ export const atendimentoSummarySchema = z.object({
   houveTransferencia: z.boolean(),
   custo: z.number().nonnegative().nullable().optional(),
   notaIa: z.number().min(0).max(10).nullable(),
-  curadoria: curadoriaAtendimentoSummarySchema
+  curadoria: curadoriaAtendimentoSummarySchema,
+  favoritadoPeloUsuario: z.boolean().optional(),
+  favoritosCount: z.number().int().min(0).optional(),
+  favoritosPerfis: z.array(z.string()).optional()
 });
 
 export const favoritoPerfilSchema = z.object({

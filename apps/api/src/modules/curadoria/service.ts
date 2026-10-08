@@ -90,19 +90,47 @@ function checklistValues(checklist: CriterioConferencia[]) {
   }));
 }
 
-export function toFilaCuradoriaItem(row: FilaCuradoriaRow): FilaCuradoriaItem {
+type FavoritoRole = 'curador' | 'gestao' | 'admin' | undefined;
+
+function favoritoValues(row: FilaCuradoriaRow | CuradoriaRealizadaRow, role: FavoritoRole) {
+  if (role === 'curador') {
+    return { favoritadoPeloUsuario: Boolean(row.favoritadoPeloUsuario) };
+  }
+  if (role === 'gestao' || role === 'admin') {
+    return {
+      favoritosCount: row.favoritosCount ?? 0,
+      favoritosPerfis: row.favoritosPerfis ?? []
+    };
+  }
+  return {};
+}
+
+function rowWithoutFavoritoMetadata<T extends FilaCuradoriaRow | CuradoriaRealizadaRow>(row: T) {
+  const {
+    favoritadoPeloUsuario: _favoritadoPeloUsuario,
+    favoritosCount: _favoritosCount,
+    favoritosPerfis: _favoritosPerfis,
+    ...base
+  } = row;
+  return base;
+}
+
+export function toFilaCuradoriaItem(row: FilaCuradoriaRow, role?: FavoritoRole): FilaCuradoriaItem {
   return filaCuradoriaItemSchema.parse({
-    ...row,
+    ...rowWithoutFavoritoMetadata(row),
+    ...favoritoValues(row, role),
     concluidoEm: row.concluidoEm.toISOString(),
     notaIa: Number(row.notaIa)
   });
 }
 
 export function toCuradoriaRealizadaItem(
-  row: CuradoriaRealizadaRow
+  row: CuradoriaRealizadaRow,
+  role?: FavoritoRole
 ): CuradoriaRealizadaItem {
   return curadoriaRealizadaItemSchema.parse({
-    ...row,
+    ...rowWithoutFavoritoMetadata(row),
+    ...favoritoValues(row, role),
     concluidoEm: row.concluidoEm.toISOString(),
     notaIa: Number(row.notaIa),
     notaCurador: Number(row.notaCurador),

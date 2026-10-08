@@ -29,7 +29,10 @@ function safeAudioUrl(audioUrl: string | null): string | null {
   return z.url().safeParse(audioUrl).success ? audioUrl : null;
 }
 
-function summaryValues(row: AtendimentoSummaryRow) {
+function summaryValues(
+  row: AtendimentoSummaryRow,
+  options?: { role?: 'curador' | 'gestao' | 'admin' }
+) {
   const custo =
     row.custo === null || row.custo === undefined ? null : Number(row.custo);
   const notaIa =
@@ -77,12 +80,23 @@ function summaryValues(row: AtendimentoSummaryRow) {
       realizadaEm: curadoriaRealizada
         ? toIsoDateTime(row.curadoriaRealizadaEm)
         : null
-    }
+    },
+    ...(options?.role === 'curador'
+      ? { favoritadoPeloUsuario: Boolean(row.favoritadoPeloUsuario) }
+      : options?.role === 'gestao' || options?.role === 'admin'
+        ? {
+            favoritosCount: row.favoritosCount ?? 0,
+            favoritosPerfis: row.favoritosPerfis ?? []
+          }
+        : {})
   };
 }
 
-export function toAtendimentoSummary(row: AtendimentoSummaryRow): AtendimentoSummary {
-  return atendimentoSummarySchema.parse(summaryValues(row));
+export function toAtendimentoSummary(
+  row: AtendimentoSummaryRow,
+  options?: { role?: 'curador' | 'gestao' | 'admin' }
+): AtendimentoSummary {
+  return atendimentoSummarySchema.parse(summaryValues(row, options));
 }
 
 export function toAtendimentoDetail(

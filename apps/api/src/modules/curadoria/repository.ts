@@ -20,6 +20,9 @@ export type FilaCuradoriaRow = {
   duracaoSegundos: number | null;
   motivoContato: string | null;
   notaIa: string;
+  favoritadoPeloUsuario?: boolean;
+  favoritosCount?: number;
+  favoritosPerfis?: string[];
 };
 
 export type CuradoriaRealizadaRow = {
@@ -34,6 +37,9 @@ export type CuradoriaRealizadaRow = {
   curadorNome: string;
   notaCurador: string;
   realizadaEm: Date;
+  favoritadoPeloUsuario?: boolean;
+  favoritosCount?: number;
+  favoritosPerfis?: string[];
 };
 
 
@@ -149,6 +155,7 @@ export type FilaCuradoriaFilters = {
   motivo?: string;
   conversationId?: string;
   notaMin?: number;
+  perfilId?: string;
 };
 
 export type CuradoriasRealizadasFilters = {
@@ -160,6 +167,7 @@ export type CuradoriasRealizadasFilters = {
   criteriosAtendidos?: string[];
   conversationId?: string;
   notaMin?: number;
+  perfilId?: string;
 };
 
 export type FilaCuradoriaFilterOptions = {
@@ -282,6 +290,16 @@ export function createCuradoriaRepository(db: pg.Pool) {
           ? `where ${countFilters.clauses.join(' and ')}`
           : '';
 
+      const profilePlaceholder = `$${3 + selectFilters.values.length}`;
+      const favoriteSelectClause = `
+            exists (
+              select 1 from favoritos f_usuario
+              where f_usuario.atendimento_id = a.id and f_usuario.perfil_id = ${profilePlaceholder}
+            ) as "favoritadoPeloUsuario",
+            (select count(*)::int from favoritos f_count where f_count.atendimento_id = a.id) as "favoritosCount",
+            (select coalesce(array_agg(u.nome order by f.favoritado_em asc, u.nome asc), '{}')
+             from favoritos f join usuarios u on u.id = f.perfil_id
+             where f.atendimento_id = a.id) as "favoritosPerfis"`;
       const [count, result] = await Promise.all([
         db.query<{ total: string }>(`
           select count(*)::text as total
@@ -297,14 +315,15 @@ export function createCuradoriaRepository(db: pg.Pool) {
             a.concluido_em as "concluidoEm",
             a.duracao_segundos as "duracaoSegundos",
             a.motivo_contato as "motivoContato",
-            ia.nota as "notaIa"
+            ia.nota as "notaIa",
+            ${favoriteSelectClause}
           from fila_curadoria a
           join agentes_voz agente on agente.id = a.agente_voz_id
           join avaliacoes ia on ia.atendimento_id = a.id and ia.autor = 'ia'
           ${whereClauseSelect}
           order by a.concluido_em asc nulls last, a.id asc
           limit $1 offset $2
-        `, [query.limit, query.offset, ...selectFilters.values])
+        `, [query.limit, query.offset, ...selectFilters.values, query.perfilId ?? null])
       ]);
       return {
         items: result.rows,
@@ -330,6 +349,16 @@ export function createCuradoriaRepository(db: pg.Pool) {
           ? `and ${countFilters.clauses.join(' and ')}`
           : '';
 
+      const profilePlaceholder = `$${3 + selectFilters.values.length}`;
+      const favoriteSelectClause = `
+            exists (
+              select 1 from favoritos f_usuario
+              where f_usuario.atendimento_id = a.id and f_usuario.perfil_id = ${profilePlaceholder}
+            ) as "favoritadoPeloUsuario",
+            (select count(*)::int from favoritos f_count where f_count.atendimento_id = a.id) as "favoritosCount",
+            (select coalesce(array_agg(u.nome order by f.favoritado_em asc, u.nome asc), '{}')
+             from favoritos f join usuarios u on u.id = f.perfil_id
+             where f.atendimento_id = a.id) as "favoritosPerfis"`;
       const [count, result] = await Promise.all([
         db.query<{ total: string }>(`
           select count(*)::text as total
@@ -351,7 +380,8 @@ export function createCuradoriaRepository(db: pg.Pool) {
             cur.autor_usuario_id as "curadorId",
             cur.autor_usuario_nome as "curadorNome",
             cur.nota as "notaCurador",
-            cur.criado_em as "realizadaEm"
+            cur.criado_em as "realizadaEm",
+            ${favoriteSelectClause}
           from atendimentos a
           join agentes_voz agente on agente.id = a.agente_voz_id
           join avaliacoes ia on ia.atendimento_id = a.id and ia.autor = 'ia'
@@ -360,7 +390,7 @@ export function createCuradoriaRepository(db: pg.Pool) {
           ${whereClauseSelect}
           order by cur.criado_em desc, a.id desc
           limit $1 offset $2
-        `, [query.limit, query.offset, ...selectFilters.values])
+        `, [query.limit, query.offset, ...selectFilters.values, query.perfilId ?? null])
       ]);
       return {
         items: result.rows,

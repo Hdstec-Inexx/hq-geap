@@ -13,6 +13,7 @@ import { MotivoCombobox } from '../atendimentos/MotivoCombobox';
 import { CriteriosMultiSelect } from '../atendimentos/CriteriosMultiSelect';
 import { parseCriteriaParam } from '../atendimentos/criterios-filtro-logic';
 import { NotaIaAvaliadoraFiltro } from '../atendimentos/NotaIaAvaliadoraFiltro';
+import { FavoritoListControl } from '../atendimentos/FavoritoListControl';
 import {
   applyDraftNotaMin,
   applyNotaMinQuery,
@@ -364,6 +365,13 @@ export function CuradoriasRealizadasPage() {
                 </Link>
                 <small>{dateTime.format(new Date(item.realizadaEm))}</small>
               </div>
+              <FavoritoListControl
+                atendimentoId={item.id}
+                favoritosCount={item.favoritosCount}
+                favoritosPerfis={item.favoritosPerfis}
+                favoritadoPeloUsuario={item.favoritadoPeloUsuario}
+                isCurador={isMinhas}
+              />
               <dl>
                 <div><dt>Motivo</dt><dd>{formatMotivoContato(item.motivoContato)}</dd></div>
                 <div><dt>Duração</dt><dd>{formatDuration(item.duracaoSegundos)}</dd></div>

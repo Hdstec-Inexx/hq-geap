@@ -45,10 +45,11 @@ const routes: FastifyPluginAsync = async (app) => {
 
     const page = await repository.listRealizadas({
       ...query.data,
-      curadorId
+      curadorId,
+      perfilId: request.authUser?.role === 'curador' ? request.authUser.id : undefined
     });
     return {
-      items: page.items.map(toCuradoriaRealizadaItem),
+      items: page.items.map((item) => toCuradoriaRealizadaItem(item, request.authUser?.role)),
       total: page.total
     };
   });
@@ -60,9 +61,12 @@ const routes: FastifyPluginAsync = async (app) => {
     if (!query.success) {
       throw app.httpErrors.badRequest('Invalid Fila de Curadoria query');
     }
-    const page = await repository.listPending(query.data);
+    const page = await repository.listPending({
+      ...query.data,
+      perfilId: request.authUser?.role === 'curador' ? request.authUser.id : undefined
+    });
     return {
-      items: page.items.map(toFilaCuradoriaItem),
+      items: page.items.map((item) => toFilaCuradoriaItem(item, request.authUser?.role)),
       total: page.total
     };
   });
