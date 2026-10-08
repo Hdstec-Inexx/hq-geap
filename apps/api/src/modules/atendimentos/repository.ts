@@ -4,6 +4,7 @@ import type {
   FavoritosInfo,
   IngestAtendimento
 } from '@hq-geap/contracts/atendimentos';
+import type { FavoritosQuery } from '@hq-geap/contracts/favoritos';
 import type pg from 'pg';
 import { buildDetalhamentoFilters, canonicalMotivoSql } from './detalhamentoFilters.js';
 
@@ -296,6 +297,35 @@ export function createAtendimentosRepository(db: pg.Pool) {
         count: result.rows.length,
         perfis: result.rows
       };
+    },
+
+    async listFavoritos(query: FavoritosQuery, perfilId: string | null) {
+      const values: unknown[] = [query.limit, query.offset];
+      const clauses = ['1 = 1'];
+      const add = (value: unknown) => { values.push(value); return `$${values.length}`; };
+      if (query.agenteVozId) clauses.push(`a.agente_voz_id = ${add(query.agenteVozId)}`);
+      if (query.conversationId) clauses.push(`a.elevenlabs_conversation_id ilike '%' || ${add(query.conversationId)} || '%'`);
+      if (perfilId) clauses.push(`f.perfil_id = ${add(perfilId)}`);
+      if (query.perfilId) clauses.push(`f.perfil_id = ${add(query.perfilId)}`);
+      const countClauses = clauses.map((clause) =>
+        clause.replace(/\$(\d+)/g, (_match, value: string) => `$${Number(value) - 2}`)
+      );
+
+      if (perfilId) {
+        const [count, result] = await Promise.all([
+          db.query<{ total: string }>(`select count(*)::text as total from favoritos f join atendimentos a on a.id = f.atendimento_id where ${countClauses.join(' and ')}`, values.slice(2)),
+          db.query(`select summary.*, a.transcricao, a.audio_url as "audioReference", f.favoritado_em as "favoritadoEm" from favoritos f join (${selectAtendimentoSummary}) summary on summary.id = f.atendimento_id join atendimentos a on a.id = summary.id where ${clauses.join(' and ')} order by f.favoritado_em desc, f.atendimento_id desc limit $1 offset $2`, values)
+        ]);
+        return { items: result.rows, total: Number(count.rows[0]?.total ?? 0) };
+      }
+
+      const groupClauses = clauses;
+      const countValues = values.slice(2);
+      const [count, result] = await Promise.all([
+        db.query<{ total: string }>(`select count(*)::text as total from (select a.id from favoritos f join atendimentos a on a.id = f.atendimento_id where ${countClauses.join(' and ')} group by a.id) grouped`, countValues),
+        db.query(`select summary.*, a.transcricao, a.audio_url as "audioReference", max(f.favoritado_em) as "ultimoFavoritadoEm", jsonb_build_object('count', count(f.id), 'perfis', jsonb_agg(jsonb_build_object('id', u.id, 'nome', u.nome) order by f.favoritado_em asc, u.nome asc)) as favoritos from favoritos f join (${selectAtendimentoSummary}) summary on summary.id = f.atendimento_id join atendimentos a on a.id = summary.id join usuarios u on u.id = f.perfil_id where ${groupClauses.join(' and ')} group by summary.id, summary."conversationId", summary."agenteVozId", summary."agenteVozNome", summary."agentId", summary.status, summary."iniciadoEm", summary."concluidoEm", summary."duracaoSegundos", summary."motivoContato", summary."houveTransferencia", summary.custo, summary."notaIa", summary."eventTimestamp", summary."curadorId", summary."curadorNome", summary."curadoriaNota", summary."curadoriaRealizadaEm", a.transcricao, a.audio_url order by max(f.favoritado_em) desc, summary.id desc limit $1 offset $2`, values)
+      ]);
+      return { items: result.rows, total: Number(count.rows[0]?.total ?? 0) };
     }
   };
 }

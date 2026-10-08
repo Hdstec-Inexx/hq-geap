@@ -6,6 +6,11 @@ import {
   favoritosInfoSchema,
   mutacaoFavoritoResponseSchema
 } from '../../packages/contracts/src/atendimentos.js';
+import {
+  favoritosCuradorSchema,
+  favoritosGestaoSchema,
+  favoritosQuerySchema
+} from '../../packages/contracts/src/favoritos.js';
 
 const baseAtendimentoDetail = {
   id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
@@ -74,4 +79,37 @@ test('atendimentoDetailSchema tolera campos de favoritos opcionais', () => {
       favoritos: { count: 0, perfis: [] }
     })
   );
+});
+
+test('favoritosQuerySchema aceita busca atemporal, agente, perfil e paginação', () => {
+  assert.deepEqual(favoritosQuerySchema.parse({
+    agenteVozId: 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22',
+    conversationId: 'conv-1',
+    perfilId: 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33',
+    limit: '20',
+    offset: '40'
+  }), {
+    agenteVozId: 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22',
+    conversationId: 'conv-1',
+    perfilId: 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33',
+    limit: 20,
+    offset: 40
+  });
+});
+
+test('favoritos define payloads distintos para Curador e Gestao/Admin', () => {
+  const item = {
+    ...baseAtendimentoDetail,
+    favoritadoEm: '2026-10-07T12:05:00.000Z'
+  };
+  assert.equal(favoritosCuradorSchema.parse({ items: [item], total: 1 }).items[0]?.favoritadoEm,
+    '2026-10-07T12:05:00.000Z');
+  assert.equal(favoritosGestaoSchema.parse({
+    items: [{
+      ...baseAtendimentoDetail,
+      ultimoFavoritadoEm: '2026-10-07T12:05:00.000Z',
+      favoritos: { count: 1, perfis: [{ id: 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', nome: 'Carlos Curador' }] }
+    }],
+    total: 1
+  }).items[0]?.favoritos.count, 1);
 });
