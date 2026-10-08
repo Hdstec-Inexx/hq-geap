@@ -96,7 +96,10 @@ const routes: FastifyPluginAsync = async (app) => {
     if (user.role !== 'curador' && user.role !== 'gestao' && user.role !== 'admin') {
       throw app.httpErrors.forbidden('Role does not have permission');
     }
-    const result = await repository.listFavoritos(parsed.data, user.role === 'curador' ? user.id : null);
+    const query = user.role === 'curador'
+      ? { ...parsed.data, perfilId: undefined }
+      : parsed.data;
+    const result = await repository.listFavoritos(query, user.role === 'curador' ? user.id : null);
     if (user.role === 'curador') {
       return favoritosCuradorSchema.parse({
         total: result.total,

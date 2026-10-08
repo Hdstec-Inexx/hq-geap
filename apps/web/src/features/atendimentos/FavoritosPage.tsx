@@ -23,7 +23,7 @@ function dateTime(value: string) {
 export function FavoritosPage() {
   const perfil = usePerfil();
   const [searchParams, setSearchParams] = useSearchParams();
-  const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1);
+  const page = Math.min(201, Math.max(1, Number(searchParams.get('page') ?? '1') || 1));
   const [conversationId, setConversationId] = useState(searchParams.get('conversationId') ?? '');
   const [agenteVozId, setAgenteVozId] = useState(searchParams.get('agenteVozId') ?? '');
   const [perfilId, setPerfilId] = useState(searchParams.get('perfilId') ?? '');
@@ -69,15 +69,13 @@ export function FavoritosPage() {
       </form>
       {state.status === 'error' ? <p className="atendimentos-state atendimentos-state-error">Não foi possível carregar os Favoritos.</p> : null}
       {items.length === 0 && state.status === 'ready' ? <p className="atendimentos-state">Nenhum Favorito encontrado.</p> : null}
-      <section aria-label="Lista de Favoritos" className="atendimentos-list">
-        {items.map((item) => {
+      <table aria-label="Lista de Favoritos" className="atendimentos-list">
+        <thead><tr><th>Agente de Voz</th><th>ID da conversa</th><th>Favoritado em</th><th>Perfis</th><th>Ação</th></tr></thead>
+        <tbody>{items.map((item) => {
           const gestaoItem = item as FavoritoGestaoItem;
-          return <article className="atendimento-row" key={item.id}>
-            <div><strong>{item.agenteVoz.nome}</strong><Link to={`/atendimentos/${item.id}`}>{item.conversationId}</Link><small>{dateTime(perfil?.role === 'curador' ? (item as FavoritoCuradorItem).favoritadoEm : gestaoItem.ultimoFavoritadoEm)}</small></div>
-            {perfil?.role === 'curador' ? <button aria-label={`Desfazer favorito de ${item.conversationId}`} onClick={() => remove(item as unknown as FavoritoCuradorItem)} type="button">★</button> : <span>{formatPerfisFavoritos(gestaoItem.favoritos.perfis)}</span>}
-          </article>;
-        })}
-      </section>
+          return <tr className="atendimento-row" key={item.id}><td>{item.agenteVoz.nome}</td><td><Link to={`/atendimentos/${item.id}`}>{item.conversationId}</Link></td><td>{dateTime(perfil?.role === 'curador' ? (item as FavoritoCuradorItem).favoritadoEm : gestaoItem.ultimoFavoritadoEm)}</td><td>{perfil?.role === 'curador' ? 'Você' : formatPerfisFavoritos(gestaoItem.favoritos.perfis)}</td><td>{perfil?.role === 'curador' ? <button aria-label={`Desfazer favorito de ${item.conversationId}`} onClick={() => remove(item as unknown as FavoritoCuradorItem)} type="button">★</button> : null}</td></tr>;
+        })}</tbody>
+      </table>
       {state.status === 'ready' && state.data.total > 50 ? <nav aria-label="Paginação de Favoritos" className="pagination-controls">
         {page > 1 ? <button type="button" onClick={() => setSearchParams((current) => { const next = new URLSearchParams(current); next.set('page', String(page - 1)); return next; })}>Anterior</button> : null}
         <span>Página {page} de {Math.ceil(state.data.total / 50)}</span>

@@ -186,6 +186,7 @@ test.describe.serial('Favoritar e desfavoritar no detalhe e no Monitoramento ao 
     await page.goto('/favoritos');
     await expect(page.getByRole('link', { name: 'Favoritos' })).toBeVisible();
     await expect(page.getByText(convDetailId)).toBeVisible();
+    await page.getByLabel('Agente de Voz').selectOption(agenteVozId);
     await page.getByPlaceholder('Buscar por ID...').fill(convDetailId);
     await page.getByRole('button', { name: 'Filtrar' }).click();
     await expect(page).toHaveURL(/conversationId=conv-favorito-detail-e2e/);
@@ -195,6 +196,9 @@ test.describe.serial('Favoritar e desfavoritar no detalhe e no Monitoramento ao 
     await queryDatabase('insert into favoritos (perfil_id, atendimento_id) values ($1, $2) on conflict do nothing', [session.user.id, atendimentoId]);
     await loginPage(page, 'gestao');
     await page.goto('/favoritos');
+    await page.getByLabel('Perfil de Curador').selectOption(session.user.id);
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page).toHaveURL(/perfilId=/);
     await expect(page.getByText(convDetailId)).toBeVisible();
     await expect(page.getByText(/Favoritado por/)).toBeVisible();
     await expect(page.getByRole('button', { name: /Desfazer favorito/ })).toHaveCount(0);
