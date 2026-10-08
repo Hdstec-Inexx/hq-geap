@@ -294,7 +294,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     const curador = await login(request, 'curador');
     const headersFor = (token: string) => ({ authorization: `Bearer ${token}` });
 
-    const listResponse = await request.get(`${apiUrl}/atendimentos`, {
+    const listResponse = await request.get(`${apiUrl}/atendimentos?inicio=2026-07-29&fim=2026-07-29`, {
       headers: headersFor(admin.token)
     });
     expect(listResponse.status()).toBe(200);
@@ -317,7 +317,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     expect(summary).not.toHaveProperty('transcricao');
 
     const limitedList = await request.get(
-      `${apiUrl}/atendimentos?limit=1&offset=0`,
+      `${apiUrl}/atendimentos?inicio=2026-07-29&fim=2026-07-29&limit=1&offset=0`,
       { headers: headersFor(admin.token) }
     );
     expect(limitedList.status()).toBe(200);
@@ -365,7 +365,8 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await page.getByLabel('E-mail').fill('admin@hq.test');
     await page.getByLabel('Senha').fill('senha-admin');
     await page.getByRole('button', { name: 'Entrar' }).click();
-    await page.getByRole('link', { name: 'Consultar Atendimentos' }).click();
+    await expect(page).toHaveURL('/');
+    await page.goto('/atendimentos?inicio=2026-07-29&fim=2026-07-29');
 
     await expect(page.getByRole('heading', { name: 'Atendimentos' })).toBeVisible();
     await page
@@ -651,10 +652,11 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     const motivoCombobox = page.locator('#atendimentos-motivo-filtro');
     await motivoCombobox.click();
     await motivoCombobox.fill('Rede Credenciada');
-    await page.locator('input[name="inicio"]').fill('');
+    await page.locator('input[name="inicio"]').fill('2026-08-01');
+    await page.locator('input[name="fim"]').fill('2026-08-31');
     await page.getByRole('button', { name: 'Filtrar' }).click();
     await expect(page).toHaveURL(/motivo=Rede\+Credenciada|motivo=Rede%20Credenciada/);
-    await expect(page.getByText('Rede Credenciada')).toBeVisible();
+    await expect(page.getByText('Rede credenciada')).toBeVisible();
 
     // Filtro pelo motivo canônico Não informado
     await motivoCombobox.click();
@@ -665,7 +667,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await expect(page).toHaveURL(/motivo=N%C3%A3o(\+|%20)informado|motivo=Nao(\+|%20)informado/);
     await expect(page.getByRole('link', { name: 'Não informado' })).toBeVisible();
     await expect(page.getByText('Boleto/Pagamento')).toHaveCount(0);
-    await expect(page.getByText('Rede Credenciada')).toHaveCount(0);
+    await expect(page.getByText('Rede credenciada')).toHaveCount(0);
 
     // Limpar filtros
     await page.getByRole('button', { name: 'Limpar filtros' }).click();
@@ -700,6 +702,10 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     // Ingestão de 2 atendimentos para o teste
     const convRealizada = 'conv-curadoria-realizada-001';
     const convPendente = 'conv-curadoria-pendente-001';
+    await queryDatabase(
+      'delete from atendimentos where elevenlabs_conversation_id = any($1::text[])',
+      [[convRealizada, convPendente]]
+    );
 
     const resp1 = await request.post(`${apiUrl}/atendimentos/ingestao`, {
       data: {
@@ -783,7 +789,8 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     expect(confRes.status()).toBe(201);
 
     // 2. Consulta GET /atendimentos verifica metadados de curadoria
-    const listRes = await request.get(`${apiUrl}/atendimentos`, { headers });
+    const dateFilter = 'inicio=2026-08-01&fim=2026-08-31';
+    const listRes = await request.get(`${apiUrl}/atendimentos?${dateFilter}`, { headers });
     expect(listRes.status()).toBe(200);
     const listData = (await listRes.json()) as {
       items: Array<{
@@ -817,7 +824,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       (item) => item.conversationId === convPendente
     );
     expect(itemPendente).toBeDefined();
-    expect(itemPendente?.notaIa).toEqual(expect.any(Number));
+    expect(itemPendente?.notaIa).toBeNull();
     expect(itemPendente?.curadoria).toEqual({
       realizada: false,
       curadorId: null,
@@ -828,7 +835,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
 
     // 3. Filtro por curadoriaStatus=realizada via API
     const listRealizada = await request.get(
-      `${apiUrl}/atendimentos?curadoriaStatus=realizada`,
+      `${apiUrl}/atendimentos?${dateFilter}&curadoriaStatus=realizada`,
       { headers }
     );
     const dataRealizada = (await listRealizada.json()) as {
@@ -843,7 +850,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
 
     // 4. Filtro por curadoriaStatus=pendente via API
     const listPendente = await request.get(
-      `${apiUrl}/atendimentos?curadoriaStatus=pendente`,
+      `${apiUrl}/atendimentos?${dateFilter}&curadoriaStatus=pendente`,
       { headers }
     );
     const dataPendente = (await listPendente.json()) as {
@@ -858,7 +865,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
 
     // 5. Filtro por curadorId via API
     const listCurador = await request.get(
-      `${apiUrl}/atendimentos?curadorId=${curador?.id}`,
+      `${apiUrl}/atendimentos?${dateFilter}&curadorId=${curador?.id}`,
       { headers }
     );
     const dataCurador = (await listCurador.json()) as {
@@ -877,7 +884,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await page.getByLabel('Senha').fill('senha-admin');
     await page.getByRole('button', { name: 'Entrar' }).click();
     await expect(page).toHaveURL('/');
-    await page.goto('/atendimentos');
+    await page.goto(`/atendimentos?${dateFilter}`);
 
     // Verificar exibição dos badges nos cards
     await expect(
@@ -909,7 +916,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       page.getByText('Curadoria Realizada Motivo').first()
     ).toBeVisible();
     await expect(
-      page.getByText('Curadoria Pendente Motivo')
+      page.getByText('Curadoria pendente', { exact: true })
     ).not.toBeVisible();
 
     // Filtrar por Curador
@@ -925,7 +932,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
       page.getByText('Curadoria Realizada Motivo').first()
     ).toBeVisible();
     await expect(
-      page.getByText('Curadoria Pendente Motivo')
+      page.getByText('Curadoria pendente', { exact: true })
     ).not.toBeVisible();
 
     // Limpar filtros
@@ -1206,6 +1213,8 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
 
     await page.getByRole('button', { name: 'Limpar filtros' }).click();
     await expect(page).toHaveURL('/atendimentos');
+    await page.getByPlaceholder('Buscar por ID...').fill('conv-crit-and-');
+    await page.getByRole('button', { name: 'Filtrar' }).click();
     await expect(page.locator(`a[href*="/atendimentos/${at1Id}"]`)).toBeVisible();
     await expect(page.locator(`a[href*="/atendimentos/${at2Id}"]`)).toBeVisible();
   });
@@ -1244,7 +1253,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
 
     // 1. Consulta via API com filtro parcial case-insensitive
     const apiRes = await request.get(
-      `${apiUrl}/atendimentos?conversationId=filt-alpha`,
+      `${apiUrl}/atendimentos?inicio=2026-08-01&fim=2026-08-31&conversationId=filt-alpha`,
       { headers }
     );
     expect(apiRes.status()).toBe(200);
@@ -1258,7 +1267,7 @@ test.describe.serial('ingestao e consulta de Atendimentos', () => {
     await page.getByLabel('Senha').fill('senha-admin');
     await page.getByRole('button', { name: 'Entrar' }).click();
     await expect(page).toHaveURL('/');
-    await page.goto('/atendimentos');
+    await page.goto('/atendimentos?inicio=2026-08-01&fim=2026-08-31');
 
     const idInput = page.locator('#atendimentos-conversation-id-filtro');
     await expect(idInput).toBeVisible();

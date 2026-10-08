@@ -22,6 +22,7 @@ const apiUrl = 'http://127.0.0.1:3000';
 
 const areasPorPapel: Record<AuthRole, string[]> = {
   curador: [
+    'Favoritos',
     'Consultar Atendimentos',
     'Monitoramento ao Vivo',
     'Abrir Fila de Curadoria',
@@ -29,6 +30,7 @@ const areasPorPapel: Record<AuthRole, string[]> = {
     'Consultar Régua de Avaliação'
   ],
   gestao: [
+    'Favoritos',
     'Abrir Dashboard da Gestão',
     'Consultar Atendimentos',
     'Monitoramento ao Vivo',
@@ -37,6 +39,7 @@ const areasPorPapel: Record<AuthRole, string[]> = {
     'Consultar Régua de Avaliação'
   ],
   admin: [
+    'Favoritos',
     'Abrir Dashboard da Gestão',
     'Consultar Atendimentos',
     'Monitoramento ao Vivo',

@@ -10,6 +10,7 @@ import { useAuthenticatedResource } from '../atendimentos/api';
 import { formatMotivoContato } from '../atendimentos/motivo-combobox-logic';
 import { MotivoCombobox } from '../atendimentos/MotivoCombobox';
 import { NotaIaAvaliadoraFiltro } from '../atendimentos/NotaIaAvaliadoraFiltro';
+import { FavoritoListControl } from '../atendimentos/FavoritoListControl';
 import {
   applyDraftNotaMin,
   applyNotaMinQuery,
@@ -90,7 +91,8 @@ export function FilaCuradoriaPage() {
   const requestPath = `/curadoria?${query.toString()}`;
   const state = useAuthenticatedResource(requestPath, filaCuradoriaSchema);
   const currentState = state.path === requestPath;
-  const canWrite = canWriteAsCurador(usePerfil()?.role);
+  const perfil = usePerfil();
+  const canWrite = canWriteAsCurador(perfil?.role);
   const items = state.status === 'ready' && currentState ? state.data.items : [];
   const total = state.status === 'ready' && currentState ? state.data.total : 0;
   const resolvedPage = resolveFilaPage(requestedPage, total, items.length);
@@ -261,6 +263,13 @@ export function FilaCuradoriaPage() {
                 <div><dt>Duração</dt><dd>{formatDuration(item.duracaoSegundos)}</dd></div>
                 <div><dt>Nota da IA Avaliadora</dt><dd>{item.notaIa.toLocaleString('pt-BR')}</dd></div>
               </dl>
+              <FavoritoListControl
+                atendimentoId={item.id}
+                favoritosCount={item.favoritosCount}
+                favoritosPerfis={item.favoritosPerfis}
+                favoritadoPeloUsuario={item.favoritadoPeloUsuario}
+                isCurador={perfil?.role === 'curador'}
+              />
               <Link className="review-link" to={reviewHref(item.id, searchParams)}>
                 {canWrite ? 'Conferir' : 'Consultar'}
               </Link>

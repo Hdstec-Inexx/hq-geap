@@ -17,6 +17,7 @@ import {
 } from '../player';
 import { formatAtendimentoDate, formatDuration } from './atendimento-facts-logic';
 import { useAuthenticatedResource } from './api';
+import { FavoritoAtendimento } from './FavoritoAtendimento';
 import { formatMotivoContato } from './motivo-combobox-logic';
 
 const currency = new Intl.NumberFormat('pt-BR', {
@@ -90,7 +91,14 @@ export function AtendimentoPage() {
       <header className="atendimentos-heading">
         <div>
           <p className="eyebrow">{atendimento.agenteVoz.nome} / {atendimento.status === 'concluido' ? 'Concluído' : 'Em andamento'}</p>
-          <h1>Atendimento</h1>
+          <div className="atendimento-title-favorite">
+            <h1>Atendimento</h1>
+            <FavoritoAtendimento
+              atendimentoId={atendimento.id}
+              favoritadoPeloUsuario={atendimento.favoritadoPeloUsuario}
+              favoritos={atendimento.favoritos}
+            />
+          </div>
           <p className="atendimento-id">{atendimento.conversationId}</p>
         </div>
         <Link className="back-link" to={backLink.to}>

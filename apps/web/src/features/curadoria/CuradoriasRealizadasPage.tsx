@@ -13,6 +13,7 @@ import { MotivoCombobox } from '../atendimentos/MotivoCombobox';
 import { CriteriosMultiSelect } from '../atendimentos/CriteriosMultiSelect';
 import { parseCriteriaParam } from '../atendimentos/criterios-filtro-logic';
 import { NotaIaAvaliadoraFiltro } from '../atendimentos/NotaIaAvaliadoraFiltro';
+import { FavoritoListControl } from '../atendimentos/FavoritoListControl';
 import {
   applyDraftNotaMin,
   applyNotaMinQuery,
@@ -373,6 +374,13 @@ export function CuradoriasRealizadasPage() {
                   <div><dt>Curador</dt><dd>{item.curadorNome}</dd></div>
                 ) : null}
               </dl>
+              <FavoritoListControl
+                atendimentoId={item.id}
+                favoritosCount={item.favoritosCount}
+                favoritosPerfis={item.favoritosPerfis}
+                favoritadoPeloUsuario={item.favoritadoPeloUsuario}
+                isCurador={isMinhas && role === 'curador'}
+              />
               <Link className="review-link" to={reviewHref(item.id, searchParams, basePath)}>
                 Consultar
               </Link>

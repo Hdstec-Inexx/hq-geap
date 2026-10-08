@@ -95,21 +95,6 @@ export function TranscriptPanel({
 
   const activeTurnIndex = getActiveTurnIndex(transcricao, currentTime);
 
-  const isTurnVisible = useCallback((index: number) => {
-    const container = containerRef.current;
-    if (!container || index < 0) return true;
-    const element = turnRefs.current[index];
-    if (!element) return true;
-
-    const containerRect = container.getBoundingClientRect();
-    const elementRect = element.getBoundingClientRect();
-
-    return (
-      elementRect.bottom > containerRect.top + 8 &&
-      elementRect.top < containerRect.bottom - 8
-    );
-  }, []);
-
   const scrollToTurn = useCallback((index: number) => {
     const container = containerRef.current;
     if (!container || index < 0) return;
@@ -139,33 +124,21 @@ export function TranscriptPanel({
     if (!isAutoScrollPaused && activeTurnIndex >= 0) {
       scrollToTurn(activeTurnIndex);
       setIsActiveTurnVisible(true);
-    } else if (activeTurnIndex >= 0) {
-      setIsActiveTurnVisible(isTurnVisible(activeTurnIndex));
     }
-  }, [activeTurnIndex, isAutoScrollPaused, isTurnVisible, scrollToTurn]);
-
-  const checkVisibility = useCallback(() => {
-    if (activeTurnIndex >= 0) {
-      const visible = isTurnVisible(activeTurnIndex);
-      setIsActiveTurnVisible(visible);
-      if (visible) {
-        setIsAutoScrollPaused(false);
-      }
-    }
-  }, [activeTurnIndex, isTurnVisible]);
+  }, [activeTurnIndex, isAutoScrollPaused, scrollToTurn]);
 
   const handleUserScrollInput = useCallback(() => {
     isProgrammaticScrollRef.current = false;
     setIsAutoScrollPaused(true);
-    checkVisibility();
-  }, [checkVisibility]);
+    setIsActiveTurnVisible(false);
+  }, []);
 
   const handleScroll = useCallback(() => {
     if (!isProgrammaticScrollRef.current) {
       setIsAutoScrollPaused(true);
-      checkVisibility();
+      setIsActiveTurnVisible(false);
     }
-  }, [checkVisibility]);
+  }, []);
 
   const handleLineSeek = useCallback(
     (turnTime: number, index: number) => {

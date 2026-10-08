@@ -14,6 +14,7 @@ export function areasPorPapel(role: UserRole): AreaCasca[] {
   }
 
   areas.push(
+    { to: '/favoritos', label: 'Favoritos' },
     { to: '/atendimentos', label: 'Consultar Atendimentos' },
     { to: '/monitoramento', label: 'Monitoramento ao Vivo' },
     {

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { calcularConferencia } from '../../apps/api/src/modules/curadoria/service.js';
+import { createCuradoriaRepository } from '../../apps/api/src/modules/curadoria/repository.js';
 
 const checklistIa = [
   {
@@ -236,7 +237,7 @@ test('filtros da Fila aplicam igualdade de notaMin na Nota da IA Avaliadora', as
   assert.deepEqual(comNota.values, ['2025-01-01', '2025-01-31', 7]);
 });
 
-test('buildCuradoriasRealizadasFilters aplica igualdade na Nota da IA Avaliadora, nao na nota do Curador', async () => {
+test('buildCuradoriasRealizadasFilters aplica piso na Nota da IA Avaliadora, nao na nota do Curador', async () => {
   const { buildCuradoriasRealizadasFilters } = await import(
     '../../apps/api/src/modules/curadoria/repository.js'
   );
@@ -247,8 +248,8 @@ test('buildCuradoriasRealizadasFilters aplica igualdade na Nota da IA Avaliadora
   assert.deepEqual(semFiltro.values, []);
 
   const comNota = buildCuradoriasRealizadasFilters({ notaMin: 7 }, 1);
-  assert.match(comNota.clauses.join(' and '), /ia\.nota = \$1/);
-  assert.doesNotMatch(comNota.clauses.join(' and '), /ia\.nota >=/);
+  assert.match(comNota.clauses.join(' and '), /ia\.nota >= \$1/);
+  assert.doesNotMatch(comNota.clauses.join(' and '), /ia\.nota =/);
   assert.doesNotMatch(comNota.clauses.join(' and '), /cur\.nota/);
   assert.doesNotMatch(comNota.clauses.join(' and '), /concluido_em/);
   assert.deepEqual(comNota.values, [7]);
@@ -298,6 +299,68 @@ test('listPending ordena FIFO no mes implicito e com periodo informado', async (
   const periodo = captured.find((sql) => sql.includes('order by')) ?? '';
   assert.match(periodo, /order by a\.concluido_em asc nulls last, a\.id asc/);
   assert.doesNotMatch(periodo, /order by a\.concluido_em desc/);
+});
+
+test('listPending enriquece a query com o estado de Favorito do perfil', async () => {
+  const queries: Array<{ text: string; values?: unknown[] }> = [];
+  const mockDb = {
+    query: async (text: string, values?: unknown[]) => {
+      queries.push({ text, values });
+      return { rows: [{ total: '0' }] };
+    }
+  } as any;
+  const repo = createCuradoriaRepository(mockDb);
+
+  await repo.listPending({ limit: 50, offset: 0, perfilId: 'perfil-curador' } as any);
+
+  const select = queries.find((query) => query.text.includes('from fila_curadoria') && query.text.includes('favoritadoPeloUsuario'));
+  assert.ok(select);
+  assert.match(select.text, /favoritadoPeloUsuario/);
+  assert.match(select.text, /from favoritos/);
+  assert.ok(select.values?.includes('perfil-curador'));
+});
+
+test('listPending nao agrega nomes de favoritos para Curador', async () => {
+  const queries: string[] = [];
+  const mockDb = {
+    query: async (text: string) => {
+      queries.push(text);
+      return { rows: [{ total: '0' }] };
+    }
+  } as any;
+  const repo = createCuradoriaRepository(mockDb);
+
+  await repo.listPending({ limit: 50, offset: 0, perfilId: 'perfil-curador' } as any);
+
+  const select = queries.find((query) => query.includes('favoritadoPeloUsuario'))!;
+  assert.match(select, /null::int as "favoritosCount"/);
+  assert.doesNotMatch(select, /array_agg\(u\.nome/);
+});
+
+test('Fila de Curadoria so libera mutacao de Favorito para Curador', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const content = await readFile(
+    new URL('../../apps/web/src/features/curadoria/FilaCuradoriaPage.tsx', import.meta.url),
+    'utf8'
+  );
+  assert.match(content, /isCurador=\{perfil\?\.role === 'curador'\}/);
+});
+
+test('listRealizadas enriquece a query com os metadados de Favorito', async () => {
+  const queries: string[] = [];
+  const mockDb = {
+    query: async (text: string) => {
+      queries.push(text);
+      return { rows: [{ total: '0' }] };
+    }
+  } as any;
+  const repo = createCuradoriaRepository(mockDb);
+
+  await repo.listRealizadas({ limit: 50, offset: 0, perfilId: 'perfil-curador' } as any);
+
+  const select = queries.find((query) => query.includes('from atendimentos') && query.includes('favoritosCount'));
+  assert.ok(select);
+  assert.match(select, /favoritosPerfis/);
 });
 
 test('listDistinctMotivos retorna motivos distintos e ordenados incluindo Nao informado canônico', async () => {

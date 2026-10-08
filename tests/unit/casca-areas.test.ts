@@ -6,6 +6,7 @@ test('Curador vê Atendimentos, Monitoramento ao Vivo, Fila de Curadoria, Minhas
   assert.deepEqual(
     areasPorPapel('curador').map((area) => area.label),
     [
+      'Favoritos',
       'Consultar Atendimentos',
       'Monitoramento ao Vivo',
       'Abrir Fila de Curadoria',
@@ -20,6 +21,7 @@ test('Gestão vê Dashboard, Atendimentos, Monitoramento ao Vivo, Fila de Curado
     areasPorPapel('gestao').map((area) => area.label),
     [
       'Abrir Dashboard da Gestão',
+      'Favoritos',
       'Consultar Atendimentos',
       'Monitoramento ao Vivo',
       'Consultar Fila de Curadoria',
@@ -34,6 +36,7 @@ test('Admin vê as áreas da Gestão mais manutenção, usuários, IA e Régua',
     areasPorPapel('admin').map((area) => area.label),
     [
       'Abrir Dashboard da Gestão',
+      'Favoritos',
       'Consultar Atendimentos',
       'Monitoramento ao Vivo',
       'Abrir Fila de Curadoria',
@@ -51,6 +54,7 @@ test('áreas apontam para as rotas correspondentes', () => {
     areasPorPapel('admin').map((area) => area.to),
     [
       '/dashboard',
+      '/favoritos',
       '/atendimentos',
       '/monitoramento',
       '/curadoria',
@@ -66,6 +70,7 @@ test('áreas apontam para as rotas correspondentes', () => {
     areasPorPapel('gestao').map((area) => area.to),
     [
       '/dashboard',
+      '/favoritos',
       '/atendimentos',
       '/monitoramento',
       '/curadoria',
@@ -77,6 +82,7 @@ test('áreas apontam para as rotas correspondentes', () => {
   assert.deepEqual(
     areasPorPapel('curador').map((area) => area.to),
     [
+      '/favoritos',
       '/atendimentos',
       '/monitoramento',
       '/curadoria',

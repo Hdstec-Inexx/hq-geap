@@ -4,7 +4,9 @@ import {
 } from '@hq-geap/contracts/monitoramento';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { apiUrl, getSession } from '../auth/session';
 import { monitoramentoAuthPayload, monitoramentoWsUrl } from './api';
+import { FavoritoLiveButton } from './FavoritoLiveButton';
 
 const maxLiveLines = 200;
 const nearBottomPx = 80;
@@ -31,6 +33,7 @@ export function MonitoramentoLivePage() {
   const [connection, setConnection] = useState<ConnectionState>({
     status: 'connecting'
   });
+  const [atendimento, setAtendimento] = useState<{ id: string; favoritadoPeloUsuario?: boolean } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const ignoreScrollRef = useRef(false);
@@ -201,12 +204,60 @@ export function MonitoramentoLivePage() {
     };
   }, [conversationId]);
 
+  useEffect(() => {
+    if (!conversationId) return;
+
+    let cancelled = false;
+    async function checkPersisted() {
+      const session = getSession();
+      if (!session) return;
+      try {
+        const res = await fetch(`${apiUrl}/atendimentos/by-conversation/${encodeURIComponent(conversationId)}`, {
+          headers: { authorization: `Bearer ${session.token}` }
+        });
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (!cancelled) {
+          try {
+            setAtendimento({
+              id: data.id,
+              favoritadoPeloUsuario: data.favoritadoPeloUsuario
+            });
+          } catch {
+            // fallback
+          }
+        }
+      } catch {
+        // ignore fetch error
+      }
+    }
+
+    checkPersisted();
+    const interval = setInterval(() => {
+      if (!atendimento) {
+        checkPersisted();
+      }
+    }, 4000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [conversationId, Boolean(atendimento)]);
+
   return (
     <main className="atendimentos-page atendimento-detail">
       <header className="atendimentos-heading">
         <div>
           <p className="eyebrow">Monitoramento ao Vivo / somente observação</p>
-          <h1>Transcrição em tempo real</h1>
+          <div className="atendimento-title-favorite">
+            <h1>Transcrição em tempo real</h1>
+            <FavoritoLiveButton
+              isPersisted={Boolean(atendimento)}
+              atendimentoId={atendimento?.id}
+              initialFavoritado={atendimento?.favoritadoPeloUsuario ?? false}
+            />
+          </div>
           <p className="atendimento-id">{conversationId}</p>
         </div>
         <Link className="back-link" to="/monitoramento">

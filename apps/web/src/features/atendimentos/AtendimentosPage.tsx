@@ -18,7 +18,9 @@ import {
   stripInvalidNotaMin
 } from './nota-ia-filtro-logic';
 import { NotaIaAvaliadoraFiltro } from './NotaIaAvaliadoraFiltro';
+import { FavoritoListControl } from './FavoritoListControl';
 import { detalhamentoQueryFromSearch } from '../dashboards/detalhamento';
+import { usePerfil } from '../auth/perfil-context';
 import {
   compactPageItems,
   MAX_PAGE,
@@ -65,10 +67,10 @@ function atendimentoHref(id: string, searchParams: URLSearchParams): string {
 }
 
 export function AtendimentosPage() {
+  const perfil = usePerfil();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const page = pageFromSearch(searchParams);
-  const detalhamentoQuery = detalhamentoQueryFromSearch(searchParams);
 
   const inicioParam = searchParams.get('inicio') ?? '';
   const fimParam = searchParams.get('fim') ?? '';
@@ -87,6 +89,7 @@ export function AtendimentosPage() {
   const notaMinParam = parseNotaMinParam(searchParams);
   const indicador = searchParams.get('indicador');
   const isDetalhamento = Boolean(indicador && inicioParam && fimParam);
+  const detalhamentoQuery = isDetalhamento ? detalhamentoQueryFromSearch(searchParams) : '';
   const [draftInicio, setDraftInicio] = useState(inicioParam);
   const [draftFim, setDraftFim] = useState(fimParam);
   const [draftConversationId, setDraftConversationId] = useState(conversationIdParam);
@@ -434,6 +437,13 @@ export function AtendimentosPage() {
                   </Link>
                   <span>{atendimento.agenteVoz.nome}</span>
                 </div>
+                <FavoritoListControl
+                  atendimentoId={atendimento.id}
+                  favoritosCount={atendimento.favoritosCount}
+                  favoritosPerfis={atendimento.favoritosPerfis}
+                  favoritadoPeloUsuario={atendimento.favoritadoPeloUsuario}
+                  isCurador={perfil?.role === 'curador'}
+                />
                 <dl className="atendimento-row-data">
                   <div><dt>Conclusão</dt><dd>{formatDate(atendimento.concluidoEm)}</dd></div>
                   <div><dt>Duração</dt><dd>{formatDuration(atendimento.duracaoSegundos)}</dd></div>

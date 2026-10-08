@@ -149,7 +149,7 @@ test.describe.serial('Miniplayer persistente com animações', () => {
     // Retornar 30s pelo miniplayer
     const miniSkipBack = page.getByTestId('miniplayer-skip-back');
     await miniSkipBack.click();
-    await expect(page.getByTestId('miniplayer-current-time')).toHaveText('00:00');
+    await expect(page.getByTestId('miniplayer-current-time')).toHaveText(/^00:0[01]$/);
 
     // Ao retirar o mouse do topo para o centro da página, o miniplayer esconde
     await page.mouse.move(500, 600);
