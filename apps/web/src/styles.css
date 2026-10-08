@@ -4099,3 +4099,87 @@ h1 {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Favoritos Page Table & Controls */
+.favoritos-table-wrap {
+  overflow-x: auto;
+  background: rgb(255 255 255 / 75%);
+  border-top: 5px solid #16816f;
+  box-shadow: 18px 20px 0 #c7ddd5;
+  margin-top: 24px;
+}
+
+.favoritos-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.favoritos-table th,
+.favoritos-table td {
+  padding: 18px 24px;
+  border-bottom: 1px solid rgb(18 59 74 / 14%);
+  vertical-align: middle;
+}
+
+.favoritos-table th {
+  color: #52717a;
+  font-family: Consolas, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgb(18 59 74 / 4%);
+}
+
+.favoritos-table tbody tr:hover td {
+  background: rgb(98 212 182 / 6%);
+}
+
+.favoritos-cell-agente strong {
+  color: #123b4a;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.favoritos-cell-conversa a {
+  color: #08735f;
+  font-family: Consolas, monospace;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration-color: #62d4b6;
+  text-underline-offset: 4px;
+}
+
+.favoritos-cell-conversa a:hover {
+  color: #065446;
+}
+
+.favoritos-cell-data {
+  color: #52717a;
+  font-family: Consolas, monospace;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.favoritos-cell-perfis {
+  color: #123b4a;
+  font-size: 0.9rem;
+}
+
+.favoritos-perfis-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  color: #0c5043;
+  background: #d1fae5;
+  border: 1px solid #a7f3d0;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.favoritos-th-action,
+.favoritos-cell-action {
+  text-align: center;
+  width: 130px;
+}
