@@ -109,11 +109,15 @@ const routes: FastifyPluginAsync = async (app) => {
     }
     return favoritosGestaoSchema.parse({
       total: result.total,
-      items: result.items.map((row) => ({
-        ...toAtendimentoSummary(row),
-        ultimoFavoritadoEm: new Date((row as typeof row & { ultimoFavoritadoEm: Date }).ultimoFavoritadoEm).toISOString(),
-        favoritos: (row as typeof row & { favoritos: FavoritosGestao['items'][number]['favoritos'] }).favoritos
-      }))
+      items: result.items.map((row) => {
+        const timestamp = new Date((row as typeof row & { ultimoFavoritadoEm: Date }).ultimoFavoritadoEm).toISOString();
+        return {
+          ...toAtendimentoSummary(row),
+          ultimoFavoritadoEm: timestamp,
+          favoritadoEm: timestamp,
+          favoritos: (row as typeof row & { favoritos: FavoritosGestao['items'][number]['favoritos'] }).favoritos
+        };
+      })
     });
   });
 
