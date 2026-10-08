@@ -190,6 +190,7 @@ function favoriteSelectClause(profilePlaceholder?: string) {
 export type FilaCuradoriaFilterOptions = {
   now?: Date;
   implicitCurrentMonth?: boolean;
+  notaMinOperator?: '=' | '>=';
 };
 
 export function buildFilaCuradoriaFilters(
@@ -211,6 +212,7 @@ export function buildFilaCuradoriaFilters(
   const inicio = filters.inicio;
   const fim = filters.fim ?? filters.inicio;
   const implicitCurrentMonth = options.implicitCurrentMonth ?? true;
+  const notaMinOperator = options.notaMinOperator ?? '=';
   if (inicio && fim) {
     const inicioPlaceholder = param(inicio);
     const fimPlaceholder = param(fim);
@@ -234,7 +236,7 @@ export function buildFilaCuradoriaFilters(
 
   if (filters.notaMin && filters.notaMin > 0) {
     const notaMin = param(filters.notaMin);
-    clauses.push(`ia.nota = ${notaMin}`);
+    clauses.push(`ia.nota ${notaMinOperator} ${notaMin}`);
   }
 
   return { clauses, values };
@@ -255,7 +257,8 @@ export function buildCuradoriasRealizadasFilters(
   startIndex = 1
 ) {
   const base = buildFilaCuradoriaFilters(filters, startIndex, {
-    implicitCurrentMonth: false
+    implicitCurrentMonth: false,
+    notaMinOperator: '>='
   });
   const clauses = [...base.clauses];
   const values = [...base.values];

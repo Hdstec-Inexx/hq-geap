@@ -365,13 +365,6 @@ export function CuradoriasRealizadasPage() {
                 </Link>
                 <small>{dateTime.format(new Date(item.realizadaEm))}</small>
               </div>
-              <FavoritoListControl
-                atendimentoId={item.id}
-                favoritosCount={item.favoritosCount}
-                favoritosPerfis={item.favoritosPerfis}
-                favoritadoPeloUsuario={item.favoritadoPeloUsuario}
-                isCurador={isMinhas}
-              />
               <dl>
                 <div><dt>Motivo</dt><dd>{formatMotivoContato(item.motivoContato)}</dd></div>
                 <div><dt>Duração</dt><dd>{formatDuration(item.duracaoSegundos)}</dd></div>
@@ -381,6 +374,13 @@ export function CuradoriasRealizadasPage() {
                   <div><dt>Curador</dt><dd>{item.curadorNome}</dd></div>
                 ) : null}
               </dl>
+              <FavoritoListControl
+                atendimentoId={item.id}
+                favoritosCount={item.favoritosCount}
+                favoritosPerfis={item.favoritosPerfis}
+                favoritadoPeloUsuario={item.favoritadoPeloUsuario}
+                isCurador={isMinhas && role === 'curador'}
+              />
               <Link className="review-link" to={reviewHref(item.id, searchParams, basePath)}>
                 Consultar
               </Link>

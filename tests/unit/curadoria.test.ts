@@ -237,7 +237,7 @@ test('filtros da Fila aplicam igualdade de notaMin na Nota da IA Avaliadora', as
   assert.deepEqual(comNota.values, ['2025-01-01', '2025-01-31', 7]);
 });
 
-test('buildCuradoriasRealizadasFilters aplica igualdade na Nota da IA Avaliadora, nao na nota do Curador', async () => {
+test('buildCuradoriasRealizadasFilters aplica piso na Nota da IA Avaliadora, nao na nota do Curador', async () => {
   const { buildCuradoriasRealizadasFilters } = await import(
     '../../apps/api/src/modules/curadoria/repository.js'
   );
@@ -248,8 +248,8 @@ test('buildCuradoriasRealizadasFilters aplica igualdade na Nota da IA Avaliadora
   assert.deepEqual(semFiltro.values, []);
 
   const comNota = buildCuradoriasRealizadasFilters({ notaMin: 7 }, 1);
-  assert.match(comNota.clauses.join(' and '), /ia\.nota = \$1/);
-  assert.doesNotMatch(comNota.clauses.join(' and '), /ia\.nota >=/);
+  assert.match(comNota.clauses.join(' and '), /ia\.nota >= \$1/);
+  assert.doesNotMatch(comNota.clauses.join(' and '), /ia\.nota =/);
   assert.doesNotMatch(comNota.clauses.join(' and '), /cur\.nota/);
   assert.doesNotMatch(comNota.clauses.join(' and '), /concluido_em/);
   assert.deepEqual(comNota.values, [7]);

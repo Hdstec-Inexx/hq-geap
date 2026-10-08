@@ -71,7 +71,6 @@ export function AtendimentosPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const page = pageFromSearch(searchParams);
-  const detalhamentoQuery = detalhamentoQueryFromSearch(searchParams);
 
   const inicioParam = searchParams.get('inicio') ?? '';
   const fimParam = searchParams.get('fim') ?? '';
@@ -90,6 +89,7 @@ export function AtendimentosPage() {
   const notaMinParam = parseNotaMinParam(searchParams);
   const indicador = searchParams.get('indicador');
   const isDetalhamento = Boolean(indicador && inicioParam && fimParam);
+  const detalhamentoQuery = isDetalhamento ? detalhamentoQueryFromSearch(searchParams) : '';
   const [draftInicio, setDraftInicio] = useState(inicioParam);
   const [draftFim, setDraftFim] = useState(fimParam);
   const [draftConversationId, setDraftConversationId] = useState(conversationIdParam);

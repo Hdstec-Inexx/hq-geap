@@ -92,21 +92,25 @@ test.describe.serial('Favoritar e desfavoritar no detalhe e no Monitoramento ao 
     await favButton.click();
     await expect(favButton).toHaveAttribute('aria-pressed', 'true');
 
-    const dbCheck1 = await queryDatabase<{ count: string }>(
-      'select count(*) from favoritos where atendimento_id = $1 and perfil_id = $2',
-      [atendimentoId, curadorId]
-    );
-    expect(dbCheck1.rows[0]?.count).toBe('1');
+    await expect.poll(async () => {
+      const result = await queryDatabase<{ count: string }>(
+        'select count(*) from favoritos where atendimento_id = $1 and perfil_id = $2',
+        [atendimentoId, curadorId]
+      );
+      return result.rows[0]?.count;
+    }).toBe('1');
 
     // 2. Desmarca favorito
     await favButton.click();
     await expect(favButton).toHaveAttribute('aria-pressed', 'false');
 
-    const dbCheck2 = await queryDatabase<{ count: string }>(
-      'select count(*) from favoritos where atendimento_id = $1 and perfil_id = $2',
-      [atendimentoId, curadorId]
-    );
-    expect(dbCheck2.rows[0]?.count).toBe('0');
+    await expect.poll(async () => {
+      const result = await queryDatabase<{ count: string }>(
+        'select count(*) from favoritos where atendimento_id = $1 and perfil_id = $2',
+        [atendimentoId, curadorId]
+      );
+      return result.rows[0]?.count;
+    }).toBe('0');
 
     for (const role of ['gestao', 'admin'] as const) {
       const session = await loginApi(request, role);
@@ -128,6 +132,8 @@ test.describe.serial('Favoritar e desfavoritar no detalhe e no Monitoramento ao 
     // Mas tem a indicação somente leitura
     await expect(page.locator('[data-testid="favoritos-readonly"]')).toBeVisible();
 
+    await page.getByRole('button', { name: 'Sair' }).click();
+    await expect(page).toHaveURL('/login');
     await loginPage(page, 'admin');
     await page.goto(`/atendimentos/${atendimentoId}`);
 
@@ -194,6 +200,7 @@ test.describe.serial('Favoritar e desfavoritar no detalhe e no Monitoramento ao 
     await expect(page.getByText(convDetailId)).toHaveCount(0);
 
     await queryDatabase('insert into favoritos (perfil_id, atendimento_id) values ($1, $2) on conflict do nothing', [session.user.id, atendimentoId]);
+    await page.getByRole('button', { name: 'Sair' }).click();
     await loginPage(page, 'gestao');
     try {
       await page.goto('/favoritos');
@@ -207,7 +214,7 @@ test.describe.serial('Favoritar e desfavoritar no detalhe e no Monitoramento ao 
       await queryDatabase('update usuarios set ativo = false where id = $1', [session.user.id]);
       await page.goto('/favoritos');
       await expect(page.getByText(convDetailId)).toBeVisible();
-      await expect(page.getByText(/Caio Curador/)).toBeVisible();
+      await expect(page.getByRole('cell', { name: /Favoritado por Caio Curador/ })).toBeVisible();
     } finally {
       await queryDatabase('update usuarios set ativo = true where id = $1', [session.user.id]);
     }
@@ -224,19 +231,19 @@ test.describe.serial('Favoritar e desfavoritar no detalhe e no Monitoramento ao 
     );
 
     await loginPage(page, 'curador');
-    await page.goto('/atendimentos');
+    await page.goto(`/atendimentos?conversationId=${convDetailId}`);
     const row = page.locator('.atendimento-row').filter({ hasText: convDetailId });
-    const button = row.getByTestId('favorito-list-button');
+    const button = page.getByTestId('favorito-list-button');
     await expect(button).toHaveAttribute('aria-pressed', 'false');
     await button.click();
     await expect(button).toHaveAttribute('aria-pressed', 'true');
 
     for (const role of ['gestao', 'admin'] as const) {
+      await page.getByRole('button', { name: 'Sair' }).click();
       await loginPage(page, role);
-      await page.goto('/atendimentos');
-      const row = page.locator('.atendimento-row').filter({ hasText: convDetailId });
-      const readonly = row.getByTestId('favoritos-list-readonly');
-      await expect(readonly).toHaveText('1');
+      await page.goto(`/atendimentos?conversationId=${convDetailId}`);
+      const readonly = page.getByTestId('favoritos-list-readonly');
+      await expect(readonly.locator('.favoritos-readonly-text')).toHaveText('1');
       await expect(readonly).toHaveAttribute('title', /Favoritado por:.*Curador/);
       await readonly.hover();
       await expect.poll(async () => readonly.evaluate((element) =>
@@ -246,7 +253,7 @@ test.describe.serial('Favoritar e desfavoritar no detalhe e no Monitoramento ao 
       await expect.poll(async () => readonly.evaluate((element) =>
         getComputedStyle(element, '::after').content
       )).toContain('Curador');
-      await expect(row.getByTestId('favorito-list-button')).toHaveCount(0);
+      await expect(page.getByTestId('favorito-list-button')).toHaveCount(0);
     }
   });
 });

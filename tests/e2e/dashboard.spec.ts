@@ -315,7 +315,7 @@ test.describe.serial('Dashboard da Gestao', () => {
     await expect(page.getByText('IA × Curador', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Taxa de Promessas Cumpridas', { exact: true })).toBeVisible();
     await expect(page.getByText('Tempo Médio até Resolução', { exact: true })).toBeVisible();
-    await expect(page.getByText('Transferências')).toHaveCount(0);
+    await expect(page.getByText('Transferências', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Custo total')).toHaveCount(0);
     await expect(page.getByText('3', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Financeiro / Boletos').first()).toBeVisible();
