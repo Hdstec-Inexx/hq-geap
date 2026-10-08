@@ -146,5 +146,8 @@ test('listFavoritos consolida Gestão/Admin por Atendimento e ordena pelo MAX do
   assert.equal(result.total, 0);
   assert.match(queries[1]!, /max\(f\.favoritado_em\)/i);
   assert.match(queries[1]!, /order by max\(f\.favoritado_em\) desc/i);
-  assert.match(queries[1]!, /f\.perfil_id = \$3/i);
+  assert.match(queries[1]!, /exists \(select 1 from favoritos filtro/i);
+  assert.match(queries[1]!, /filtro\.perfil_id = \$3/i);
+  assert.match(queries[1]!, /join usuarios u/i);
+  assert.doesNotMatch(queries[1]!, /u\.ativo/i);
 });

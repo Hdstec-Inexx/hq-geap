@@ -16,6 +16,10 @@ import { apiUrl, getSession } from '../auth/session';
 import { useAuthenticatedResource } from './api';
 import { formatPerfisFavoritos } from './favorito-logic';
 
+const FAVORITOS_PAGE_SIZE = 50;
+const FAVORITOS_MAX_OFFSET = 10_000;
+const FAVORITOS_MAX_PAGE = Math.floor(FAVORITOS_MAX_OFFSET / FAVORITOS_PAGE_SIZE) + 1;
+
 function dateTime(value: string) {
   return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
 }
@@ -23,13 +27,13 @@ function dateTime(value: string) {
 export function FavoritosPage() {
   const perfil = usePerfil();
   const [searchParams, setSearchParams] = useSearchParams();
-  const page = Math.min(201, Math.max(1, Number(searchParams.get('page') ?? '1') || 1));
+  const page = Math.min(FAVORITOS_MAX_PAGE, Math.max(1, Number(searchParams.get('page') ?? '1') || 1));
   const [conversationId, setConversationId] = useState(searchParams.get('conversationId') ?? '');
   const [agenteVozId, setAgenteVozId] = useState(searchParams.get('agenteVozId') ?? '');
   const [perfilId, setPerfilId] = useState(searchParams.get('perfilId') ?? '');
   const agentes = useAuthenticatedResource('/agentes-voz', agentesVozListSchema);
   const curadores = useAuthenticatedResource('/curadores', curadoresListSchema);
-  const query = new URLSearchParams({ limit: '50', offset: String((page - 1) * 50) });
+  const query = new URLSearchParams({ limit: String(FAVORITOS_PAGE_SIZE), offset: String((page - 1) * FAVORITOS_PAGE_SIZE) });
   if (searchParams.get('conversationId')) query.set('conversationId', searchParams.get('conversationId')!);
   if (searchParams.get('agenteVozId')) query.set('agenteVozId', searchParams.get('agenteVozId')!);
   if (searchParams.get('perfilId')) query.set('perfilId', searchParams.get('perfilId')!);
@@ -62,7 +66,7 @@ export function FavoritosPage() {
     <main className="atendimentos-page">
       <header className="atendimentos-heading"><div><p className="eyebrow">Operação / atemporal</p><h1>Favoritos</h1></div><Link className="back-link" to="/">Voltar ao início</Link></header>
       <form className="atendimentos-filters" onSubmit={submit}>
-        <label>ID da conversa<input value={conversationId} onChange={(event) => setConversationId(event.target.value)} placeholder="Buscar por ID..." /></label>
+        <label>ID externo do Atendimento<input value={conversationId} onChange={(event) => setConversationId(event.target.value)} placeholder="Buscar por ID..." /></label>
         <label>Agente de Voz<select value={agenteVozId} onChange={(event) => setAgenteVozId(event.target.value)}><option value="">Todos os agentes</option>{agentes.status === 'ready' && agentes.data.map((agente) => <option key={agente.id} value={agente.id}>{agente.nome}</option>)}</select></label>
         {perfil?.role !== 'curador' ? <label>Perfil de Curador<select value={perfilId} onChange={(event) => setPerfilId(event.target.value)}><option value="">Todos os perfis</option>{curadores.status === 'ready' && curadores.data.map((curador) => <option key={curador.id} value={curador.id}>{curador.nome}</option>)}</select></label> : null}
         <button className="primary-action" type="submit">Filtrar</button>
@@ -76,10 +80,10 @@ export function FavoritosPage() {
           return <tr className="atendimento-row" key={item.id}><td>{item.agenteVoz.nome}</td><td><Link to={`/atendimentos/${item.id}`}>{item.conversationId}</Link></td><td>{dateTime(perfil?.role === 'curador' ? (item as FavoritoCuradorItem).favoritadoEm : gestaoItem.ultimoFavoritadoEm)}</td><td>{perfil?.role === 'curador' ? 'Você' : formatPerfisFavoritos(gestaoItem.favoritos.perfis)}</td><td>{perfil?.role === 'curador' ? <button aria-label={`Desfazer favorito de ${item.conversationId}`} onClick={() => remove(item as unknown as FavoritoCuradorItem)} type="button">★</button> : null}</td></tr>;
         })}</tbody>
       </table>
-      {state.status === 'ready' && state.data.total > 50 ? <nav aria-label="Paginação de Favoritos" className="pagination-controls">
+      {state.status === 'ready' && state.data.total > FAVORITOS_PAGE_SIZE ? <nav aria-label="Paginação de Favoritos" className="pagination-controls">
         {page > 1 ? <button type="button" onClick={() => setSearchParams((current) => { const next = new URLSearchParams(current); next.set('page', String(page - 1)); return next; })}>Anterior</button> : null}
-        <span>Página {page} de {Math.ceil(state.data.total / 50)}</span>
-        {page * 50 < state.data.total ? <button type="button" onClick={() => setSearchParams((current) => { const next = new URLSearchParams(current); next.set('page', String(page + 1)); return next; })}>Próxima</button> : null}
+        <span>Página {page} de {Math.ceil(state.data.total / FAVORITOS_PAGE_SIZE)}</span>
+        {page < FAVORITOS_MAX_PAGE && page * FAVORITOS_PAGE_SIZE < state.data.total ? <button type="button" onClick={() => setSearchParams((current) => { const next = new URLSearchParams(current); next.set('page', String(page + 1)); return next; })}>Próxima</button> : null}
       </nav> : null}
     </main>
   );

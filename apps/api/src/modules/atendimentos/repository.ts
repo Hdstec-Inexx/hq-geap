@@ -306,7 +306,9 @@ export function createAtendimentosRepository(db: pg.Pool) {
       if (query.agenteVozId) clauses.push(`a.agente_voz_id = ${add(query.agenteVozId)}`);
       if (query.conversationId) clauses.push(`a.elevenlabs_conversation_id ilike '%' || ${add(query.conversationId)} || '%'`);
       if (perfilId) clauses.push(`f.perfil_id = ${add(perfilId)}`);
-      if (query.perfilId) clauses.push(`f.perfil_id = ${add(query.perfilId)}`);
+      if (query.perfilId) {
+        clauses.push(`exists (select 1 from favoritos filtro where filtro.atendimento_id = a.id and filtro.perfil_id = ${add(query.perfilId)})`);
+      }
       const countClauses = clauses.map((clause) =>
         clause.replace(/\$(\d+)/g, (_match, value: string) => `$${Number(value) - 2}`)
       );
