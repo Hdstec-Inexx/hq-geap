@@ -174,4 +174,42 @@ test.describe.serial('Favoritar e desfavoritar no detalhe e no Monitoramento ao 
     );
     expect(liveDesfavorito.rows[0]?.count).toBe('0');
   });
+
+  test('lista Favoritos na casca, filtra, remove para Curador e consolida para Gestão', async ({
+    page,
+    request
+  }) => {
+    const session = await loginApi(request, 'curador');
+    await queryDatabase('insert into favoritos (perfil_id, atendimento_id) values ($1, $2) on conflict do nothing', [session.user.id, atendimentoId]);
+
+    await loginPage(page, 'curador');
+    await page.goto('/favoritos');
+    await expect(page.getByRole('link', { name: 'Favoritos' })).toBeVisible();
+    await expect(page.getByText(convDetailId)).toBeVisible();
+    await page.getByLabel('Agente de Voz').selectOption(agenteVozId);
+    await page.getByPlaceholder('Buscar por ID...').fill(convDetailId);
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    await expect(page).toHaveURL(/conversationId=conv-favorito-detail-e2e/);
+    await page.getByRole('button', { name: `Desfazer favorito de ${convDetailId}` }).click();
+    await expect(page.getByText(convDetailId)).toHaveCount(0);
+
+    await queryDatabase('insert into favoritos (perfil_id, atendimento_id) values ($1, $2) on conflict do nothing', [session.user.id, atendimentoId]);
+    await loginPage(page, 'gestao');
+    try {
+      await page.goto('/favoritos');
+      await page.getByLabel('Perfil de Curador').selectOption(session.user.id);
+      await page.getByRole('button', { name: 'Filtrar' }).click();
+      await expect(page).toHaveURL(/perfilId=/);
+      await expect(page.getByText(convDetailId)).toBeVisible();
+      await expect(page.getByText(/Favoritado por/)).toBeVisible();
+      await expect(page.getByRole('button', { name: /Desfazer favorito/ })).toHaveCount(0);
+
+      await queryDatabase('update usuarios set ativo = false where id = $1', [session.user.id]);
+      await page.goto('/favoritos');
+      await expect(page.getByText(convDetailId)).toBeVisible();
+      await expect(page.getByText(/Caio Curador/)).toBeVisible();
+    } finally {
+      await queryDatabase('update usuarios set ativo = true where id = $1', [session.user.id]);
+    }
+  });
 });

@@ -6,6 +6,13 @@ import {
   type FavoritosInfo,
   type MutacaoFavoritoResponse
 } from '@hq-geap/contracts/atendimentos';
+import {
+  favoritosCuradorSchema,
+  favoritosGestaoSchema,
+  favoritosQuerySchema,
+  type FavoritosCurador,
+  type FavoritosGestao
+} from '@hq-geap/contracts/favoritos';
 import type { FastifyPluginAsync } from 'fastify';
 import { isDetalhamentoQuery } from './detalhamentoFilters.js';
 import {
@@ -81,8 +88,43 @@ const routes: FastifyPluginAsync = async (app) => {
     };
   });
 
+  app.get('/favoritos', async (request): Promise<FavoritosCurador | FavoritosGestao> => {
+    const parsed = favoritosQuerySchema.safeParse(request.query);
+    if (!parsed.success) throw app.httpErrors.badRequest('Invalid Favoritos query');
+    const user = request.authUser;
+    if (!user) throw app.httpErrors.unauthorized('Authentication required');
+    if (user.role !== 'curador' && user.role !== 'gestao' && user.role !== 'admin') {
+      throw app.httpErrors.forbidden('Role does not have permission');
+    }
+    const query = user.role === 'curador'
+      ? { ...parsed.data, perfilId: undefined }
+      : parsed.data;
+    const result = await repository.listFavoritos(query, user.role === 'curador' ? user.id : null);
+    if (user.role === 'curador') {
+      return favoritosCuradorSchema.parse({
+        total: result.total,
+        items: result.items.map((row) => ({ ...toAtendimentoSummary(row), favoritadoEm: new Date((row as typeof row & { favoritadoEm: Date }).favoritadoEm).toISOString() }))
+      });
+    }
+    return favoritosGestaoSchema.parse({
+      total: result.total,
+      items: result.items.map((row) => ({
+        ...toAtendimentoSummary(row),
+        ultimoFavoritadoEm: new Date((row as typeof row & { ultimoFavoritadoEm: Date }).ultimoFavoritadoEm).toISOString(),
+        favoritos: (row as typeof row & { favoritos: FavoritosGestao['items'][number]['favoritos'] }).favoritos
+      }))
+    });
+  });
+
   app.get('/atendimentos/motivos', async (): Promise<string[]> => {
     return repository.listDistinctMotivos();
+  });
+
+  app.get('/agentes-voz', async () => {
+    const result = await app.db.query<{ id: string; nome: string }>(
+      'select id, nome from agentes_voz order by nome'
+    );
+    return result.rows;
   });
 
   app.get<{ Params: { conversationId: string } }>(

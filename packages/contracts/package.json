@@ -40,6 +40,10 @@
       "types": "./src/health.ts",
       "default": "./dist/health.js"
     },
+    "./favoritos": {
+      "types": "./src/favoritos.ts",
+      "default": "./dist/favoritos.js"
+    },
     "./monitoramento": {
       "types": "./src/monitoramento.ts",
       "default": "./dist/monitoramento.js"

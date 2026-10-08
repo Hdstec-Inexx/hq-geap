@@ -9,6 +9,7 @@ import { UsuariosRoute } from '../features/admin/usuarios/routes';
 import { ComentariosPendentesRoute } from '../features/admin/comentarios/routes';
 import { AtendimentoPage } from '../features/atendimentos/AtendimentoPage';
 import { AtendimentosPage } from '../features/atendimentos/AtendimentosPage';
+import { FavoritosPage } from '../features/atendimentos/FavoritosPage';
 import {
   CuradoriaReviewRoute,
   CuradoriasRealizadasRoute,
@@ -36,6 +37,7 @@ export const router = createBrowserRouter([
               { index: true, element: <HomePage /> },
               { path: '/app', element: <Navigate replace to="/" /> },
               { path: '/atendimentos', element: <AtendimentosPage /> },
+              { path: '/favoritos', element: <FavoritosPage /> },
               {
                 path: '/atendimentos/:atendimentoId',
                 element: <AtendimentoPage />

@@ -128,3 +128,26 @@ test('toAtendimentoDetail mapeia favoritadoPeloUsuario para Curador e favoritos 
     perfis: [{ id: '11111111-1111-4111-8111-111111111111', nome: 'Carlos Curador' }]
   });
 });
+
+test('listFavoritos consolida Gestão/Admin por Atendimento e ordena pelo MAX do favorito', async () => {
+  const queries: string[] = [];
+  const db = {
+    async query(text: string) {
+      queries.push(text);
+      return { rows: [{ total: '0' }] };
+    },
+    async connect() { throw new Error('not used'); }
+  } as any;
+  const result = await createAtendimentosRepository(db).listFavoritos({
+    limit: 50,
+    offset: 0,
+    perfilId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+  }, null);
+  assert.equal(result.total, 0);
+  assert.match(queries[1]!, /max\(f\.favoritado_em\)/i);
+  assert.match(queries[1]!, /order by max\(f\.favoritado_em\) desc/i);
+  assert.match(queries[1]!, /exists \(select 1 from favoritos filtro/i);
+  assert.match(queries[1]!, /filtro\.perfil_id = \$3/i);
+  assert.match(queries[1]!, /join usuarios u/i);
+  assert.doesNotMatch(queries[1]!, /u\.ativo/i);
+});
