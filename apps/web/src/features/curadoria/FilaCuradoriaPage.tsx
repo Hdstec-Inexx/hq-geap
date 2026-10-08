@@ -91,7 +91,8 @@ export function FilaCuradoriaPage() {
   const requestPath = `/curadoria?${query.toString()}`;
   const state = useAuthenticatedResource(requestPath, filaCuradoriaSchema);
   const currentState = state.path === requestPath;
-  const canWrite = canWriteAsCurador(usePerfil()?.role);
+  const perfil = usePerfil();
+  const canWrite = canWriteAsCurador(perfil?.role);
   const items = state.status === 'ready' && currentState ? state.data.items : [];
   const total = state.status === 'ready' && currentState ? state.data.total : 0;
   const resolvedPage = resolveFilaPage(requestedPage, total, items.length);
@@ -262,7 +263,7 @@ export function FilaCuradoriaPage() {
                 favoritosCount={item.favoritosCount}
                 favoritosPerfis={item.favoritosPerfis}
                 favoritadoPeloUsuario={item.favoritadoPeloUsuario}
-                isCurador={canWrite}
+                isCurador={perfil?.role === 'curador'}
               />
               <dl>
                 <div><dt>Motivo</dt><dd>{formatMotivoContato(item.motivoContato)}</dd></div>

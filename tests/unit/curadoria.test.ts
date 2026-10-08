@@ -320,6 +320,32 @@ test('listPending enriquece a query com o estado de Favorito do perfil', async (
   assert.ok(select.values?.includes('perfil-curador'));
 });
 
+test('listPending nao agrega nomes de favoritos para Curador', async () => {
+  const queries: string[] = [];
+  const mockDb = {
+    query: async (text: string) => {
+      queries.push(text);
+      return { rows: [{ total: '0' }] };
+    }
+  } as any;
+  const repo = createCuradoriaRepository(mockDb);
+
+  await repo.listPending({ limit: 50, offset: 0, perfilId: 'perfil-curador' } as any);
+
+  const select = queries.find((query) => query.includes('favoritadoPeloUsuario'))!;
+  assert.match(select, /null::int as "favoritosCount"/);
+  assert.doesNotMatch(select, /array_agg\(u\.nome/);
+});
+
+test('Fila de Curadoria so libera mutacao de Favorito para Curador', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const content = await readFile(
+    new URL('../../apps/web/src/features/curadoria/FilaCuradoriaPage.tsx', import.meta.url),
+    'utf8'
+  );
+  assert.match(content, /isCurador=\{perfil\?\.role === 'curador'\}/);
+});
+
 test('listRealizadas enriquece a query com os metadados de Favorito', async () => {
   const queries: string[] = [];
   const mockDb = {

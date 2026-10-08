@@ -77,15 +77,21 @@ const selectAtendimento = `
   join atendimentos a on a.id = summary.id
 `;
 
-const selectAtendimentoSummaryWithFavoritos = (perfilPlaceholder: string) =>
+const selectAtendimentoSummaryWithFavoritos = (perfilPlaceholder?: string) =>
   selectAtendimentoSummary.replace(
     'from atendimentos a',
-    `,
+    perfilPlaceholder
+      ? `,
     exists (
       select 1 from favoritos f_usuario
       where f_usuario.atendimento_id = a.id
         and f_usuario.perfil_id = ${perfilPlaceholder}
     ) as "favoritadoPeloUsuario",
+    null::int as "favoritosCount",
+    '{}'::text[] as "favoritosPerfis"
+   from atendimentos a`
+      : `,
+    false as "favoritadoPeloUsuario",
     (select count(*)::int from favoritos f_count where f_count.atendimento_id = a.id) as "favoritosCount",
     (select coalesce(array_agg(u.nome order by f.favoritado_em asc, u.nome asc), '{}')
      from favoritos f join usuarios u on u.id = f.perfil_id
@@ -238,7 +244,9 @@ export function createAtendimentosRepository(db: pg.Pool) {
           where ${countClauses.join(' and ')}
         `, [query.status ?? null, ...countDetalhamento.values]),
         db.query<AtendimentoSummaryRow>(`
-          ${selectAtendimentoSummaryWithFavoritos(`$${4 + detalhamento.values.length}`)}
+          ${selectAtendimentoSummaryWithFavoritos(
+            perfilId ? `$${4 + detalhamento.values.length}` : undefined
+          )}
           where ${clauses.join(' and ')}
           order by coalesce(a.concluido_em, a.iniciado_em, a.criado_em) asc, a.id asc
           limit $1 offset $2
@@ -246,8 +254,8 @@ export function createAtendimentosRepository(db: pg.Pool) {
           query.limit,
           query.offset,
           query.status ?? null,
-           ...detalhamento.values,
-           perfilId
+          ...detalhamento.values,
+          ...(perfilId ? [perfilId] : [])
         ])
       ]);
       return {

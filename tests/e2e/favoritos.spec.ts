@@ -238,6 +238,14 @@ test.describe.serial('Favoritar e desfavoritar no detalhe e no Monitoramento ao 
       const readonly = row.getByTestId('favoritos-list-readonly');
       await expect(readonly).toHaveText('1');
       await expect(readonly).toHaveAttribute('title', /Favoritado por:.*Curador/);
+      await readonly.hover();
+      await expect.poll(async () => readonly.evaluate((element) =>
+        getComputedStyle(element, '::after').opacity
+      )).toBe('1');
+      await readonly.focus();
+      await expect.poll(async () => readonly.evaluate((element) =>
+        getComputedStyle(element, '::after').content
+      )).toContain('Curador');
       await expect(row.getByTestId('favorito-list-button')).toHaveCount(0);
     }
   });
