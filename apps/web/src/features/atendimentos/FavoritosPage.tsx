@@ -23,12 +23,13 @@ function dateTime(value: string) {
 export function FavoritosPage() {
   const perfil = usePerfil();
   const [searchParams, setSearchParams] = useSearchParams();
+  const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1);
   const [conversationId, setConversationId] = useState(searchParams.get('conversationId') ?? '');
   const [agenteVozId, setAgenteVozId] = useState(searchParams.get('agenteVozId') ?? '');
   const [perfilId, setPerfilId] = useState(searchParams.get('perfilId') ?? '');
   const agentes = useAuthenticatedResource('/agentes-voz', agentesVozListSchema);
   const curadores = useAuthenticatedResource('/curadores', curadoresListSchema);
-  const query = new URLSearchParams({ limit: '50', offset: '0' });
+  const query = new URLSearchParams({ limit: '50', offset: String((page - 1) * 50) });
   if (searchParams.get('conversationId')) query.set('conversationId', searchParams.get('conversationId')!);
   if (searchParams.get('agenteVozId')) query.set('agenteVozId', searchParams.get('agenteVozId')!);
   if (searchParams.get('perfilId')) query.set('perfilId', searchParams.get('perfilId')!);
@@ -43,6 +44,7 @@ export function FavoritosPage() {
     if (conversationId.trim()) next.set('conversationId', conversationId.trim());
     if (agenteVozId) next.set('agenteVozId', agenteVozId);
     if (perfilId) next.set('perfilId', perfilId);
+    next.set('page', '1');
     setSearchParams(next);
   }
 
@@ -76,6 +78,11 @@ export function FavoritosPage() {
           </article>;
         })}
       </section>
+      {state.status === 'ready' && state.data.total > 50 ? <nav aria-label="Paginação de Favoritos" className="pagination-controls">
+        {page > 1 ? <button type="button" onClick={() => setSearchParams((current) => { const next = new URLSearchParams(current); next.set('page', String(page - 1)); return next; })}>Anterior</button> : null}
+        <span>Página {page} de {Math.ceil(state.data.total / 50)}</span>
+        {page * 50 < state.data.total ? <button type="button" onClick={() => setSearchParams((current) => { const next = new URLSearchParams(current); next.set('page', String(page + 1)); return next; })}>Próxima</button> : null}
+      </nav> : null}
     </main>
   );
 }
