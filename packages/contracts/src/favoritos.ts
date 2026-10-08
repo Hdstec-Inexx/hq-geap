@@ -15,6 +15,7 @@ export const favoritoCuradorItemSchema = atendimentoSummarySchema.extend({
 
 export const favoritoGestaoItemSchema = atendimentoSummarySchema.extend({
   ultimoFavoritadoEm: z.iso.datetime(),
+  favoritadoEm: z.iso.datetime().optional(),
   favoritos: z.object({
     count: z.number().int().min(1),
     perfis: z.array(favoritoPerfilSchema)

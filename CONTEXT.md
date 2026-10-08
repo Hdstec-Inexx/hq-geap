@@ -62,7 +62,7 @@ A exportação do arquivo de áudio (`.mp3`) do Atendimento. Acesso restrito aos
 O veredito sobre um Atendimento, produzido pela IA Avaliadora ou pelo Curador — as duas coexistem lado a lado quando ambas existem, sem hierarquia, e são snapshots imutáveis. A da IA é gerada para todo Atendimento concluído e carrega: checklist de critérios, **Nota da IA Avaliadora**, falhas identificadas e resumo do atendimento. A do Curador é a **conferência da avaliação da IA** em registro separado: ele confirma ou corrige o shape espelho (checklist, falhas e resumo), sua nota deriva da mesma soma da Régua, registra a **Nota da Avaliação da IA** (0–10, qualidade da própria IA Avaliadora) e pode adicionar um comentário opcional na revisão. Enquanto a conferência humana não for realizada, o painel do Curador não é exibido (sem renderizar card vazio nem mensagem de placeholder) e o painel da Avaliação da IA se expande para ocupar a largura total do container. Quando a avaliação do Curador existir, ambos os painéis coexistem lado a lado. Concordância não é flag gravada — deriva da comparação dos dois snapshots.
 
 **Nota da IA Avaliadora**:
-Nota de 0–10 do Atendimento na Régua, produzida pela Avaliação da IA (soma dos critérios atendidos). Distinta da **Nota da Avaliação da IA**. Nas listagens (Atendimentos, Fila de Curadoria, Curadorias Realizadas e Minhas Curadorias) o slider filtra pela **nota exata** selecionada; 0 ou parâmetro omitido não restringe. Atendimentos sem essa nota saem da lista quando o filtro está ativo.
+Nota de 0–10 do Atendimento na Régua, produzida pela Avaliação da IA (soma dos critérios atendidos). Distinta da **Nota da Avaliação da IA**. Nas listagens de Atendimentos e Fila de Curadoria o slider filtra pela **nota exata** selecionada; em Curadorias Realizadas e Minhas Curadorias aplica piso inclusivo (≥); 0 ou parâmetro omitido não restringe. Atendimentos sem essa nota saem da lista quando o filtro está ativo.
 _Avoid_: Nota IA (ambíguo com Nota da Avaliação da IA)
 
 **Nota da Avaliação da IA**:
@@ -111,6 +111,14 @@ A lista operacional de Atendimentos. Sem período informado, observa o **mês ci
 
 **Minhas Curadorias**:
 A lista de Atendimentos concluídos que já receberam conferência humana. Permite ao Curador consultar suas próprias revisões (e aos perfis de Gestão e Admin, auditar o histórico de conferências realizadas sob o nome "Curadorias Realizadas").
+
+**Favorito**:
+A marca do Curador sobre um Atendimento já persistido no HQ, em andamento ou concluído, registrando que ele considerou que o Agente de Voz foi bem naquele contato. Não depende de nota, Aprovação ou conferência. Não altera o Atendimento nem a Avaliação, não carrega texto, não é Comentário e não entra na Fila de Manutenção. Há no máximo um por par (Curador, Atendimento). O Curador marca e desfaz apenas o seu próprio Favorito no detalhe, nas listas de Atendimentos, Fila de Curadoria e Minhas Curadorias, e no Monitoramento ao Vivo (quando já persistido no HQ, ficando desabilitado antes disso). O Curador visualiza apenas o seu próprio estado de marcação; Gestão e Admin veem em modo somente leitura quais Perfis favoritaram (exibido como contagem com tooltip de nomes nas linhas de listagens), sem poder marcar ou apagar. A desativação de Perfil preserva seus Favoritos no histórico.
+_Avoid_: Destaque
+
+**Favoritos**:
+A lista de Atendimentos com Favorito ativo, sem mês implícito, acessível diretamente pelo menu lateral da Casca Autenticada para todos os papéis, dispondo de busca por Agente de Voz e ID da conversa. O Curador vê apenas os Atendimentos que ele próprio favoritou, ordenados do mais recente ao mais antigo pelo instante da sua marcação. Gestão e Admin veem cada Atendimento uma única vez acompanhado de todos os Perfis que o favoritaram, ordenados pelo Favorito mais recente ainda vigente nele, com filtro para restringir por Perfil de Curador. Não gera métricas nem indicadores agregados no Dashboard ou Pulso da Operação.
+_Avoid_: Painel (já é o card da Avaliação ou um gráfico do dashboard)
 
 **Curadoria no Atendimento**:
 Atributo de visualização e filtro na listagem de Atendimentos que indica se a conferência humana já foi realizada e identifica o Curador responsável pela avaliação mais recente.
