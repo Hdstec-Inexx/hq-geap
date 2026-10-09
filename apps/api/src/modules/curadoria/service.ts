@@ -1,3 +1,4 @@
+import type { FavoritosInfo } from '@hq-geap/contracts/atendimentos';
 import type { EstadoCriterio } from '@hq-geap/contracts/avaliacoes';
 import {
   avaliacaoCuradorSchema,
@@ -159,12 +160,16 @@ export function toAvaliacaoCurador(row: AvaliacaoCuradorRow): AvaliacaoCurador {
 
 export function toCuradoriaDetail(
   row: CuradoriaAtendimentoRow,
-  audioUrl: string | null
+  audioUrl: string | null,
+  options?: {
+    favoritadoPeloUsuario?: boolean;
+    favoritos?: FavoritosInfo;
+  }
 ): CuradoriaDetail {
   const historico = row.historico.map(toAvaliacaoCurador);
   const avaliacaoIa = toAvaliacaoIa(row.avaliacaoIa);
   return curadoriaDetailSchema.parse({
-    atendimento: toAtendimentoDetail(row, audioUrl),
+    atendimento: toAtendimentoDetail(row, audioUrl, options),
     avaliacaoIa: {
       ...avaliacaoIa,
       checklist: checklistValues(row.avaliacaoIa.checklist)

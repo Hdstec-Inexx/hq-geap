@@ -1,4 +1,4 @@
-import { normalizeMotivo } from '@hq-geap/contracts/atendimentos';
+import { normalizeMotivo, type FavoritosInfo } from '@hq-geap/contracts/atendimentos';
 import type { EstadoCriterio } from '@hq-geap/contracts/avaliacoes';
 import type pg from 'pg';
 import {
@@ -614,6 +614,30 @@ export function createCuradoriaRepository(db: pg.Pool) {
         order by lower(nome), id
       `);
       return result.rows;
+    },
+
+    async isFavoritadoByPerfil(atendimentoId: string, perfilId: string): Promise<boolean> {
+      const result = await db.query<{ exists: boolean }>(`
+        select exists(
+          select 1 from favoritos
+          where atendimento_id = $1 and perfil_id = $2
+        ) as exists
+      `, [atendimentoId, perfilId]);
+      return Boolean(result.rows[0]?.exists);
+    },
+
+    async findFavoritos(atendimentoId: string): Promise<FavoritosInfo> {
+      const result = await db.query<{ id: string; nome: string }>(`
+        select u.id, u.nome
+        from favoritos f
+        join usuarios u on u.id = f.perfil_id
+        where f.atendimento_id = $1
+        order by f.favoritado_em asc, u.nome asc
+      `, [atendimentoId]);
+      return {
+        count: result.rows.length,
+        perfis: result.rows
+      };
     }
   };
 }

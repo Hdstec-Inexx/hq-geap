@@ -808,5 +808,76 @@ test('findDetail reusa a nota da Avaliacao da IA ja carregada sem join extra', a
   assert.match(findDetail, /notaIa:\s*ia\.nota/);
 });
 
+test('toCuradoriaDetail propaga opcoes de favoritos para o atendimento', async () => {
+  const { toCuradoriaDetail } = await import(
+    '../../apps/api/src/modules/curadoria/service.js'
+  );
+
+  const mockRow: any = {
+    id: '11111111-1111-4111-8111-111111111111',
+    conversationId: 'conv-123',
+    agenteVozId: '22222222-2222-4222-8222-222222222222',
+    agenteVozNome: 'Livia',
+    agentId: 'agent-livia',
+    status: 'concluido',
+    iniciadoEm: new Date('2025-01-15T12:00:00.000Z'),
+    concluidoEm: new Date('2025-01-15T12:01:00.000Z'),
+    duracaoSegundos: 60,
+    motivoContato: 'Cancelamento',
+    houveTransferencia: false,
+    custo: null,
+    notaIa: null,
+    eventTimestamp: null,
+    curadorId: null,
+    curadorNome: null,
+    curadoriaNota: null,
+    curadoriaRealizadaEm: null,
+    transcricao: [],
+    audioReference: null,
+    avaliacaoIa: {
+      id: '33333333-3333-4333-8333-333333333333',
+      atendimentoId: '11111111-1111-4111-8111-111111111111',
+      nota: '9.50',
+      notaQualidade: '9.50',
+      atendimentoAprovado: true,
+      falhasIdentificadas: [],
+      resumoAtendimento: 'Atendimento correto.',
+      promptVersao: 1,
+      criadoEm: new Date('2025-01-15T12:01:05.000Z'),
+      saudacaoEIntencao: true,
+      solicitouCpf: true,
+      informouProtocoloEmail: true,
+      resolveuSolicitacao: true,
+      validouEmailPorExtenso: true,
+      semDiminutivos: true,
+      encerramentoGeap: true,
+      usoCorretoFerramentas: true,
+      checklist: []
+    },
+    historico: []
+  };
+
+  const detailCurador = toCuradoriaDetail(mockRow, null, {
+    favoritadoPeloUsuario: true
+  });
+  assert.equal(detailCurador.atendimento.favoritadoPeloUsuario, true);
+
+  const detailGestao = toCuradoriaDetail(mockRow, null, {
+    favoritos: { count: 1, perfis: [{ id: '99999999-9999-4999-8999-999999999999', nome: 'Curador A' }] }
+  });
+  assert.equal(detailGestao.atendimento.favoritos?.count, 1);
+});
+
+test('CuradoriaReviewPage renderiza FavoritoAtendimento no cabecalho', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const page = await readFile(
+    new URL('../../apps/web/src/features/curadoria/CuradoriaReviewPage.tsx', import.meta.url),
+    'utf8'
+  );
+  assert.match(page, /import\s*\{\s*FavoritoAtendimento\s*\}\s*from/);
+  assert.match(page, /<FavoritoAtendimento/);
+  assert.match(page, /atendimentoId=\{atendimento\.id\}/);
+});
+
 
 

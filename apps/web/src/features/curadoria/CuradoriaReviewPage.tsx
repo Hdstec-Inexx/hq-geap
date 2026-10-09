@@ -15,6 +15,7 @@ import {
 import { apiUrl, getSession } from '../auth/session';
 
 import { canWriteAsCurador, usePerfil } from '../auth/perfil-context';
+import { FavoritoAtendimento } from '../atendimentos/FavoritoAtendimento';
 import { formatAtendimentoDate, formatDuration } from '../atendimentos/atendimento-facts-logic';
 import { useAuthenticatedResource } from '../atendimentos/api';
 import { formatMotivoContato } from '../atendimentos/motivo-combobox-logic';
@@ -339,7 +340,14 @@ function ReviewContent({
       <header className="atendimentos-heading">
         <div>
           <p className="eyebrow">{atendimento.agenteVoz.nome} / Concluído</p>
-          <h1>Revisar Atendimento</h1>
+          <div className="atendimento-title-favorite">
+            <h1>Revisar Atendimento</h1>
+            <FavoritoAtendimento
+              atendimentoId={atendimento.id}
+              favoritadoPeloUsuario={atendimento.favoritadoPeloUsuario}
+              favoritos={atendimento.favoritos}
+            />
+          </div>
           <p className="atendimento-id">{atendimento.conversationId}</p>
         </div>
         <Link className="back-link" to={backLink.to}>{backLink.label}</Link>
