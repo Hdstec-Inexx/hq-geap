@@ -53,6 +53,20 @@ test.describe.serial('Favoritar e desfavoritar no detalhe e no Monitoramento ao 
     `, [agenteVozId, convDetailId]);
     atendimentoId = atendimento.rows[0]!.id;
 
+    await queryDatabase('delete from avaliacoes where atendimento_id = $1 and autor = \'ia\'', [atendimentoId]);
+    await queryDatabase(`
+      insert into avaliacoes (
+        atendimento_id, autor, prompt_id, nota,
+        saudacao_e_intencao, solicitou_cpf, informou_protocolo_email,
+        resolveu_solicitacao, validou_email_por_extenso, sem_diminutivos,
+        encerramento_geap, uso_correto_ferramentas, atendimento_aprovado,
+        nota_qualidade
+      )
+      select $1, 'ia', p.id, 10,
+        true, true, true, true, true, true, true, true, true, 10
+      from (select id from prompts_ia_avaliadora where ativo limit 1) p
+    `, [atendimentoId]);
+
     const liveAtendimento = await queryDatabase<{ id: string }>(`
       insert into atendimentos (
         agente_voz_id, elevenlabs_conversation_id, status, iniciado_em,
@@ -255,5 +269,42 @@ test.describe.serial('Favoritar e desfavoritar no detalhe e no Monitoramento ao 
       )).toContain('Curador');
       await expect(page.getByTestId('favorito-list-button')).toHaveCount(0);
     }
+  });
+
+  test('Curador pode favoritar e desfavoritar enquanto avalia o atendimento na revisão de curadoria', async ({
+    page,
+    request
+  }) => {
+    const curador = await loginApi(request, 'curador');
+    await queryDatabase(
+      'delete from favoritos where atendimento_id = $1 and perfil_id = $2',
+      [atendimentoId, curador.user.id]
+    );
+
+    await loginPage(page, 'curador');
+    await page.goto(`/curadoria/${atendimentoId}`);
+    await expect(page.getByRole('heading', { name: 'Revisar Atendimento' })).toBeVisible();
+
+    const button = page.getByTestId('favorito-button');
+    await expect(button).toBeVisible();
+    await expect(button).toHaveAttribute('aria-pressed', 'false');
+
+    await button.click();
+    await expect(button).toHaveAttribute('aria-pressed', 'true');
+
+    const dbCheck1 = await queryDatabase(
+      'select count(*)::text from favoritos where atendimento_id = $1 and perfil_id = $2',
+      [atendimentoId, curador.user.id]
+    );
+    expect(dbCheck1.rows[0]?.count).toBe('1');
+
+    await button.click();
+    await expect(button).toHaveAttribute('aria-pressed', 'false');
+
+    const dbCheck2 = await queryDatabase(
+      'select count(*)::text from favoritos where atendimento_id = $1 and perfil_id = $2',
+      [atendimentoId, curador.user.id]
+    );
+    expect(dbCheck2.rows[0]?.count).toBe('0');
   });
 });

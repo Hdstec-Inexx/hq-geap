@@ -1,3 +1,4 @@
+import type { FavoritosInfo } from '@hq-geap/contracts/atendimentos';
 import {
   curadoriasRealizadasQuerySchema,
   filaCuradoriaQuerySchema,
@@ -86,7 +87,20 @@ const routes: FastifyPluginAsync = async (app) => {
           'Failed to resolve Atendimento audio URL'
         );
       }
-      return toCuradoriaDetail(row, audioUrl);
+      let favoritadoPeloUsuario: boolean | undefined;
+      let favoritos: FavoritosInfo | undefined;
+
+      const user = request.authUser;
+      if (user?.role === 'curador') {
+        favoritadoPeloUsuario = await repository.isFavoritadoByPerfil(row.id, user.id);
+      } else if (user?.role === 'gestao' || user?.role === 'admin') {
+        favoritos = await repository.findFavoritos(row.id);
+      }
+
+      return toCuradoriaDetail(row, audioUrl, {
+        favoritadoPeloUsuario,
+        favoritos
+      });
     }
   );
 
