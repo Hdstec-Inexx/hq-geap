@@ -2,14 +2,13 @@ import fp from 'fastify-plugin';
 import { z } from 'zod';
 import { loadEnvironment } from '../environment.js';
 
+const emptyToUndefined = (value: unknown) =>
+  typeof value === 'string' && value.trim() === '' ? undefined : value;
+
 const configSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-    HOST: z.preprocess(
-      (value) =>
-        typeof value === 'string' && value.trim() === '' ? undefined : value,
-      z.string().optional()
-    ),
+    HOST: z.preprocess(emptyToUndefined, z.string().optional()),
     PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
     DATABASE_URL: z
       .string()
@@ -25,44 +24,30 @@ const configSchema = z
     STORAGE_PROVIDER: z.enum(['public', 'minio', 'gcs']).default('public'),
     STORAGE_BUCKET: z.string().trim().min(1).default('hq-geap'),
     STORAGE_PUBLIC_URL: z.url().default('http://127.0.0.1:9000/hq-geap'),
-    STORAGE_ENDPOINT: z.preprocess(
-      (value) =>
-        typeof value === 'string' && value.trim() === '' ? undefined : value,
-      z.url().optional()
-    ),
+    STORAGE_ENDPOINT: z.preprocess(emptyToUndefined, z.url().optional()),
     STORAGE_ACCESS_KEY: z.preprocess(
-      (value) =>
-        typeof value === 'string' && value.trim() === '' ? undefined : value,
+      emptyToUndefined,
       z.string().trim().min(1).optional()
     ),
     STORAGE_SECRET_KEY: z.preprocess(
-      (value) =>
-        typeof value === 'string' && value.trim() === '' ? undefined : value,
+      emptyToUndefined,
       z.string().trim().min(1).optional()
     ),
-    R2_ENDPOINT: z.preprocess(
-      (value) =>
-        typeof value === 'string' && value.trim() === '' ? undefined : value,
-      z.url().optional()
-    ),
+    R2_ENDPOINT: z.preprocess(emptyToUndefined, z.url().optional()),
     R2_BUCKET: z.preprocess(
-      (value) =>
-        typeof value === 'string' && value.trim() === '' ? undefined : value,
+      emptyToUndefined,
       z.string().trim().min(1).optional()
     ),
     R2_ACCESS_KEY: z.preprocess(
-      (value) =>
-        typeof value === 'string' && value.trim() === '' ? undefined : value,
+      emptyToUndefined,
       z.string().trim().min(1).optional()
     ),
     R2_SECRET_KEY: z.preprocess(
-      (value) =>
-        typeof value === 'string' && value.trim() === '' ? undefined : value,
+      emptyToUndefined,
       z.string().trim().min(1).optional()
     ),
     ELEVENLABS_API_KEY: z.preprocess(
-      (value) =>
-        typeof value === 'string' && value.trim() === '' ? undefined : value,
+      emptyToUndefined,
       z.string().trim().min(1).optional()
     ),
     ELEVENLABS_API_URL: z.url().default('https://api.elevenlabs.io'),
