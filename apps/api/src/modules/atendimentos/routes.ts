@@ -47,7 +47,10 @@ const routes: FastifyPluginAsync = async (app) => {
         reply.code(result.created ? 201 : 200);
         let audioUrl: string | null = null;
         try {
-          audioUrl = await app.storage.resolveAudioUrl(result.row.audioReference);
+          audioUrl = await app.storage.resolveAudioUrl(
+            result.row.audioReference,
+            result.row.concluidoEm ?? result.row.iniciadoEm
+          );
         } catch {
           request.log.warn(
             { conversationId: result.row.conversationId },
@@ -141,7 +144,10 @@ const routes: FastifyPluginAsync = async (app) => {
       }
       let audioUrl: string | null = null;
       try {
-        audioUrl = await app.storage.resolveAudioUrl(row.audioReference);
+        audioUrl = await app.storage.resolveAudioUrl(
+          row.audioReference,
+          row.concluidoEm ?? row.iniciadoEm
+        );
       } catch {
         request.log.warn(
           { atendimentoId: row.id },
@@ -215,7 +221,10 @@ const routes: FastifyPluginAsync = async (app) => {
       }
       let audioUrl: string | null = null;
       try {
-        audioUrl = await app.storage.resolveAudioUrl(row.audioReference);
+        audioUrl = await app.storage.resolveAudioUrl(
+          row.audioReference,
+          row.concluidoEm ?? row.iniciadoEm
+        );
       } catch {
         request.log.warn(
           { atendimentoId: row.id },
