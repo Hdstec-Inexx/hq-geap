@@ -80,7 +80,10 @@ const routes: FastifyPluginAsync = async (app) => {
       if (!row) throw app.httpErrors.notFound('Atendimento avaliado pela IA nao encontrado');
       let audioUrl: string | null = null;
       try {
-        audioUrl = await app.storage.resolveAudioUrl(row.audioReference);
+        audioUrl = await app.storage.resolveAudioUrl(
+          row.audioReference,
+          row.concluidoEm ?? row.iniciadoEm
+        );
       } catch {
         request.log.warn(
           { atendimentoId: row.id },
