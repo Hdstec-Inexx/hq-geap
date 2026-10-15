@@ -40,6 +40,26 @@ const configSchema = z
         typeof value === 'string' && value.trim() === '' ? undefined : value,
       z.string().trim().min(1).optional()
     ),
+    R2_ENDPOINT: z.preprocess(
+      (value) =>
+        typeof value === 'string' && value.trim() === '' ? undefined : value,
+      z.url().optional()
+    ),
+    R2_BUCKET: z.preprocess(
+      (value) =>
+        typeof value === 'string' && value.trim() === '' ? undefined : value,
+      z.string().trim().min(1).optional()
+    ),
+    R2_ACCESS_KEY: z.preprocess(
+      (value) =>
+        typeof value === 'string' && value.trim() === '' ? undefined : value,
+      z.string().trim().min(1).optional()
+    ),
+    R2_SECRET_KEY: z.preprocess(
+      (value) =>
+        typeof value === 'string' && value.trim() === '' ? undefined : value,
+      z.string().trim().min(1).optional()
+    ),
     ELEVENLABS_API_KEY: z.preprocess(
       (value) =>
         typeof value === 'string' && value.trim() === '' ? undefined : value,
@@ -122,6 +142,32 @@ const configSchema = z
         code: 'custom',
         path: ['STORAGE_ENDPOINT'],
         message: 'MinIO must use HTTPS in production'
+      });
+    }
+    const r2Fields = [
+      ['R2_ENDPOINT', config.R2_ENDPOINT],
+      ['R2_BUCKET', config.R2_BUCKET],
+      ['R2_ACCESS_KEY', config.R2_ACCESS_KEY],
+      ['R2_SECRET_KEY', config.R2_SECRET_KEY]
+    ] as const;
+    const hasAnyR2 = r2Fields.some(([, val]) => Boolean(val));
+    const hasAllR2 = r2Fields.every(([, val]) => Boolean(val));
+    if (hasAnyR2 && !hasAllR2) {
+      for (const [key, val] of r2Fields) {
+        if (!val) {
+          context.addIssue({
+            code: 'custom',
+            path: [key],
+            message: `${key} is required when Cloudflare R2 is configured`
+          });
+        }
+      }
+    }
+    if (config.R2_ENDPOINT && new URL(config.R2_ENDPOINT).protocol !== 'https:') {
+      context.addIssue({
+        code: 'custom',
+        path: ['R2_ENDPOINT'],
+        message: 'R2_ENDPOINT must use HTTPS'
       });
     }
   })

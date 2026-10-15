@@ -92,3 +92,4 @@ O entrypoint **valida a config antes** de migrate/seed. Se faltar variável (ou 
 4. `STORAGE_PROVIDER`: `minio` ou `gcs` — nunca `public` em produção
 5. Com MinIO: `STORAGE_ENDPOINT` em **HTTPS** + access/secret keys + `STORAGE_PUBLIC_URL`
 6. `DATABASE_URL` deve apontar para o PostgreSQL externo (hostname na rede do Easypanel / host do DB), não `127.0.0.1` nem um serviço `db` deste Compose
+7. Com Cloudflare R2 (opcional): se qualquer variável `R2_*` for informada, todas as 4 (`R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY`, `R2_SECRET_KEY`) tornam-se obrigatórias e `R2_ENDPOINT` deve usar **HTTPS**
