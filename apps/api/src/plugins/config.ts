@@ -2,14 +2,13 @@ import fp from 'fastify-plugin';
 import { z } from 'zod';
 import { loadEnvironment } from '../environment.js';
 
+const emptyToUndefined = (value: unknown) =>
+  typeof value === 'string' && value.trim() === '' ? undefined : value;
+
 const configSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-    HOST: z.preprocess(
-      (value) =>
-        typeof value === 'string' && value.trim() === '' ? undefined : value,
-      z.string().optional()
-    ),
+    HOST: z.preprocess(emptyToUndefined, z.string().optional()),
     PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
     DATABASE_URL: z
       .string()
@@ -25,24 +24,30 @@ const configSchema = z
     STORAGE_PROVIDER: z.enum(['public', 'minio', 'gcs']).default('public'),
     STORAGE_BUCKET: z.string().trim().min(1).default('hq-geap'),
     STORAGE_PUBLIC_URL: z.url().default('http://127.0.0.1:9000/hq-geap'),
-    STORAGE_ENDPOINT: z.preprocess(
-      (value) =>
-        typeof value === 'string' && value.trim() === '' ? undefined : value,
-      z.url().optional()
-    ),
+    STORAGE_ENDPOINT: z.preprocess(emptyToUndefined, z.url().optional()),
     STORAGE_ACCESS_KEY: z.preprocess(
-      (value) =>
-        typeof value === 'string' && value.trim() === '' ? undefined : value,
+      emptyToUndefined,
       z.string().trim().min(1).optional()
     ),
     STORAGE_SECRET_KEY: z.preprocess(
-      (value) =>
-        typeof value === 'string' && value.trim() === '' ? undefined : value,
+      emptyToUndefined,
+      z.string().trim().min(1).optional()
+    ),
+    R2_ENDPOINT: z.preprocess(emptyToUndefined, z.url().optional()),
+    R2_BUCKET: z.preprocess(
+      emptyToUndefined,
+      z.string().trim().min(1).optional()
+    ),
+    R2_ACCESS_KEY: z.preprocess(
+      emptyToUndefined,
+      z.string().trim().min(1).optional()
+    ),
+    R2_SECRET_KEY: z.preprocess(
+      emptyToUndefined,
       z.string().trim().min(1).optional()
     ),
     ELEVENLABS_API_KEY: z.preprocess(
-      (value) =>
-        typeof value === 'string' && value.trim() === '' ? undefined : value,
+      emptyToUndefined,
       z.string().trim().min(1).optional()
     ),
     ELEVENLABS_API_URL: z.url().default('https://api.elevenlabs.io'),
@@ -123,6 +128,38 @@ const configSchema = z
         path: ['STORAGE_ENDPOINT'],
         message: 'MinIO must use HTTPS in production'
       });
+    }
+    const r2Fields = [
+      ['R2_ENDPOINT', config.R2_ENDPOINT],
+      ['R2_BUCKET', config.R2_BUCKET],
+      ['R2_ACCESS_KEY', config.R2_ACCESS_KEY],
+      ['R2_SECRET_KEY', config.R2_SECRET_KEY]
+    ] as const;
+    const hasAnyR2 = r2Fields.some(([, val]) => Boolean(val));
+    const hasAllR2 = r2Fields.every(([, val]) => Boolean(val));
+    if (hasAnyR2 && !hasAllR2) {
+      for (const [key, val] of r2Fields) {
+        if (!val) {
+          context.addIssue({
+            code: 'custom',
+            path: [key],
+            message: `${key} is required when Cloudflare R2 is configured`
+          });
+        }
+      }
+    }
+    if (config.R2_ENDPOINT) {
+      try {
+        if (new URL(config.R2_ENDPOINT).protocol !== 'https:') {
+          context.addIssue({
+            code: 'custom',
+            path: ['R2_ENDPOINT'],
+            message: 'R2_ENDPOINT must use HTTPS'
+          });
+        }
+      } catch {
+        // Ignorado aqui para permitir que a validação z.url() reporte o erro de URL inválida
+      }
     }
   })
   .transform((config) => ({

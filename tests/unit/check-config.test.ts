@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { checkAppConfig } from '../../apps/api/src/check-config.js';
+import { parseAppConfig } from '../../apps/api/src/plugins/config.js';
 
 const validProductionEnv = {
   NODE_ENV: 'production',
@@ -45,4 +46,123 @@ test('checkAppConfig rejeita JWT_SECRET curto antes do migrate', () => {
   if (!result.ok) {
     assert.match(result.message, /JWT_SECRET/);
   }
+});
+
+test('checkAppConfig e parseAppConfig aceitam configuracao completa do Cloudflare R2 com HTTPS', () => {
+  const envWithR2 = {
+    ...validProductionEnv,
+    R2_ENDPOINT: 'https://test-account.r2.cloudflarestorage.com',
+    R2_BUCKET: 'hq-geap-cold',
+    R2_ACCESS_KEY: 'r2-access-key-123',
+    R2_SECRET_KEY: 'r2-secret-key-456'
+  };
+  const result = checkAppConfig(envWithR2);
+  assert.equal(result.ok, true);
+
+  const parsed = parseAppConfig(envWithR2);
+  assert.equal(parsed.R2_ENDPOINT, 'https://test-account.r2.cloudflarestorage.com');
+  assert.equal(parsed.R2_BUCKET, 'hq-geap-cold');
+  assert.equal(parsed.R2_ACCESS_KEY, 'r2-access-key-123');
+  assert.equal(parsed.R2_SECRET_KEY, 'r2-secret-key-456');
+});
+
+test('checkAppConfig rejeita configuracao parcial de Cloudflare R2 quando faltam campos obrigatorios', () => {
+  const partialR2Configs = [
+    { R2_ENDPOINT: 'https://test.r2.cloudflarestorage.com' },
+    { R2_BUCKET: 'hq-geap-cold' },
+    { R2_ACCESS_KEY: 'access-key' },
+    { R2_SECRET_KEY: 'secret-key' },
+    {
+      R2_ENDPOINT: 'https://test.r2.cloudflarestorage.com',
+      R2_BUCKET: 'hq-geap-cold'
+    }
+  ];
+
+  for (const partial of partialR2Configs) {
+    const result = checkAppConfig({
+      ...validProductionEnv,
+      ...partial
+    });
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.match(result.message, /R2_/);
+    }
+  }
+});
+
+test('checkAppConfig rejeita R2_ENDPOINT com protocolo inseguro HTTP', () => {
+  const result = checkAppConfig({
+    ...validProductionEnv,
+    R2_ENDPOINT: 'http://test-account.r2.cloudflarestorage.com',
+    R2_BUCKET: 'hq-geap-cold',
+    R2_ACCESS_KEY: 'r2-access-key-123',
+    R2_SECRET_KEY: 'r2-secret-key-456'
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.message, /R2_ENDPOINT/);
+    assert.match(result.message, /HTTPS/i);
+  }
+});
+
+test('checkAppConfig rejeita R2_ENDPOINT com formato de URL invalido sem lancar excecao nao tratada', () => {
+  const invalidUrlEnv = {
+    ...validProductionEnv,
+    R2_ENDPOINT: 'not-a-valid-url',
+    R2_BUCKET: 'hq-geap-cold',
+    R2_ACCESS_KEY: 'r2-access-key-123',
+    R2_SECRET_KEY: 'r2-secret-key-456'
+  };
+
+  const result = checkAppConfig(invalidUrlEnv);
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.message, /Invalid API config/);
+    assert.match(result.message, /R2_ENDPOINT/);
+  }
+
+  assert.throws(
+    () => parseAppConfig(invalidUrlEnv),
+    (error: unknown) => {
+      // Must throw a ZodError (with name === 'ZodError' and issues array), not TypeError: Invalid URL
+      return (
+        typeof error === 'object' &&
+        error !== null &&
+        'name' in error &&
+        error.name === 'ZodError' &&
+        'issues' in error &&
+        Array.isArray((error as { issues: Array<{ path: unknown[] }> }).issues) &&
+        (error as { issues: Array<{ path: unknown[] }> }).issues.some((i) =>
+          i.path.includes('R2_ENDPOINT')
+        )
+      );
+    }
+  );
+});
+
+test('checkAppConfig e parseAppConfig operam normalmente em storage unico quando R2 esta ausente ou vazio', () => {
+  const withoutR2Result = checkAppConfig(validProductionEnv);
+  assert.equal(withoutR2Result.ok, true);
+
+  const parsedWithoutR2 = parseAppConfig(validProductionEnv);
+  assert.equal(parsedWithoutR2.R2_ENDPOINT, undefined);
+  assert.equal(parsedWithoutR2.R2_BUCKET, undefined);
+  assert.equal(parsedWithoutR2.R2_ACCESS_KEY, undefined);
+  assert.equal(parsedWithoutR2.R2_SECRET_KEY, undefined);
+
+  const envWithEmptyStrings = {
+    ...validProductionEnv,
+    R2_ENDPOINT: '',
+    R2_BUCKET: '   ',
+    R2_ACCESS_KEY: '',
+    R2_SECRET_KEY: ''
+  };
+  const emptyStringsResult = checkAppConfig(envWithEmptyStrings);
+  assert.equal(emptyStringsResult.ok, true);
+
+  const parsedEmptyStrings = parseAppConfig(envWithEmptyStrings);
+  assert.equal(parsedEmptyStrings.R2_ENDPOINT, undefined);
+  assert.equal(parsedEmptyStrings.R2_BUCKET, undefined);
+  assert.equal(parsedEmptyStrings.R2_ACCESS_KEY, undefined);
+  assert.equal(parsedEmptyStrings.R2_SECRET_KEY, undefined);
 });
