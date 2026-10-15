@@ -216,11 +216,11 @@ function buildTestApp(options: {
 
 test('GET /atendimentos/:id resolve audio recente (< 30 dias) via storage primario S3', async () => {
   const primaryMock = createMockClient({
-    existingFiles: ['atendimentos/recente.mp3'],
+    existingFiles: ['conv-recente.mp3'],
     urlPrefix: 'https://s3.primary.example.com/hq-geap-primary'
   });
   const r2Mock = createMockClient({
-    existingFiles: ['atendimentos/recente.mp3'],
+    existingFiles: ['conv-recente.mp3'],
     urlPrefix: 'https://r2.example.com/hq-geap-cold'
   });
 
@@ -229,7 +229,7 @@ test('GET /atendimentos/:id resolve audio recente (< 30 dias) via storage primar
       {
         id: '11111111-1111-4111-8111-000000000001',
         conversationId: 'conv-recente',
-        audioReference: 'atendimentos/recente.mp3',
+        audioReference: 'conv-recente.mp3',
         concluidoEm: RECENT_DATE,
         iniciadoEm: RECENT_DATE
       }
@@ -246,7 +246,7 @@ test('GET /atendimentos/:id resolve audio recente (< 30 dias) via storage primar
   assert.equal(response.statusCode, 200);
   const body = response.json();
   assert.ok(
-    body.audioUrl?.startsWith('https://s3.primary.example.com/hq-geap-primary/atendimentos/recente.mp3'),
+    body.audioUrl?.startsWith('https://s3.primary.example.com/hq-geap-primary/conv-recente.mp3'),
     `Esperava URL do S3 primario, recebeu: ${body.audioUrl}`
   );
   assert.equal(primaryMock.statCalls.length, 1);
@@ -255,11 +255,11 @@ test('GET /atendimentos/:id resolve audio recente (< 30 dias) via storage primar
 
 test('GET /atendimentos/:id resolve audio historico (>= 30 dias) via storage R2', async () => {
   const primaryMock = createMockClient({
-    existingFiles: ['atendimentos/historico.mp3'],
+    existingFiles: ['conv-historico.mp3'],
     urlPrefix: 'https://s3.primary.example.com/hq-geap-primary'
   });
   const r2Mock = createMockClient({
-    existingFiles: ['atendimentos/historico.mp3'],
+    existingFiles: ['conv-historico.mp3'],
     urlPrefix: 'https://r2.example.com/hq-geap-cold'
   });
 
@@ -268,7 +268,7 @@ test('GET /atendimentos/:id resolve audio historico (>= 30 dias) via storage R2'
       {
         id: '11111111-1111-4111-8111-000000000002',
         conversationId: 'conv-historico',
-        audioReference: 'atendimentos/historico.mp3',
+        audioReference: 'conv-historico.mp3',
         concluidoEm: HISTORICAL_DATE,
         iniciadoEm: HISTORICAL_DATE
       }
@@ -285,7 +285,7 @@ test('GET /atendimentos/:id resolve audio historico (>= 30 dias) via storage R2'
   assert.equal(response.statusCode, 200);
   const body = response.json();
   assert.ok(
-    body.audioUrl?.startsWith('https://r2.example.com/hq-geap-cold/atendimentos/historico.mp3'),
+    body.audioUrl?.startsWith('https://r2.example.com/hq-geap-cold/conv-historico.mp3'),
     `Esperava URL do R2, recebeu: ${body.audioUrl}`
   );
   assert.equal(r2Mock.statCalls.length, 1);
@@ -294,11 +294,11 @@ test('GET /atendimentos/:id resolve audio historico (>= 30 dias) via storage R2'
 
 test('GET /atendimentos/:id usa iniciadoEm quando concluidoEm e nulo para determinar tiering', async () => {
   const primaryMock = createMockClient({
-    existingFiles: ['atendimentos/sem-concluido.mp3'],
+    existingFiles: ['conv-sem-concluido.mp3'],
     urlPrefix: 'https://s3.primary.example.com/hq-geap-primary'
   });
   const r2Mock = createMockClient({
-    existingFiles: ['atendimentos/sem-concluido.mp3'],
+    existingFiles: ['conv-sem-concluido.mp3'],
     urlPrefix: 'https://r2.example.com/hq-geap-cold'
   });
 
@@ -307,7 +307,7 @@ test('GET /atendimentos/:id usa iniciadoEm quando concluidoEm e nulo para determ
       {
         id: '11111111-1111-4111-8111-000000000003',
         conversationId: 'conv-sem-concluido',
-        audioReference: 'atendimentos/sem-concluido.mp3',
+        audioReference: 'conv-sem-concluido.mp3',
         concluidoEm: null,
         iniciadoEm: HISTORICAL_DATE
       }
@@ -324,7 +324,7 @@ test('GET /atendimentos/:id usa iniciadoEm quando concluidoEm e nulo para determ
   assert.equal(response.statusCode, 200);
   const body = response.json();
   assert.ok(
-    body.audioUrl?.startsWith('https://r2.example.com/hq-geap-cold/atendimentos/sem-concluido.mp3'),
+    body.audioUrl?.startsWith('https://r2.example.com/hq-geap-cold/conv-sem-concluido.mp3'),
     `Esperava URL do R2 com base em iniciadoEm historico, recebeu: ${body.audioUrl}`
   );
   assert.equal(r2Mock.statCalls.length, 1);
@@ -344,7 +344,7 @@ test('GET /atendimentos/:id trata falha no storage graciosamente (audioUrl null,
       {
         id: '11111111-1111-4111-8111-000000000004',
         conversationId: 'conv-falha',
-        audioReference: 'atendimentos/falha.mp3',
+        audioReference: 'conv-falha.mp3',
         concluidoEm: RECENT_DATE,
         iniciadoEm: RECENT_DATE
       }
@@ -366,11 +366,11 @@ test('GET /atendimentos/:id trata falha no storage graciosamente (audioUrl null,
 
 test('GET /atendimentos/by-conversation/:conversationId resolve audio recente e historico', async () => {
   const primaryMock = createMockClient({
-    existingFiles: ['atendimentos/conv-rec.mp3', 'atendimentos/conv-hist.mp3'],
+    existingFiles: ['conv-rec.mp3', 'conv-hist.mp3'],
     urlPrefix: 'https://s3.primary.example.com/hq-geap-primary'
   });
   const r2Mock = createMockClient({
-    existingFiles: ['atendimentos/conv-rec.mp3', 'atendimentos/conv-hist.mp3'],
+    existingFiles: ['conv-rec.mp3', 'conv-hist.mp3'],
     urlPrefix: 'https://r2.example.com/hq-geap-cold'
   });
 
@@ -379,14 +379,14 @@ test('GET /atendimentos/by-conversation/:conversationId resolve audio recente e 
       {
         id: '22222222-2222-4222-8222-000000000001',
         conversationId: 'conv-rec-01',
-        audioReference: 'atendimentos/conv-rec.mp3',
+        audioReference: 'conv-rec.mp3',
         concluidoEm: RECENT_DATE,
         iniciadoEm: RECENT_DATE
       },
       {
         id: '22222222-2222-4222-8222-000000000002',
         conversationId: 'conv-hist-02',
-        audioReference: 'atendimentos/conv-hist.mp3',
+        audioReference: 'conv-hist.mp3',
         concluidoEm: HISTORICAL_DATE,
         iniciadoEm: HISTORICAL_DATE
       }
@@ -401,7 +401,7 @@ test('GET /atendimentos/by-conversation/:conversationId resolve audio recente e 
     url: '/atendimentos/by-conversation/conv-rec-01'
   });
   assert.equal(recentResponse.statusCode, 200);
-  assert.ok(recentResponse.json().audioUrl?.startsWith('https://s3.primary.example.com/hq-geap-primary'));
+  assert.ok(recentResponse.json().audioUrl?.startsWith('https://s3.primary.example.com/hq-geap-primary/conv-rec.mp3'));
   assert.equal(primaryMock.statCalls.length, 1);
   assert.equal(r2Mock.statCalls.length, 0);
 
@@ -411,18 +411,18 @@ test('GET /atendimentos/by-conversation/:conversationId resolve audio recente e 
     url: '/atendimentos/by-conversation/conv-hist-02'
   });
   assert.equal(historicalResponse.statusCode, 200);
-  assert.ok(historicalResponse.json().audioUrl?.startsWith('https://r2.example.com/hq-geap-cold'));
+  assert.ok(historicalResponse.json().audioUrl?.startsWith('https://r2.example.com/hq-geap-cold/conv-hist.mp3'));
   assert.equal(r2Mock.statCalls.length, 1);
   assert.equal(primaryMock.statCalls.length, 1); // 1 call from previous recent request, none from historical
 });
 
 test('GET /curadoria/:atendimentoId resolve audio recente e historico', async () => {
   const primaryMock = createMockClient({
-    existingFiles: ['atendimentos/curadoria-rec.mp3', 'atendimentos/curadoria-hist.mp3'],
+    existingFiles: ['conv-cur-rec.mp3', 'conv-cur-hist.mp3'],
     urlPrefix: 'https://s3.primary.example.com/hq-geap-primary'
   });
   const r2Mock = createMockClient({
-    existingFiles: ['atendimentos/curadoria-rec.mp3', 'atendimentos/curadoria-hist.mp3'],
+    existingFiles: ['conv-cur-rec.mp3', 'conv-cur-hist.mp3'],
     urlPrefix: 'https://r2.example.com/hq-geap-cold'
   });
 
@@ -431,14 +431,14 @@ test('GET /curadoria/:atendimentoId resolve audio recente e historico', async ()
       {
         id: '33333333-3333-4333-8333-000000000001',
         conversationId: 'conv-cur-rec',
-        audioReference: 'atendimentos/curadoria-rec.mp3',
+        audioReference: 'conv-cur-rec.mp3',
         concluidoEm: RECENT_DATE,
         iniciadoEm: RECENT_DATE
       },
       {
         id: '33333333-3333-4333-8333-000000000002',
         conversationId: 'conv-cur-hist',
-        audioReference: 'atendimentos/curadoria-hist.mp3',
+        audioReference: 'conv-cur-hist.mp3',
         concluidoEm: HISTORICAL_DATE,
         iniciadoEm: HISTORICAL_DATE
       }
@@ -454,7 +454,7 @@ test('GET /curadoria/:atendimentoId resolve audio recente e historico', async ()
   });
   assert.equal(recentResponse.statusCode, 200);
   assert.ok(
-    recentResponse.json().atendimento.audioUrl?.startsWith('https://s3.primary.example.com/hq-geap-primary'),
+    recentResponse.json().atendimento.audioUrl?.startsWith('https://s3.primary.example.com/hq-geap-primary/conv-cur-rec.mp3'),
     `Esperava S3 para curadoria recente, obteve: ${recentResponse.json().atendimento.audioUrl}`
   );
   assert.equal(primaryMock.statCalls.length, 1);
@@ -467,7 +467,7 @@ test('GET /curadoria/:atendimentoId resolve audio recente e historico', async ()
   });
   assert.equal(historicalResponse.statusCode, 200);
   assert.ok(
-    historicalResponse.json().atendimento.audioUrl?.startsWith('https://r2.example.com/hq-geap-cold'),
+    historicalResponse.json().atendimento.audioUrl?.startsWith('https://r2.example.com/hq-geap-cold/conv-cur-hist.mp3'),
     `Esperava R2 para curadoria historica, obteve: ${historicalResponse.json().atendimento.audioUrl}`
   );
   assert.equal(r2Mock.statCalls.length, 1);
@@ -487,7 +487,7 @@ test('GET /curadoria/:atendimentoId trata falha de resolucao de audio sem retorn
       {
         id: '33333333-3333-4333-8333-000000000003',
         conversationId: 'conv-cur-err',
-        audioReference: 'atendimentos/curadoria-err.mp3',
+        audioReference: 'conv-cur-err.mp3',
         concluidoEm: RECENT_DATE,
         iniciadoEm: RECENT_DATE
       }
@@ -507,7 +507,7 @@ test('GET /curadoria/:atendimentoId trata falha de resolucao de audio sem retorn
 
 test('GET /atendimentos/:id realiza fallback cruzado quando audio historico falta no R2 mas existe no S3', async () => {
   const primaryMock = createMockClient({
-    existingFiles: ['atendimentos/fallback-s3.mp3'],
+    existingFiles: ['conv-fallback-s3.mp3'],
     urlPrefix: 'https://s3.primary.example.com/hq-geap-primary'
   });
   const r2Mock = createMockClient({
@@ -520,7 +520,7 @@ test('GET /atendimentos/:id realiza fallback cruzado quando audio historico falt
       {
         id: '11111111-1111-4111-8111-000000000005',
         conversationId: 'conv-fallback-s3',
-        audioReference: 'atendimentos/fallback-s3.mp3',
+        audioReference: 'conv-fallback-s3.mp3',
         concluidoEm: HISTORICAL_DATE,
         iniciadoEm: HISTORICAL_DATE
       }
@@ -537,7 +537,7 @@ test('GET /atendimentos/:id realiza fallback cruzado quando audio historico falt
   assert.equal(response.statusCode, 200);
   const body = response.json();
   assert.ok(
-    body.audioUrl?.startsWith('https://s3.primary.example.com/hq-geap-primary/atendimentos/fallback-s3.mp3'),
+    body.audioUrl?.startsWith('https://s3.primary.example.com/hq-geap-primary/conv-fallback-s3.mp3'),
     `Esperava fallback para S3 primario, recebeu: ${body.audioUrl}`
   );
   assert.equal(r2Mock.statCalls.length, 1, 'Deve ter tentado R2 primeiro');
@@ -550,7 +550,7 @@ test('GET /atendimentos/:id realiza fallback cruzado quando audio recente falta 
     urlPrefix: 'https://s3.primary.example.com/hq-geap-primary'
   });
   const r2Mock = createMockClient({
-    existingFiles: ['atendimentos/fallback-r2.mp3'],
+    existingFiles: ['conv-fallback-r2.mp3'],
     urlPrefix: 'https://r2.example.com/hq-geap-cold'
   });
 
@@ -559,7 +559,7 @@ test('GET /atendimentos/:id realiza fallback cruzado quando audio recente falta 
       {
         id: '11111111-1111-4111-8111-000000000006',
         conversationId: 'conv-fallback-r2',
-        audioReference: 'atendimentos/fallback-r2.mp3',
+        audioReference: 'conv-fallback-r2.mp3',
         concluidoEm: RECENT_DATE,
         iniciadoEm: RECENT_DATE
       }
@@ -576,7 +576,7 @@ test('GET /atendimentos/:id realiza fallback cruzado quando audio recente falta 
   assert.equal(response.statusCode, 200);
   const body = response.json();
   assert.ok(
-    body.audioUrl?.startsWith('https://r2.example.com/hq-geap-cold/atendimentos/fallback-r2.mp3'),
+    body.audioUrl?.startsWith('https://r2.example.com/hq-geap-cold/conv-fallback-r2.mp3'),
     `Esperava fallback para R2, recebeu: ${body.audioUrl}`
   );
   assert.equal(primaryMock.statCalls.length, 1, 'Deve ter tentado S3 primeiro');
@@ -585,11 +585,11 @@ test('GET /atendimentos/:id realiza fallback cruzado quando audio recente falta 
 
 test('GET /atendimentos/:id prioriza concluidoEm sobre iniciadoEm para resolucao de tiering', async () => {
   const primaryMock = createMockClient({
-    existingFiles: ['atendimentos/prioridade.mp3'],
+    existingFiles: ['conv-prioridade.mp3'],
     urlPrefix: 'https://s3.primary.example.com/hq-geap-primary'
   });
   const r2Mock = createMockClient({
-    existingFiles: ['atendimentos/prioridade.mp3'],
+    existingFiles: ['conv-prioridade.mp3'],
     urlPrefix: 'https://r2.example.com/hq-geap-cold'
   });
 
@@ -599,7 +599,7 @@ test('GET /atendimentos/:id prioriza concluidoEm sobre iniciadoEm para resolucao
       {
         id: '11111111-1111-4111-8111-000000000007',
         conversationId: 'conv-prioridade',
-        audioReference: 'atendimentos/prioridade.mp3',
+        audioReference: 'conv-prioridade.mp3',
         concluidoEm: RECENT_DATE,
         iniciadoEm: HISTORICAL_DATE
       }
@@ -616,7 +616,7 @@ test('GET /atendimentos/:id prioriza concluidoEm sobre iniciadoEm para resolucao
   assert.equal(response.statusCode, 200);
   const body = response.json();
   assert.ok(
-    body.audioUrl?.startsWith('https://s3.primary.example.com/hq-geap-primary/atendimentos/prioridade.mp3'),
+    body.audioUrl?.startsWith('https://s3.primary.example.com/hq-geap-primary/conv-prioridade.mp3'),
     `Esperava S3 baseado em concluidoEm recente, recebeu: ${body.audioUrl}`
   );
   assert.equal(primaryMock.statCalls.length, 1);
