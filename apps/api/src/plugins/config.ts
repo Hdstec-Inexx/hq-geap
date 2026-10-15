@@ -163,12 +163,18 @@ const configSchema = z
         }
       }
     }
-    if (config.R2_ENDPOINT && new URL(config.R2_ENDPOINT).protocol !== 'https:') {
-      context.addIssue({
-        code: 'custom',
-        path: ['R2_ENDPOINT'],
-        message: 'R2_ENDPOINT must use HTTPS'
-      });
+    if (config.R2_ENDPOINT) {
+      try {
+        if (new URL(config.R2_ENDPOINT).protocol !== 'https:') {
+          context.addIssue({
+            code: 'custom',
+            path: ['R2_ENDPOINT'],
+            message: 'R2_ENDPOINT must use HTTPS'
+          });
+        }
+      } catch {
+        // Ignorado aqui para permitir que a validação z.url() reporte o erro de URL inválida
+      }
     }
   })
   .transform((config) => ({

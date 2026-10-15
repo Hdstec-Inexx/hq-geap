@@ -105,6 +105,41 @@ test('checkAppConfig rejeita R2_ENDPOINT com protocolo inseguro HTTP', () => {
   }
 });
 
+test('checkAppConfig rejeita R2_ENDPOINT com formato de URL invalido sem lancar excecao nao tratada', () => {
+  const invalidUrlEnv = {
+    ...validProductionEnv,
+    R2_ENDPOINT: 'not-a-valid-url',
+    R2_BUCKET: 'hq-geap-cold',
+    R2_ACCESS_KEY: 'r2-access-key-123',
+    R2_SECRET_KEY: 'r2-secret-key-456'
+  };
+
+  const result = checkAppConfig(invalidUrlEnv);
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.match(result.message, /Invalid API config/);
+    assert.match(result.message, /R2_ENDPOINT/);
+  }
+
+  assert.throws(
+    () => parseAppConfig(invalidUrlEnv),
+    (error: unknown) => {
+      // Must throw a ZodError (with name === 'ZodError' and issues array), not TypeError: Invalid URL
+      return (
+        typeof error === 'object' &&
+        error !== null &&
+        'name' in error &&
+        error.name === 'ZodError' &&
+        'issues' in error &&
+        Array.isArray((error as { issues: Array<{ path: unknown[] }> }).issues) &&
+        (error as { issues: Array<{ path: unknown[] }> }).issues.some((i) =>
+          i.path.includes('R2_ENDPOINT')
+        )
+      );
+    }
+  );
+});
+
 test('checkAppConfig e parseAppConfig operam normalmente em storage unico quando R2 esta ausente ou vazio', () => {
   const withoutR2Result = checkAppConfig(validProductionEnv);
   assert.equal(withoutR2Result.ok, true);
