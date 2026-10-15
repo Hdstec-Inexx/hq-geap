@@ -62,23 +62,38 @@ export function isNotFoundError(err: unknown): boolean {
     name?: unknown;
     message?: unknown;
   };
+
+  const statusCode =
+    typeof candidate.statusCode === 'number'
+      ? candidate.statusCode
+      : typeof candidate.status === 'number'
+        ? candidate.status
+        : undefined;
+
+  if (statusCode !== undefined && statusCode >= 500) {
+    return false;
+  }
+
   const code =
     typeof candidate.code === 'string' ? candidate.code.toLowerCase() : '';
   const name =
     typeof candidate.name === 'string' ? candidate.name.toLowerCase() : '';
-  const message =
-    typeof candidate.message === 'string' ? candidate.message.toLowerCase() : '';
+
+  if (
+    code === 'enotfound' ||
+    code === 'econnrefused' ||
+    code === 'etimedout' ||
+    code === 'econnreset'
+  ) {
+    return false;
+  }
 
   return (
+    statusCode === 404 ||
     code === 'notfound' ||
     code === 'nosuchkey' ||
     name === 'notfound' ||
-    name === 'nosuchkey' ||
-    candidate.statusCode === 404 ||
-    candidate.status === 404 ||
-    message.includes('not found') ||
-    message.includes('no such key') ||
-    message.includes('does not exist')
+    name === 'nosuchkey'
   );
 }
 

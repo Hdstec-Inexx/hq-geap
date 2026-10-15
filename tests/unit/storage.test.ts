@@ -387,9 +387,21 @@ test('isNotFoundError reconhece erros 404, NotFound e NoSuchKey de S3 e R2', () 
   (internalError as any).code = 'InternalError';
   assert.equal(isNotFoundError(internalError), false);
 
+  const badGateway = new Error('Endpoint not found');
+  (badGateway as any).statusCode = 502;
+  assert.equal(isNotFoundError(badGateway), false);
+
+  const dnsError = new Error('getaddrinfo ENOTFOUND account.r2.cloudflarestorage.com');
+  (dnsError as any).code = 'ENOTFOUND';
+  assert.equal(isNotFoundError(dnsError), false);
+
   const netError = new Error('connect ECONNREFUSED');
   (netError as any).code = 'ECONNREFUSED';
   assert.equal(isNotFoundError(netError), false);
+
+  const timeoutError = new Error('Connection timeout');
+  (timeoutError as any).code = 'ETIMEDOUT';
+  assert.equal(isNotFoundError(timeoutError), false);
 });
 
 test('instanciacao real do cliente Cloudflare R2 com MinioClient a partir de configuracoes validadas', async () => {
